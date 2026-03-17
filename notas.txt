@@ -1,0 +1,141 @@
+#Para arrancar el ambiente virtual
+tinyllama_env\Scripts\activate 
+
+#Para verificar si la api esta corriendo
+netstat -ano | findstr :8000
+
+# Ejecutar la ap
+tinyllama_env\Scripts\python.exe -m uvicorn api.main:app --reload
+
+# Abre en navegador:
+# - http://localhost:8000       ← Interfaz web del chatbot
+
+# Aca esta la aplicacion
+http://localhost:8000/
+
+# interfaz interactiva
+http://localhost:8000/api/docs
+
+# Prueba Intents
+
+{
+  "message": "hola, tengo una duda sobre el módulo",
+  "user_id": "usuario_prueba"
+}
+
+# Prueba RAG
+
+{
+  "message": "No guarde mi número de folio proporcionado al finalizar su pre-registro",
+  "user_id": "string",
+  "conversation_id": "string"
+}
+
+# Limpiar cache del pip
+pip cache purge
+
+
+#---------CARGA DE EXCEL--------------------
+python scripts/upload_documents.py --file data/documents/tickets_2.xlsx
+
+#---------CARGA DE PDF---------------------
+# 1. Verificar que el sistema RAG funciona
+python scripts/load_chunks_to_rag.py --verify
+
+# 2. Cargar los 144 chunks
+python scripts/load_chunks_to_rag.py --chunks output/chunks/ready_for_rag/all_chunks.jsonl
+
+
+# 3. Modo verbose para ver detalles
+python scripts/load_chunks_to_rag.py --chunks output/chunks/ready_for_rag/all_chunks.jsonl --verbose
+
+# Verificar que los chunks se cargaron
+python scripts/load_chunks_to_rag.py --verify
+
+# Deberías ver que el índice FAISS ahora tiene 575 vectores
+
+
+## -----------Borrado manual de la base de conocimientos -----------------
+
+# 1. Detén cualquier servidor/proceso del chatbot que esté corriendo
+#    Esto libera los archivos para poder borrarlos
+
+# 2. Navega al directorio de tu proyecto
+cd /ruta/a/tu/proyecto
+
+# 3. Borra TODOS los archivos de FAISS y documentos
+rm -rf data/vector_store/*
+
+------------------------------------------------------------
+
+Ahora deberías tener:
+
+🌐 Interfaz Web: http://localhost:8000
+
+📚 API Docs (Swagger): http://localhost:8000/docs
+
+📖 API Redoc: http://localhost:8000/redoc
+
+🩺 Health Check: http://localhost:8000/health
+
+📊 Estadísticas: http://localhost:8000/stats
+
+-------------------------------------------------------------------------
+
+## COMO SE USA EL DEBUGER -----------------------------------------------
+
+# Prueba simple
+python debug_rag_avanzado.py --query "¿Cómo cambio mi correo electrónico?"
+
+# Suite completa
+python debug_rag_avanzado.py --suite
+
+# Con nombre personalizado
+python debug_rag_avanzado.py --suite --name "antes_mejoras"
+
+# Comparar después de mejoras
+python debug_rag_avanzado.py --suite --name "despues_mejoras" --compare "antes_mejoras"
+
+---------GIT-----------------------------------------------------
+
+# 3. Al terminar, verifica cambios
+git status
+
+# 4. Añade archivos modificados
+git add .
+# O archivos específicos: git add archivo.py
+
+# 5. Haz commit con mensaje descriptivo
+git commit -m "Agregada funcionalidad X"
+
+# 6. Sube cambios
+git push origin main
+
+
+
+#------------------BORRAR DATOS DE FAISS--------------------------------
+
+reset_faiss.py en la raíz de tu proyecto. Luego:
+
+Uso básico (con confirmación)
+python reset_faiss.py
+
+Forzar eliminación sin preguntar
+python reset_faiss.py --force
+
+Eliminar y crear índice vacío automáticamente
+python reset_faiss.py --create-empty
+
+Eliminar sin crear backup
+python reset_faiss.py --no-backup
+
+#------------CARGAR LOS CHUNKS---------------------
+
+python scripts/load_chunks_to_rag.py --chunks "..\Documentos RAG\output\chunks\ready_for_rag\all_chunks.jsonl"
+
+
+#------------EJECUTAR EL DEBUG PARA DOCUMENTOS PDF--------------------
+
+python debug_chunks_pdf_simple.py
+
+python debug_chunks_pdf_simple.py --name mi_prueba_marzo

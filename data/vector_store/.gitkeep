@@ -1,0 +1,2 @@
+# Crear archivo vacío para mantener el directorio en git
+touch data/vector_store/.gitkeep

@@ -1,0 +1,99 @@
+📦 ChatBot_5_TinyLlama/
+├── 📁 api/
+│   ├── 📄 endpoints.py
+│   └── 📄 main.py
+├── 📁 config/
+│   ├── 📄 models.py
+│   └── 📄 settings.py
+├── 📁 data/
+│   ├── 📁 vector_store/
+│   │   ├── 📄 documents.pkl
+│   │   ├── 📄 faiss_index.bin
+│   │   ├── 📄 intents.json
+│   │   └── 📄 metadata.pkl
+│   ├── 📄 create_prepa_excel.py
+│   ├── 📄 intents.json
+│   ├── 📄 tickets.xlsx
+│   ├── 📄 tickets_2.xlsx
+│   ├── 📄 tickets_3.xlsx
+│   ├── 📄 tickets_4.xlsx
+│   └── 📄 tickets_config.json
+├── 📁 logs/
+│   └── 📄 tinyllama_wrapper.log
+├── 📁 models/
+│   ├── 📁 cache/
+│   │   ├── 📁 .locks/
+│   │   └── 📁 models--TinyLlama--TinyLlama-1.1B-Chat-v1.0/
+│   ├── 📄 __init__.py
+│   └── 📄 tinyllama_wrapper.py
+├── 📁 rag/
+│   ├── 📄 __init__.py
+│   ├── 📄 core.py
+│   ├── 📄 embeddings.py
+│   ├── 📄 generator.py
+│   └── 📄 retriever.py
+├── 📁 scripts/
+│   ├── 📄 debug_rag_loader.py
+│   ├── 📄 load_chunks_to_rag.py
+│   ├── 📄 setup_local.py
+│   └── 📄 upload_documents.py
+├── 📁 static/
+│   └── 📄 index.html
+├── 📁 tests/
+│   ├── 📄 test_api.py
+│   └── 📄 test_rag.py
+├── 📁 tinyllama_env/
+│   ├── 📁 Include/
+│   ├── 📁 Lib/
+│   │   └── 📁 site-packages/
+│   ├── 📁 Library/
+│   │   ├── 📁 bin/
+│   │   ├── 📁 lib/
+│   │   └── 📁 share/
+│   ├── 📁 Scripts/
+│   │   ├── 📄 Activate.ps1
+│   │   ├── 📄 accelerate-config.exe
+│   │   ├── 📄 accelerate-estimate-memory.exe
+│   │   ├── 📄 accelerate-launch.exe
+│   │   ├── 📄 accelerate-merge-weights.exe
+│   │   ├── 📄 accelerate.exe
+│   │   ├── 📄 activate
+│   │   ├── 📄 activate.bat
+│   │   ├── 📄 convert-caffe2-to-onnx.exe
+│   │   ├── 📄 convert-onnx-to-caffe2.exe
+│   │   ├── 📄 deactivate.bat
+│   │   ├── 📄 dotenv.exe
+│   │   ├── 📄 f2py.exe
+│   │   ├── 📄 fastapi.exe
+│   │   ├── 📄 hf.exe
+│   │   ├── 📄 httpx.exe
+│   │   ├── 📄 huggingface-cli.exe
+│   │   ├── 📄 isympy.exe
+│   │   ├── 📄 markdown-it.exe
+│   │   ├── 📄 normalizer.exe
+│   │   ├── 📄 pip.exe
+│   │   ├── 📄 pip3.12.exe
+│   │   ├── 📄 pip3.exe
+│   │   ├── 📄 pygmentize.exe
+│   │   ├── 📄 python.exe
+│   │   ├── 📄 pythonw.exe
+│   │   ├── 📄 tiny-agents.exe
+│   │   ├── 📄 torchrun.exe
+│   │   ├── 📄 tqdm.exe
+│   │   ├── 📄 transformers-cli.exe
+│   │   ├── 📄 typer.exe
+│   │   ├── 📄 uvicorn.exe
+│   │   └── 📄 wheel.exe
+│   └── 📁 share/
+│       └── 📁 man/
+├── 📄 .cursorrules
+├── 📄 .dockerignore
+├── 📄 .env
+├── 📄 AGENTS.md
+├── 📄 Dockerfile
+├── 📄 README.md
+├── 📄 generate_tree.py
+├── 📄 notas.txt
+├── 📄 packages.txt
+├── 📄 requirements.txt
+└── 📄 verificar_memoria.py

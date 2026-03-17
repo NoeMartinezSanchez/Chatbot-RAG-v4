@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Entorno virtual
+tinyllama_env/
+venv/
+env/
+.venv/
+
+# HuggingFace cache (se descarga automáticamente)
+models/cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Variables de entorno
+.env
+.env.local
+
+# Logs
+logs/
+*.log
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Docker
+*.dockerignore

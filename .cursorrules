@@ -1,0 +1,77 @@
+# Contexto del Proyecto: ChatBot con TinyLlama (RAG + LLM)
+
+## Descripción General
+Estoy migrando un chatbot de arquitectura RAG que actualmente usa BERT a **TinyLlama** como modelo principal y único generador de respuestas. El objetivo es mejorar drásticamente la calidad, coherencia y capacidad de respuestas, eliminando por completo la dependencia de BERT.
+
+## Tecnologías Principales
+- **Framework API**: FastAPI
+- **Modelo Principal**: TinyLlama-1.1B-Chat (Hugging Face Transformers)
+- **Vector Store**: FAISS (índices de documentos)
+- **Embeddings**: Sentence Transformers (all-MiniLM-L6-v2)
+- **Optimización**: Cuantización 4-bit (bitsandbytes), Accelerate
+- **Despliegue**: Docker, Render/Railway
+
+## Estructura de Archivos Clave
+- `api/endpoints.py` - Endpoints de la API
+- `api/main.py` - Punto de entrada
+- `rag/core.py` - Lógica principal del RAG
+- `rag/retriever.py` - Recuperación de documentos
+- `rag/embeddings.py` - Generación de embeddings
+- `rag/generator.py` - **NUEVO**: Usará exclusivamente TinyLlama
+- `models/tinyllama_wrapper.py` - Wrapper para TinyLlama (carga, inferencia)
+- `models/__init__.py` - Inicialización del módulo de modelos
+- `config/settings.py` - Configuración del proyecto
+- `config/models.py` - Modelos Pydantic
+- `data/vector_store/` - Índices FAISS y metadatos
+- `scripts/download_model.py` - Descarga de TinyLlama
+
+## Objetivos Principales
+1. **Reemplazar BERT por TinyLlama** como único generador de respuestas.
+2. Integrar TinyLlama con el sistema RAG actual (contexto + pregunta → respuesta).
+3. Optimizar el uso de memoria y velocidad de inferencia (cuantización 4-bit, caching).
+4. Mantener compatibilidad con los endpoints existentes (no cambiar la API).
+5. Garantizar un tiempo de respuesta < 2 segundos en GPU (o < 5 segundos en CPU).
+
+## Requisitos Técnicos Específicos
+- **Cuantización obligatoria**: Usar `BitsAndBytesConfig` con carga en 4-bit para reducir uso de memoria a ~2-3GB.
+- **Fallback**: No hay fallback a BERT. Si TinyLlama falla, se debe registrar el error y devolver una respuesta genérica.
+- **Manejo de contexto**: El prompt debe incluir el contexto recuperado y la pregunta del usuario.
+- **Logging**: Registrar tiempos de inferencia, tokens generados, errores.
+- **Pruebas**: Test unitario que verifique que TinyLlama responde con coherencia básica.
+
+## Consideraciones de Producción
+- **Memoria máxima**: 4GB (para correr en instancias pequeñas de cloud)
+- **Tiempo de respuesta**: < 2 segundos en GPU (T4 o similar)
+- **Escalabilidad**: Soporte para múltiples requests concurrentes con cola de procesos
+- **Cache**: Implementar caché de respuestas para preguntas frecuentes (opcional)
+
+## Estándares de Código
+- **Type hints** obligatorios en todas las funciones nuevas.
+- **Docstrings** en formato Google.
+- **Logging estructurado** usando `loguru` o `logging`.
+- **Manejo de errores**: try-except con registro y respuesta amigable.
+- **Tests**: pytest para funciones críticas (generación, recuperación).
+
+## Prompts Útiles para la IA (Cursor)
+- `@codebase /explain-code` – Para entender el flujo actual.
+- `@codebase /generate-code` – Para crear nuevos wrappers o modificar generadores.
+- `@codebase /refactor-code` – Para adaptar el código existente a TinyLlama.
+- `@codebase /optimize-code` – Para mejorar rendimiento (cuantización, batching).
+- `@codebase /debug-error` – Para resolver errores específicos.
+
+## Ejemplo de Prompt para Generación con TinyLlama
+
+Contexto: {contexto_recuperado}
+Pregunta: {pregunta_usuario}
+Instrucción: Responde la pregunta basándote únicamente en el contexto proporcionado. Si no encuentras la respuesta en el contexto, indícalo claramente.
+Respuesta:
+
+
+## Notas Adicionales
+- No se debe conservar ningún código relacionado con BERT (a menos que sea parte del retriever, que es independiente).
+- La integración debe ser limpia: el generador actual debe apuntar al wrapper de TinyLlama.
+- El proyecto debe poder ejecutarse en CPU con degradación de rendimiento (pero funcional).
+
+---
+**Última actualización**: Marzo 2026
+**Responsable**: Científico de Datos / ML Engineer

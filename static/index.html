@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot RAG - Prepa en Línea SEP</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #1abc9c;
+            --light-color: #ecf0f1;
+            --dark-color: #2c3e50;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 1200px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            display: flex;
+            height: 90vh;
+        }
+
+        /* Panel lateral */
+        .sidebar {
+            width: 300px;
+            background: var(--primary-color);
+            color: white;
+            padding: 30px 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+            color: var(--accent-color);
+        }
+
+        .logo p {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .stats {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stats h3 {
+            font-size: 16px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .stat-item span:last-child {
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+
+        .examples {
+            margin-top: auto;
+        }
+
+        .examples h3 {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .example-question {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .example-question:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(5px);
+        }
+
+        /* Área principal del chat */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            background: white;
+            padding: 20px 30px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header h2 {
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--success-color);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* Área de mensajes */
+        .chat-messages {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            background: #f9f9f9;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            max-width: 80%;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .user-message {
+            margin-left: auto;
+        }
+
+        .message-content {
+            padding: 15px 20px;
+            border-radius: 18px;
+            position: relative;
+        }
+
+        .user-message .message-content {
+            background: var(--secondary-color);
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+
+        .bot-message .message-content {
+            background: white;
+            color: var(--dark-color);
+            border: 1px solid #eee;
+            border-bottom-left-radius: 5px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        .message-time {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-top: 5px;
+            text-align: right;
+        }
+
+        /* Fuentes RAG */
+        .sources-container {
+            margin-top: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            border-left: 4px solid var(--accent-color);
+        }
+
+        .sources-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+
+        .source-item {
+            background: white;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            border: 1px solid #eee;
+        }
+
+        .source-meta {
+            display: flex;
+            gap: 10px;
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .confidence-badge {
+            background: var(--success-color);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: auto;
+        }
+
+        /* Área de entrada */
+        .input-area {
+            padding: 20px 30px;
+            background: white;
+            border-top: 1px solid #eee;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        textarea {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #eee;
+            border-radius: 12px;
+            resize: none;
+            font-size: 16px;
+            transition: border-color 0.3s;
+            height: 60px;
+            max-height: 120px;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--secondary-color);
+        }
+
+        .send-button {
+            background: var(--secondary-color);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            width: 60px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .send-button:hover {
+            background: var(--primary-color);
+            transform: scale(1.05);
+        }
+
+        .send-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .char-count {
+            opacity: 0.7;
+        }
+
+        /* Indicador de carga */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 10px 20px;
+            background: white;
+            border-radius: 18px;
+            border: 1px solid #eee;
+            width: fit-content;
+            margin-bottom: 20px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--secondary-color);
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0.7); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .chat-container {
+                flex-direction: column;
+                height: 95vh;
+            }
+            
+            .sidebar {
+                width: 100%;
+                max-height: 200px;
+                overflow-y: auto;
+            }
+            
+            .message {
+                max-width: 90%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <!-- Panel lateral -->
+        <div class="sidebar">
+            <div class="logo">
+                <h1><i class="fas fa-robot"></i> Chatbot RAG</h1>
+                <p>Prepa en Línea SEP</p>
+            </div>
+
+            <div class="stats">
+                <h3><i class="fas fa-chart-bar"></i> Estadísticas</h3>
+                <div class="stat-item">
+                    <span>Documentos cargados:</span>
+                    <span id="doc-count">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>Respuestas RAG:</span>
+                    <span id="rag-count">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>Confianza media:</span>
+                    <span id="avg-confidence">0%</span>
+                </div>
+            </div>
+
+            <div class="examples">
+                <h3><i class="fas fa-lightbulb"></i> Ejemplos de preguntas</h3>
+                <div class="example-question" onclick="useExample(this)">
+                    ¿Cómo cambio mi correo electrónico?
+                </div>
+                <div class="example-question" onclick="useExample(this)">
+                    Quiero retomar mis estudios, ¿qué debo hacer?
+                </div>
+                <div class="example-question" onclick="useExample(this)">
+                    Problemas con el registro en la plataforma
+                </div>
+                <div class="example-question" onclick="useExample(this)">
+                    ¿Cuál es el proceso de reingreso?
+                </div>
+            </div>
+        </div>
+
+        <!-- Área principal -->
+        <div class="main-content">
+            <!-- Encabezado -->
+            <div class="chat-header">
+                <h2><i class="fas fa-comments"></i> Asistente Virtual</h2>
+                <div class="status-indicator">
+                    <div class="status-dot"></div>
+                    <span>Sistema RAG activo</span>
+                </div>
+            </div>
+
+            <!-- Mensajes -->
+            <div class="chat-messages" id="chatMessages">
+                <!-- Mensaje de bienvenida -->
+                <div class="message bot-message">
+                    <div class="message-content">
+                        <strong><i class="fas fa-robot"></i> Asistente:</strong><br>
+                        ¡Hola! Soy tu asistente virtual de Prepa en Línea SEP. 
+                        Estoy aquí para ayudarte con consultas sobre registro, 
+                        problemas técnicos, reingreso y más. ¿En qué puedo asistirte?
+                    </div>
+                    <div class="message-time" id="welcome-time"></div>
+                </div>
+            </div>
+
+            <!-- Área de entrada -->
+            <div class="input-area">
+                <div class="input-container">
+                    <textarea 
+                        id="messageInput" 
+                        placeholder="Escribe tu pregunta aquí... (Presiona Shift+Enter para nueva línea)"
+                        onkeydown="handleKeyDown(event)"
+                        rows="1"
+                    ></textarea>
+                    <button class="send-button" id="sendButton" onclick="sendMessage()">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="controls">
+                    <div class="char-count">
+                        Caracteres: <span id="charCount">0</span>
+                    </div>
+                    <div>
+                        <input type="checkbox" id="showSources" checked>
+                        <label for="showSources">Mostrar fuentes</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuración
+        const API_URL = 'http://localhost:8000';
+        let messageCount = 0;
+        let ragResponseCount = 0;
+        let totalConfidence = 0;
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            // Establecer hora del mensaje de bienvenida
+            document.getElementById('welcome-time').textContent = getCurrentTime();
+            
+            // Actualizar contador de caracteres
+            document.getElementById('messageInput').addEventListener('input', updateCharCount);
+            updateCharCount();
+            
+            // Cargar estadísticas iniciales
+            loadStats();
+            
+            // Enfocar el input
+            document.getElementById('messageInput').focus();
+        });
+
+        // Funciones auxiliares
+        function getCurrentTime() {
+            const now = new Date();
+            return now.toLocaleTimeString('es-MX', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: true 
+            });
+        }
+
+        function updateCharCount() {
+            const input = document.getElementById('messageInput');
+            const count = input.value.length;
+            document.getElementById('charCount').textContent = count;
+            
+            // Habilitar/deshabilitar botón
+            document.getElementById('sendButton').disabled = count === 0;
+        }
+
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                if (!document.getElementById('sendButton').disabled) {
+                    sendMessage();
+                }
+            }
+            
+            // Auto-ajustar altura del textarea
+            setTimeout(() => {
+                const textarea = event.target;
+                textarea.style.height = 'auto';
+                textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+            }, 0);
+        }
+
+        function useExample(element) {
+            const question = element.textContent;
+            document.getElementById('messageInput').value = question;
+            updateCharCount();
+            document.getElementById('messageInput').focus();
+        }
+
+        // Enviar mensaje
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Agregar mensaje del usuario
+            addMessage(message, 'user');
+            
+            // Limpiar input
+            input.value = '';
+            input.style.height = '60px';
+            updateCharCount();
+            
+            // Mostrar indicador de escritura
+            showTypingIndicator();
+            
+            try {
+                // Enviar a la API
+                const response = await fetch(`${API_URL}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        conversation_id: "web_interface",
+                        user_id: "web_user"
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Error HTTP: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Remover indicador de escritura
+                removeTypingIndicator();
+                
+                // Agregar respuesta del bot
+                addBotMessage(data);
+                
+                // Actualizar estadísticas
+                updateStats(data);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                removeTypingIndicator();
+                addErrorMessage('Error al conectar con el servidor. Asegúrate de que la API esté corriendo en http://localhost:8000');
+            }
+        }
+
+        // Agregar mensaje del usuario
+        function addMessage(text, sender) {
+            const chatMessages = document.getElementById('chatMessages');
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}-message`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            if (sender === 'user') {
+                contentDiv.innerHTML = `<strong><i class="fas fa-user"></i> Tú:</strong><br>${escapeHtml(text)}`;
+            }
+            
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = getCurrentTime();
+            
+            messageDiv.appendChild(contentDiv);
+            messageDiv.appendChild(timeDiv);
+            chatMessages.appendChild(messageDiv);
+            
+            // Scroll al final
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            messageCount++;
+        }
+
+        // Agregar respuesta del bot
+        function addBotMessage(data) {
+            const chatMessages = document.getElementById('chatMessages');
+            const showSources = document.getElementById('showSources').checked;
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message bot-message';
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            // Icono según tipo de respuesta
+            const icon = data.is_rag_response ? 'fas fa-database' : 'fas fa-comment';
+            const typeBadge = data.is_rag_response 
+                ? `<span class="confidence-badge">RAG ${(data.confidence * 100).toFixed(1)}%</span>`
+                : '<span style="opacity:0.7; font-size:12px;">(Intento)</span>';
+            
+            contentDiv.innerHTML = `
+                <strong><i class="${icon}"></i> Asistente:</strong> ${typeBadge}<br>
+                ${escapeHtml(data.response)}
+            `;
+            
+            // Agregar fuentes si es respuesta RAG y están habilitadas
+            if (data.is_rag_response && data.sources && data.sources.length > 0 && showSources) {
+                const sourcesDiv = document.createElement('div');
+                sourcesDiv.className = 'sources-container';
+                
+                let sourcesHTML = `
+                    <div class="sources-title">
+                        <i class="fas fa-file-alt"></i> Fuentes consultadas (${data.sources.length})
+                    </div>
+                `;
+                
+                data.sources.forEach((source, index) => {
+                    sourcesHTML += `
+                        <div class="source-item">
+                            <pre style="white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(source.content)}</pre>
+                            <div class="source-meta">
+                                <span>Fuente: ${source.metadata.source || 'N/A'}</span>
+                                <span>Fila: ${source.metadata.row_index || 'N/A'}</span>
+                                <span>Hoja: ${source.metadata.sheet_name || 'N/A'}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                sourcesDiv.innerHTML = sourcesHTML;
+                contentDiv.appendChild(sourcesDiv);
+            }
+            
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = getCurrentTime();
+            
+            messageDiv.appendChild(contentDiv);
+            messageDiv.appendChild(timeDiv);
+            chatMessages.appendChild(messageDiv);
+            
+            // Scroll al final
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Agregar mensaje de error
+        function addErrorMessage(text) {
+            const chatMessages = document.getElementById('chatMessages');
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message bot-message';
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.style.borderLeft = '4px solid var(--danger-color)';
+            contentDiv.innerHTML = `
+                <strong><i class="fas fa-exclamation-triangle"></i> Error:</strong><br>
+                ${escapeHtml(text)}
+            `;
+            
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = getCurrentTime();
+            
+            messageDiv.appendChild(contentDiv);
+            messageDiv.appendChild(timeDiv);
+            chatMessages.appendChild(messageDiv);
+            
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Indicador de escritura
+        function showTypingIndicator() {
+            const chatMessages = document.getElementById('chatMessages');
+            
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'typing-indicator';
+            typingDiv.id = 'typingIndicator';
+            
+            typingDiv.innerHTML = `
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <span style="margin-left:10px;">El asistente está escribiendo...</span>
+            `;
+            
+            chatMessages.appendChild(typingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const typingIndicator = document.getElementById('typingIndicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        // Actualizar estadísticas
+        function updateStats(data) {
+            if (data.is_rag_response) {
+                ragResponseCount++;
+                totalConfidence += data.confidence;
+                
+                document.getElementById('rag-count').textContent = ragResponseCount;
+                
+                const avgConfidence = ragResponseCount > 0 
+                    ? (totalConfidence / ragResponseCount * 100).toFixed(1)
+                    : 0;
+                document.getElementById('avg-confidence').textContent = `${avgConfidence}%`;
+            }
+        }
+
+        // Cargar estadísticas iniciales
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_URL}/stats`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.vector_store && data.vector_store.total_documents) {
+                        document.getElementById('doc-count').textContent = data.vector_store.total_documents;
+                    }
+                }
+            } catch (error) {
+                console.log('No se pudieron cargar estadísticas iniciales');
+            }
+        }
+
+        // Seguridad: escapar HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
