@@ -166,8 +166,8 @@ class RAGSystem:
             metadata_list = doc_results['metadatas'][0]
             context_str = " ".join(contexts)
             
-            # Usar extracción simple del contexto (más rápido que TinyLlama en CPU)
-            response = self._simple_extract_response(query, context_str)
+            # Usar TinyLlama generativo
+            response = self.generator.generate(query, context_str)
             
             # 6. Preparar fuentes para mostrar
             sources = []
