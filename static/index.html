@@ -22,6 +22,7 @@
             --success-color: #27ae60;
             --warning-color: #f39c12;
             --danger-color: #e74c3c;
+            --sidebar-width: 280px;
         }
 
         body {
@@ -30,55 +31,58 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 20px;
+            padding: 10px;
         }
 
         .chat-container {
             width: 100%;
-            max-width: 1200px;
+            max-width: 1400px;
             background: white;
             border-radius: 20px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             overflow: hidden;
             display: flex;
-            height: 90vh;
+            height: 92vh;
         }
 
         /* Panel lateral */
         .sidebar {
-            width: 300px;
+            width: var(--sidebar-width);
             background: var(--primary-color);
             color: white;
-            padding: 30px 20px;
+            padding: 20px;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
 
         .logo {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .logo h1 {
-            font-size: 24px;
+            font-size: 20px;
             margin-bottom: 5px;
             color: var(--accent-color);
         }
 
         .logo p {
-            font-size: 14px;
+            font-size: 12px;
             opacity: 0.8;
         }
 
         .stats {
             background: rgba(255, 255, 255, 0.1);
             border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 20px;
+            padding: 12px;
+            margin-bottom: 15px;
         }
 
         .stats h3 {
-            font-size: 16px;
+            font-size: 14px;
             margin-bottom: 10px;
             display: flex;
             align-items: center;
@@ -88,8 +92,8 @@
         .stat-item {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 14px;
+            margin-bottom: 6px;
+            font-size: 12px;
         }
 
         .stat-item span:last-child {
@@ -97,91 +101,118 @@
             color: var(--accent-color);
         }
 
-        .examples {
-            margin-top: auto;
-        }
-
-        .examples h3 {
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .example-question {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 14px;
-        }
-
-        .example-question:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: translateX(5px);
-        }
-
-        /* Menú jerárquico */
+        /* Menú jerárquico - PRINCIPAL */
         .menu-section {
-            margin-top: 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            padding-top: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            margin-bottom: 15px;
         }
 
-        .menu-section h3 {
-            margin-bottom: 15px;
+        .menu-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .menu-header h3 {
+            font-size: 14px;
             display: flex;
             align-items: center;
             gap: 8px;
+        }
+
+        .menu-toggle-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: none;
+            border-radius: 6px;
+            padding: 6px 10px;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .menu-toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
         }
 
         .menu-container {
-            max-height: 300px;
+            flex: 1;
             overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .menu-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .menu-container::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .menu-container::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
         }
 
         .menu-category {
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
         .menu-btn {
             width: 100%;
-            background: rgba(255, 255, 255, 0.15);
-            border: none;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 8px;
-            padding: 12px;
+            padding: 10px 12px;
             color: white;
             cursor: pointer;
             text-align: left;
-            font-size: 14px;
+            font-size: 13px;
             display: flex;
             align-items: center;
-            gap: 8px;
-            transition: all 0.3s;
+            gap: 10px;
+            transition: all 0.2s;
         }
 
         .menu-btn:hover {
-            background: rgba(255, 255, 255, 0.25);
-            transform: translateX(5px);
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(3px);
         }
 
         .menu-btn.active {
             background: var(--accent-color);
+            border-color: var(--accent-color);
         }
 
-        .menu-btn i {
-            transition: transform 0.3s;
+        .menu-btn i.folder-icon {
+            color: var(--accent-color);
+            font-size: 14px;
+            transition: transform 0.2s;
         }
 
-        .menu-btn.expanded i {
+        .menu-btn.expanded i.folder-icon {
+            transform: rotate(15deg);
+        }
+
+        .menu-btn .chevron {
+            margin-left: auto;
+            font-size: 10px;
+            opacity: 0.7;
+            transition: transform 0.2s;
+        }
+
+        .menu-btn.expanded .chevron {
             transform: rotate(90deg);
         }
 
         .menu-subcategory {
             display: none;
-            margin-left: 20px;
+            margin-left: 15px;
             margin-top: 5px;
         }
 
@@ -191,8 +222,8 @@
 
         .menu-question {
             display: none;
-            margin-left: 20px;
-            margin-top: 5px;
+            margin-left: 10px;
+            margin-top: 4px;
         }
 
         .menu-question.visible {
@@ -201,64 +232,114 @@
 
         .subcategory-btn {
             width: 100%;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.08);
             border: none;
             border-radius: 6px;
-            padding: 10px;
-            color: white;
-            cursor: pointer;
-            text-align: left;
-            font-size: 13px;
-            margin-bottom: 5px;
-            transition: all 0.3s;
-        }
-
-        .subcategory-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-
-        .question-btn {
-            width: 100%;
-            background: rgba(26, 188, 156, 0.2);
-            border: 1px solid rgba(26, 188, 156, 0.3);
-            border-radius: 6px;
             padding: 8px 10px;
-            color: white;
+            color: rgba(255, 255, 255, 0.85);
             cursor: pointer;
             text-align: left;
             font-size: 12px;
             margin-bottom: 4px;
-            transition: all 0.3s;
-        }
-
-        .question-btn:hover {
-            background: rgba(26, 188, 156, 0.4);
-        }
-
-        .menu-back-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: none;
-            border-radius: 6px;
-            padding: 8px 12px;
-            color: white;
-            cursor: pointer;
-            font-size: 13px;
-            margin-bottom: 10px;
             display: flex;
             align-items: center;
             gap: 8px;
-            transition: all 0.3s;
+            transition: all 0.2s;
         }
 
-        .menu-back-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
+        .subcategory-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .subcategory-btn i {
+            color: var(--secondary-color);
+            font-size: 11px;
+        }
+
+        .subcategory-btn .chevron {
+            margin-left: auto;
+            font-size: 9px;
+            opacity: 0.6;
+            transition: transform 0.2s;
+        }
+
+        .subcategory-btn.expanded .chevron {
+            transform: rotate(90deg);
+        }
+
+        .question-btn {
+            width: 100%;
+            background: rgba(26, 188, 156, 0.15);
+            border: 1px solid rgba(26, 188, 156, 0.25);
+            border-radius: 5px;
+            padding: 7px 10px;
+            color: rgba(255, 255, 255, 0.9);
+            cursor: pointer;
+            text-align: left;
+            font-size: 11px;
+            margin-bottom: 3px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .question-btn:hover {
+            background: rgba(26, 188, 156, 0.35);
+            transform: translateX(3px);
+        }
+
+        .question-btn i {
+            color: var(--warning-color);
+            font-size: 10px;
+            flex-shrink: 0;
+        }
+
+        .question-btn span {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .menu-empty {
             text-align: center;
             padding: 20px;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 13px;
+        }
+
+        /* Breadcrumb de navegación */
+        .menu-breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 10px;
+            font-size: 11px;
             color: rgba(255, 255, 255, 0.6);
-            font-size: 14px;
+        }
+
+        .menu-breadcrumb span {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 3px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .menu-breadcrumb span:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .menu-breadcrumb .current {
+            background: var(--accent-color);
+            color: white;
+            cursor: default;
+        }
+
+        .menu-breadcrumb .current:hover {
+            background: var(--accent-color);
+            color: white;
         }
 
         /* Área principal del chat */
@@ -266,11 +347,114 @@
             flex: 1;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Panel de categorías rápidas - ARRIBA DEL CHAT */
+        .quick-menu {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #34495e 100%);
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .quick-menu h4 {
+            color: white;
+            font-size: 12px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .quick-categories {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .quick-category-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 8px 14px;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .quick-category-btn:hover {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+            transform: translateY(-2px);
+        }
+
+        .quick-category-btn i {
+            font-size: 11px;
+        }
+
+        /* Dropdown para subcategorías en panel rápido */
+        .quick-dropdown {
+            position: relative;
+        }
+
+        .quick-dropdown-content {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            min-width: 250px;
+            max-height: 300px;
+            overflow-y: auto;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            margin-top: 5px;
+        }
+
+        .quick-dropdown-content.show {
+            display: block;
+            animation: slideDown 0.2s ease;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .quick-dropdown-item {
+            padding: 10px 15px;
+            color: var(--dark-color);
+            font-size: 13px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            transition: all 0.2s;
+        }
+
+        .quick-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .quick-dropdown-item:hover {
+            background: var(--light-color);
+        }
+
+        .quick-dropdown-item .count {
+            float: right;
+            font-size: 11px;
+            color: #999;
+            background: #eee;
+            padding: 2px 8px;
+            border-radius: 10px;
         }
 
         .chat-header {
             background: white;
-            padding: 20px 30px;
+            padding: 15px 25px;
             border-bottom: 1px solid #eee;
             display: flex;
             justify-content: space-between;
@@ -279,6 +463,7 @@
 
         .chat-header h2 {
             color: var(--primary-color);
+            font-size: 18px;
             display: flex;
             align-items: center;
             gap: 10px;
@@ -288,7 +473,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            font-size: 14px;
+            font-size: 13px;
         }
 
         .status-dot {
@@ -308,13 +493,13 @@
         /* Área de mensajes */
         .chat-messages {
             flex: 1;
-            padding: 30px;
+            padding: 20px 25px;
             overflow-y: auto;
             background: #f9f9f9;
         }
 
         .message {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             max-width: 80%;
             animation: fadeIn 0.3s ease;
         }
@@ -329,9 +514,10 @@
         }
 
         .message-content {
-            padding: 15px 20px;
+            padding: 12px 18px;
             border-radius: 18px;
             position: relative;
+            line-height: 1.5;
         }
 
         .user-message .message-content {
@@ -345,47 +531,58 @@
             color: var(--dark-color);
             border: 1px solid #eee;
             border-bottom-left-radius: 5px;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
         }
 
         .message-time {
-            font-size: 11px;
-            opacity: 0.7;
-            margin-top: 5px;
+            font-size: 10px;
+            opacity: 0.6;
+            margin-top: 4px;
             text-align: right;
         }
 
         /* Fuentes RAG */
         .sources-container {
-            margin-top: 15px;
+            margin-top: 12px;
             background: #f8f9fa;
-            border-radius: 10px;
-            padding: 15px;
-            border-left: 4px solid var(--accent-color);
+            border-radius: 8px;
+            padding: 12px;
+            border-left: 3px solid var(--accent-color);
         }
 
         .sources-title {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             font-weight: bold;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             color: var(--primary-color);
+            font-size: 12px;
         }
 
         .source-item {
             background: white;
-            border-radius: 8px;
-            padding: 10px;
-            margin-bottom: 8px;
-            font-size: 13px;
+            border-radius: 6px;
+            padding: 8px;
+            margin-bottom: 6px;
+            font-size: 12px;
             border: 1px solid #eee;
+        }
+
+        .source-item pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 0;
+            font-family: inherit;
+            font-size: 11px;
+            max-height: 80px;
+            overflow-y: auto;
         }
 
         .source-meta {
             display: flex;
             gap: 10px;
-            font-size: 12px;
+            font-size: 10px;
             color: #666;
             margin-top: 5px;
         }
@@ -394,14 +591,14 @@
             background: var(--success-color);
             color: white;
             padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            margin-left: auto;
+            border-radius: 10px;
+            font-size: 11px;
+            margin-left: 8px;
         }
 
         /* Área de entrada */
         .input-area {
-            padding: 20px 30px;
+            padding: 15px 25px;
             background: white;
             border-top: 1px solid #eee;
         }
@@ -409,18 +606,19 @@
         .input-container {
             display: flex;
             gap: 10px;
+            align-items: flex-end;
         }
 
         textarea {
             flex: 1;
-            padding: 15px;
+            padding: 12px 15px;
             border: 2px solid #eee;
             border-radius: 12px;
             resize: none;
-            font-size: 16px;
+            font-size: 14px;
             transition: border-color 0.3s;
-            height: 60px;
-            max-height: 120px;
+            height: 50px;
+            max-height: 100px;
         }
 
         textarea:focus {
@@ -433,13 +631,14 @@
             color: white;
             border: none;
             border-radius: 12px;
-            width: 60px;
+            width: 50px;
+            height: 50px;
             cursor: pointer;
             transition: all 0.3s;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 20px;
+            font-size: 18px;
         }
 
         .send-button:hover {
@@ -456,8 +655,8 @@
         .controls {
             display: flex;
             justify-content: space-between;
-            margin-top: 10px;
-            font-size: 14px;
+            margin-top: 8px;
+            font-size: 12px;
             color: #666;
         }
 
@@ -470,12 +669,12 @@
             display: flex;
             align-items: center;
             gap: 5px;
-            padding: 10px 20px;
+            padding: 10px 15px;
             background: white;
             border-radius: 18px;
             border: 1px solid #eee;
             width: fit-content;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .typing-dot {
@@ -494,21 +693,111 @@
             40% { transform: scale(1); opacity: 1; }
         }
 
+        /* Tema */
+        .theme-badge {
+            background: var(--accent-color);
+            color: white;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            margin-left: 8px;
+        }
+
         /* Responsive */
-        @media (max-width: 768px) {
+        @media (max-width: 900px) {
             .chat-container {
                 flex-direction: column;
                 height: 95vh;
             }
-            
+
             .sidebar {
                 width: 100%;
-                max-height: 200px;
-                overflow-y: auto;
+                max-height: 180px;
+                flex-direction: row;
+                flex-wrap: wrap;
+                padding: 15px;
             }
-            
+
+            .logo, .stats {
+                display: none;
+            }
+
+            .menu-section {
+                width: 100%;
+                margin-bottom: 0;
+            }
+
+            .menu-header h3 {
+                font-size: 13px;
+            }
+
+            .menu-container {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                overflow-x: auto;
+                overflow-y: hidden;
+            }
+
+            .menu-category {
+                margin-bottom: 0;
+            }
+
+            .menu-btn {
+                width: auto;
+                white-space: nowrap;
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            .menu-subcategory, .menu-question {
+                position: absolute;
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+                padding: 10px;
+                z-index: 50;
+                min-width: 200px;
+            }
+
+            .quick-menu {
+                padding: 10px 15px;
+            }
+
+            .quick-category-btn {
+                padding: 6px 10px;
+                font-size: 11px;
+            }
+
+            .chat-header h2 {
+                font-size: 16px;
+            }
+
             .message {
                 max-width: 90%;
+            }
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 5px;
+            }
+
+            .chat-container {
+                border-radius: 12px;
+            }
+
+            .chat-messages {
+                padding: 15px;
+            }
+
+            .input-area {
+                padding: 12px 15px;
+            }
+
+            .message-content {
+                padding: 10px 14px;
+                font-size: 14px;
             }
         }
     </style>
@@ -518,14 +807,14 @@
         <!-- Panel lateral -->
         <div class="sidebar">
             <div class="logo">
-                <h1><i class="fas fa-robot"></i> Chatbot RAG</h1>
+                <h1><i class="fas fa-robot"></i> Chatbot</h1>
                 <p>Prepa en Línea SEP</p>
             </div>
 
             <div class="stats">
                 <h3><i class="fas fa-chart-bar"></i> Estadísticas</h3>
                 <div class="stat-item">
-                    <span>Documentos cargados:</span>
+                    <span>Documentos:</span>
                     <span id="doc-count">0</span>
                 </div>
                 <div class="stat-item">
@@ -533,29 +822,20 @@
                     <span id="rag-count">0</span>
                 </div>
                 <div class="stat-item">
-                    <span>Confianza media:</span>
+                    <span>Confianza:</span>
                     <span id="avg-confidence">0%</span>
                 </div>
             </div>
 
-            <div class="examples">
-                <h3><i class="fas fa-lightbulb"></i> Ejemplos de preguntas</h3>
-                <div class="example-question" onclick="useExample(this)">
-                    ¿Cómo cambio mi correo electrónico?
-                </div>
-                <div class="example-question" onclick="useExample(this)">
-                    Quiero retomar mis estudios, ¿qué debo hacer?
-                </div>
-                <div class="example-question" onclick="useExample(this)">
-                    Problemas con el registro en la plataforma
-                </div>
-                <div class="example-question" onclick="useExample(this)">
-                    ¿Cuál es el proceso de reingreso?
-                </div>
-            </div>
-
+            <!-- Menú jerárquico PRINCIPAL -->
             <div class="menu-section">
-                <h3><i class="fas fa-folder-tree"></i> Navegación por Temas</h3>
+                <div class="menu-header">
+                    <h3><i class="fas fa-folder-tree"></i> Temas</h3>
+                    <button class="menu-toggle-btn" onclick="collapseAllMenu()" title="Contraer todo">
+                        <i class="fas fa-compress-alt"></i>
+                    </button>
+                </div>
+                <div id="menuBreadcrumb" class="menu-breadcrumb"></div>
                 <div id="menuContainer" class="menu-container">
                     <div class="menu-empty">Cargando menú...</div>
                 </div>
@@ -564,12 +844,23 @@
 
         <!-- Área principal -->
         <div class="main-content">
+            <!-- Panel de categorías rápidas -->
+            <div class="quick-menu">
+                <h4><i class="fas fa-bolt"></i> Acceso rápido</h4>
+                <div id="quickCategories" class="quick-categories">
+                    <!-- Se llena dinámicamente -->
+                </div>
+            </div>
+
             <!-- Encabezado -->
             <div class="chat-header">
-                <h2><i class="fas fa-comments"></i> Asistente Virtual</h2>
+                <h2>
+                    <i class="fas fa-comments"></i> Asistente Virtual
+                    <span class="theme-badge">Prepa en Línea</span>
+                </h2>
                 <div class="status-indicator">
                     <div class="status-dot"></div>
-                    <span>Sistema RAG activo</span>
+                    <span>Sistema activo</span>
                 </div>
             </div>
 
@@ -579,9 +870,9 @@
                 <div class="message bot-message">
                     <div class="message-content">
                         <strong><i class="fas fa-robot"></i> Asistente:</strong><br>
-                        ¡Hola! Soy tu asistente virtual de Prepa en Línea SEP. 
-                        Estoy aquí para ayudarte con consultas sobre registro, 
-                        problemas técnicos, reingreso y más. ¿En qué puedo asistirte?
+                        ¡Hola! Soy tu asistente de Prepa en Línea SEP.
+                        Puedes explorar los temas en el panel izquierdo o escribir tu pregunta directamente.
+                        ¿En qué puedo ayudarte?
                     </div>
                     <div class="message-time" id="welcome-time"></div>
                 </div>
@@ -592,7 +883,7 @@
                 <div class="input-container">
                     <textarea 
                         id="messageInput" 
-                        placeholder="Escribe tu pregunta aquí... (Presiona Shift+Enter para nueva línea)"
+                        placeholder="Escribe tu pregunta aquí..."
                         onkeydown="handleKeyDown(event)"
                         rows="1"
                     ></textarea>
@@ -602,7 +893,7 @@
                 </div>
                 <div class="controls">
                     <div class="char-count">
-                        Caracteres: <span id="charCount">0</span>
+                        <span id="charCount">0</span> caracteres
                     </div>
                     <div>
                         <input type="checkbox" id="showSources" checked>
@@ -615,51 +906,44 @@
 
     <script>
         // Configuración
-        const API_URL = 'https://ecotecds-chatbot-rag-tinyllama.hf.space';
+        const API_URL = window.location.origin;
         let messageCount = 0;
         let ragResponseCount = 0;
         let totalConfidence = 0;
-        
+
         // Estado del menú jerárquico
         let menuData = {};
         let currentCategory = null;
         let currentSubcategory = null;
+        let expandedCategories = new Set();
+        let expandedSubcategories = new Set();
 
         // Inicialización
         document.addEventListener('DOMContentLoaded', function() {
-            // Establecer hora del mensaje de bienvenida
             document.getElementById('welcome-time').textContent = getCurrentTime();
-            
-            // Actualizar contador de caracteres
             document.getElementById('messageInput').addEventListener('input', updateCharCount);
             updateCharCount();
-            
-            // Cargar estadísticas iniciales
             loadStats();
-            
-            // Cargar menú jerárquico
             loadMenu();
-            
-            // Enfocar el input
             document.getElementById('messageInput').focus();
+
+            // Cerrar dropdowns al hacer click fuera
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.quick-dropdown')) {
+                    document.querySelectorAll('.quick-dropdown-content').forEach(el => el.classList.remove('show'));
+                }
+            });
         });
 
-        // Funciones auxiliares
         function getCurrentTime() {
             const now = new Date();
-            return now.toLocaleTimeString('es-MX', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                hour12: true 
-            });
+            return now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
         }
 
         function updateCharCount() {
             const input = document.getElementById('messageInput');
             const count = input.value.length;
             document.getElementById('charCount').textContent = count;
-            
-            // Habilitar/deshabilitar botón
             document.getElementById('sendButton').disabled = count === 0;
         }
 
@@ -670,234 +954,154 @@
                     sendMessage();
                 }
             }
-            
-            // Auto-ajustar altura del textarea
             setTimeout(() => {
                 const textarea = event.target;
                 textarea.style.height = 'auto';
-                textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+                textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px';
             }, 0);
-        }
-
-        function useExample(element) {
-            const question = element.textContent;
-            document.getElementById('messageInput').value = question;
-            updateCharCount();
-            document.getElementById('messageInput').focus();
         }
 
         // Enviar mensaje
         async function sendMessage() {
             const input = document.getElementById('messageInput');
             const message = input.value.trim();
-            
+
             if (!message) return;
-            
-            // Agregar mensaje del usuario
+
             addMessage(message, 'user');
-            
-            // Limpiar input
             input.value = '';
-            input.style.height = '60px';
+            input.style.height = '50px';
             updateCharCount();
-            
-            // Mostrar indicador de escritura
             showTypingIndicator();
-            
+
             try {
-                // Enviar a la API
                 const response = await fetch(`${API_URL}/chat`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         message: message,
                         conversation_id: "web_interface",
                         user_id: "web_user"
                     })
                 });
-                
-                if (!response.ok) {
-                    throw new Error(`Error HTTP: ${response.status}`);
-                }
-                
+
+                if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
+
                 const data = await response.json();
-                
-                // Remover indicador de escritura
                 removeTypingIndicator();
-                
-                // Agregar respuesta del bot
                 addBotMessage(data);
-                
-                // Actualizar estadísticas
                 updateStats(data);
-                
             } catch (error) {
                 console.error('Error:', error);
                 removeTypingIndicator();
-                addErrorMessage('Error al conectar con el servidor. Asegúrate de que la API esté corriendo en http://localhost:8000');
+                addErrorMessage('Error al conectar con el servidor. Asegúrate de que la API esté corriendo.');
             }
         }
 
-        // Agregar mensaje del usuario
         function addMessage(text, sender) {
             const chatMessages = document.getElementById('chatMessages');
-            
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${sender}-message`;
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            
-            if (sender === 'user') {
-                contentDiv.innerHTML = `<strong><i class="fas fa-user"></i> Tú:</strong><br>${escapeHtml(text)}`;
-            }
-            
-            const timeDiv = document.createElement('div');
-            timeDiv.className = 'message-time';
-            timeDiv.textContent = getCurrentTime();
-            
-            messageDiv.appendChild(contentDiv);
-            messageDiv.appendChild(timeDiv);
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    <strong><i class="fas fa-${sender === 'user' ? 'user' : 'robot'}"></i> ${sender === 'user' ? 'Tú' : 'Asistente'}:</strong><br>
+                    ${escapeHtml(text)}
+                </div>
+                <div class="message-time">${getCurrentTime()}</div>
+            `;
             chatMessages.appendChild(messageDiv);
-            
-            // Scroll al final
             chatMessages.scrollTop = chatMessages.scrollHeight;
-            
             messageCount++;
         }
 
-        // Agregar respuesta del bot
         function addBotMessage(data) {
             const chatMessages = document.getElementById('chatMessages');
             const showSources = document.getElementById('showSources').checked;
-            
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message bot-message';
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            
-            // Icono según tipo de respuesta
+
             const icon = data.is_rag_response ? 'fas fa-database' : 'fas fa-comment';
-            const typeBadge = data.is_rag_response 
+            const badge = data.is_rag_response
                 ? `<span class="confidence-badge">RAG ${(data.confidence * 100).toFixed(1)}%</span>`
-                : '<span style="opacity:0.7; font-size:12px;">(Intento)</span>';
-            
-            contentDiv.innerHTML = `
-                <strong><i class="${icon}"></i> Asistente:</strong> ${typeBadge}<br>
-                ${escapeHtml(data.response)}
+                : '';
+
+            let html = `
+                <div class="message-content">
+                    <strong><i class="${icon}"></i> Asistente:</strong> ${badge}<br>
+                    ${escapeHtml(data.response)}
             `;
-            
-            // Agregar fuentes si es respuesta RAG y están habilitadas
+
             if (data.is_rag_response && data.sources && data.sources.length > 0 && showSources) {
-                const sourcesDiv = document.createElement('div');
-                sourcesDiv.className = 'sources-container';
-                
-                let sourcesHTML = `
-                    <div class="sources-title">
-                        <i class="fas fa-file-alt"></i> Fuentes consultadas (${data.sources.length})
-                    </div>
+                html += `
+                    <div class="sources-container">
+                        <div class="sources-title"><i class="fas fa-file-alt"></i> Fuentes (${data.sources.length})</div>
                 `;
-                
-                data.sources.forEach((source, index) => {
-                    sourcesHTML += `
+                data.sources.forEach(source => {
+                    html += `
                         <div class="source-item">
-                            <pre style="white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(source.content)}</pre>
+                            <pre>${escapeHtml(source.content)}</pre>
                             <div class="source-meta">
-                                <span>Fuente: ${source.metadata.source || 'N/A'}</span>
+                                <span>${source.metadata.source || 'N/A'}</span>
                                 <span>Fila: ${source.metadata.row_index || 'N/A'}</span>
-                                <span>Hoja: ${source.metadata.sheet_name || 'N/A'}</span>
                             </div>
                         </div>
                     `;
                 });
-                
-                sourcesDiv.innerHTML = sourcesHTML;
-                contentDiv.appendChild(sourcesDiv);
+                html += '</div>';
             }
-            
-            const timeDiv = document.createElement('div');
-            timeDiv.className = 'message-time';
-            timeDiv.textContent = getCurrentTime();
-            
-            messageDiv.appendChild(contentDiv);
-            messageDiv.appendChild(timeDiv);
-            chatMessages.appendChild(messageDiv);
-            
-            // Scroll al final
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
 
-        // Agregar mensaje de error
-        function addErrorMessage(text) {
-            const chatMessages = document.getElementById('chatMessages');
-            
+            html += `</div><div class="message-time">${getCurrentTime()}</div>`;
+
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message bot-message';
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            contentDiv.style.borderLeft = '4px solid var(--danger-color)';
-            contentDiv.innerHTML = `
-                <strong><i class="fas fa-exclamation-triangle"></i> Error:</strong><br>
-                ${escapeHtml(text)}
-            `;
-            
-            const timeDiv = document.createElement('div');
-            timeDiv.className = 'message-time';
-            timeDiv.textContent = getCurrentTime();
-            
-            messageDiv.appendChild(contentDiv);
-            messageDiv.appendChild(timeDiv);
+            messageDiv.innerHTML = html;
             chatMessages.appendChild(messageDiv);
-            
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        // Indicador de escritura
+        function addErrorMessage(text) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message bot-message';
+            messageDiv.innerHTML = `
+                <div class="message-content" style="border-left:3px solid var(--danger-color);">
+                    <strong><i class="fas fa-exclamation-triangle"></i> Error:</strong><br>
+                    ${escapeHtml(text)}
+                </div>
+                <div class="message-time">${getCurrentTime()}</div>
+            `;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
         function showTypingIndicator() {
             const chatMessages = document.getElementById('chatMessages');
-            
             const typingDiv = document.createElement('div');
             typingDiv.className = 'typing-indicator';
             typingDiv.id = 'typingIndicator';
-            
             typingDiv.innerHTML = `
                 <div class="typing-dot"></div>
                 <div class="typing-dot"></div>
                 <div class="typing-dot"></div>
-                <span style="margin-left:10px;">El asistente está escribiendo...</span>
+                <span style="margin-left:8px;font-size:12px;">Escribiendo...</span>
             `;
-            
             chatMessages.appendChild(typingDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
         function removeTypingIndicator() {
-            const typingIndicator = document.getElementById('typingIndicator');
-            if (typingIndicator) {
-                typingIndicator.remove();
-            }
+            const el = document.getElementById('typingIndicator');
+            if (el) el.remove();
         }
 
-        // Actualizar estadísticas
         function updateStats(data) {
             if (data.is_rag_response) {
                 ragResponseCount++;
                 totalConfidence += data.confidence;
-                
                 document.getElementById('rag-count').textContent = ragResponseCount;
-                
-                const avgConfidence = ragResponseCount > 0 
-                    ? (totalConfidence / ragResponseCount * 100).toFixed(1)
-                    : 0;
-                document.getElementById('avg-confidence').textContent = `${avgConfidence}%`;
+                const avg = ragResponseCount > 0 ? (totalConfidence / ragResponseCount * 100).toFixed(1) : 0;
+                document.getElementById('avg-confidence').textContent = `${avg}%`;
             }
         }
 
-        // Cargar estadísticas iniciales
         async function loadStats() {
             try {
                 const response = await fetch(`${API_URL}/stats`);
@@ -908,18 +1112,20 @@
                     }
                 }
             } catch (error) {
-                console.log('No se pudieron cargar estadísticas iniciales');
+                console.log('No se pudieron cargar estadísticas');
             }
         }
 
-        // Cargar menú jerárquico
+        // === MENÚ JERÁRQUICO ===
+
         async function loadMenu() {
             try {
                 const response = await fetch(`${API_URL}/menu`);
                 if (response.ok) {
                     const data = await response.json();
                     menuData = data.menu || {};
-                    renderMenuCategories();
+                    renderMenu();
+                    renderQuickMenu();
                 } else {
                     document.getElementById('menuContainer').innerHTML = '<div class="menu-empty">Menú no disponible</div>';
                 }
@@ -929,114 +1135,218 @@
             }
         }
 
-        // Renderizar categorías
-        function renderMenuCategories() {
+        function renderMenu() {
             const container = document.getElementById('menuContainer');
-            
+
             if (Object.keys(menuData).length === 0) {
                 container.innerHTML = '<div class="menu-empty">No hay temas disponibles</div>';
                 return;
             }
-            
+
             let html = '';
             Object.keys(menuData).forEach(category => {
+                const isExpanded = expandedCategories.has(category);
                 html += `
                     <div class="menu-category">
-                        <button class="menu-btn" onclick="toggleCategory('${escapeHtml(category)}')">
-                            <i class="fas fa-chevron-right"></i>
+                        <button class="menu-btn ${isExpanded ? 'expanded' : ''}" onclick="toggleCategory('${escapeHtml(category)}')">
+                            <i class="fas fa-folder folder-icon"></i>
                             ${escapeHtml(category)}
+                            <i class="fas fa-chevron-right chevron"></i>
                         </button>
-                        <div class="menu-subcategory" id="subcat-${escapeHtml(category)}">
+                        <div class="menu-subcategory ${isExpanded ? 'visible' : ''}" id="subcat-${escapeHtml(category)}">
                             ${renderSubcategories(category)}
                         </div>
                     </div>
                 `;
             });
             container.innerHTML = html;
+            updateBreadcrumb();
         }
 
-        // Renderizar subcategorías
         function renderSubcategories(category) {
             const subcategories = menuData[category];
             let html = '';
-            
             Object.keys(subcategories).forEach(subcat => {
-                const questions = subcategories[subcat];
+                const isExpanded = expandedSubcategories.has(`${category}-${subcat}`);
                 html += `
-                    <button class="subcategory-btn" onclick="toggleSubcategory('${escapeHtml(category)}', '${escapeHtml(subcat)}')">
-                        <i class="fas fa-folder"></i> ${escapeHtml(subcat)} (${questions.length})
+                    <button class="subcategory-btn ${isExpanded ? 'expanded' : ''}" onclick="toggleSubcategory('${escapeHtml(category)}', '${escapeHtml(subcat)}')">
+                        <i class="fas fa-folder-open"></i>
+                        ${escapeHtml(subcat)}
+                        <span style="margin-left:auto;font-size:10px;opacity:0.6;">${subcategories[subcat].length}</span>
+                        <i class="fas fa-chevron-right chevron"></i>
                     </button>
-                    <div class="menu-question" id="ques-${escapeHtml(category)}-${escapeHtml(subcat)}">
+                    <div class="menu-question ${isExpanded ? 'visible' : ''}" id="ques-${escapeHtml(category)}-${escapeHtml(subcat)}">
                         ${renderQuestions(category, subcat)}
                     </div>
                 `;
             });
-            
             return html;
         }
 
-        // Renderizar preguntas
         function renderQuestions(category, subcategory) {
             const questions = menuData[category][subcategory];
             let html = '';
-            
             questions.forEach((q, idx) => {
+                const shortQ = q.question.length > 35 ? q.question.substring(0, 35) + '...' : q.question;
                 html += `
-                    <button class="question-btn" onclick="showAnswer('${escapeHtml(category)}', '${escapeHtml(subcategory)}', ${idx})">
-                        <i class="fas fa-question-circle"></i> ${escapeHtml(q.question)}
+                    <button class="question-btn" onclick="showAnswer('${escapeHtml(category)}', '${escapeHtml(subcategory)}', ${idx})" title="${escapeHtml(q.question)}">
+                        <i class="fas fa-question-circle"></i>
+                        <span>${escapeHtml(shortQ)}</span>
                     </button>
                 `;
             });
-            
             return html;
         }
 
-        // Alternar categoría
         function toggleCategory(category) {
-            const subcatDiv = document.getElementById(`subcat-${category}`);
-            const btn = subcatDiv.previousElementSibling;
-            
-            subcatDiv.classList.toggle('visible');
-            btn.classList.toggle('expanded');
+            if (expandedCategories.has(category)) {
+                expandedCategories.delete(category);
+            } else {
+                expandedCategories.add(category);
+                // Cerrar subcategorías de otras categorías
+                expandedSubcategories.forEach(key => {
+                    if (key.startsWith(category + '-')) return;
+                    expandedSubcategories.delete(key);
+                });
+            }
+            currentCategory = category;
+            currentSubcategory = null;
+            renderMenu();
         }
 
-        // Alternar subcategoría
         function toggleSubcategory(category, subcategory) {
-            const quesDiv = document.getElementById(`ques-${category}-${subcategory}`);
-            quesDiv.classList.toggle('visible');
+            const key = `${category}-${subcategory}`;
+            if (expandedSubcategories.has(key)) {
+                expandedSubcategories.delete(key);
+            } else {
+                expandedSubcategories.add(key);
+            }
+            currentCategory = category;
+            currentSubcategory = subcategory;
+            renderMenu();
         }
 
-        // Mostrar respuesta en el chat
+        function updateBreadcrumb() {
+            const breadcrumb = document.getElementById('menuBreadcrumb');
+            if (!currentCategory) {
+                breadcrumb.innerHTML = '';
+                return;
+            }
+
+            let html = `<span onclick="clearMenuFilter()">Inicio</span>`;
+            html += ` <i class="fas fa-chevron-right" style="font-size:8px;"></i> `;
+            html += `<span class="current">${escapeHtml(currentCategory)}</span>`;
+
+            if (currentSubcategory) {
+                html += ` <i class="fas fa-chevron-right" style="font-size:8px;"></i> `;
+                html += `<span class="current">${escapeHtml(currentSubcategory)}</span>`;
+            }
+
+            breadcrumb.innerHTML = html;
+        }
+
+        function clearMenuFilter() {
+            currentCategory = null;
+            currentSubcategory = null;
+            renderMenu();
+        }
+
+        function collapseAllMenu() {
+            expandedCategories.clear();
+            expandedSubcategories.clear();
+            currentCategory = null;
+            currentSubcategory = null;
+            renderMenu();
+        }
+
         function showAnswer(category, subcategory, questionIdx) {
             const question = menuData[category][subcategory][questionIdx];
-            
             const chatMessages = document.getElementById('chatMessages');
-            
-            // Crear mensaje del bot
+
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message bot-message';
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            contentDiv.innerHTML = `
-                <strong><i class="fas fa-folder-tree"></i> Asistente:</strong><br>
-                <span style="font-size: 12px; color: var(--accent-color);">Tema: ${escapeHtml(category)} > ${escapeHtml(subcategory)}</span><br><br>
-                <strong>Pregunta:</strong> ${escapeHtml(question.question)}<br><br>
-                <strong>Respuesta:</strong><br>${escapeHtml(question.answer)}
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    <strong><i class="fas fa-folder-tree"></i> Asistente:</strong><br>
+                    <span style="font-size:11px;color:var(--accent-color);">📁 ${escapeHtml(category)} > ${escapeHtml(subcategory)}</span><br><br>
+                    <strong>Pregunta:</strong> ${escapeHtml(question.question)}<br><br>
+                    <strong>Respuesta:</strong><br>${escapeHtml(question.answer)}
+                </div>
+                <div class="message-time">${getCurrentTime()}</div>
             `;
-            
-            const timeDiv = document.createElement('div');
-            timeDiv.className = 'message-time';
-            timeDiv.textContent = getCurrentTime();
-            
-            messageDiv.appendChild(contentDiv);
-            messageDiv.appendChild(timeDiv);
             chatMessages.appendChild(messageDiv);
-            
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        // Seguridad: escapar HTML
+        // === MENÚ RÁPIDO ===
+
+        function renderQuickMenu() {
+            const container = document.getElementById('quickCategories');
+            const categories = Object.keys(menuData);
+
+            if (categories.length === 0) {
+                container.innerHTML = '<span style="color:rgba(255,255,255,0.5);font-size:12px;">No hay temas disponibles</span>';
+                return;
+            }
+
+            let html = '';
+            categories.slice(0, 6).forEach(category => {
+                const subcats = Object.keys(menuData[category]);
+                if (subcats.length === 1) {
+                    // Sin subcategorías, mostrar preguntas directamente
+                    html += `
+                        <button class="quick-category-btn" onclick="showQuickQuestions('${escapeHtml(category)}', '${escapeHtml(subcats[0])}')">
+                            <i class="fas fa-folder"></i> ${escapeHtml(category)}
+                        </button>
+                    `;
+                } else {
+                    // Con subcategorías, crear dropdown
+                    html += `
+                        <div class="quick-dropdown">
+                            <button class="quick-category-btn" onclick="toggleQuickDropdown('${escapeHtml(category)}', event)">
+                                <i class="fas fa-folder"></i> ${escapeHtml(category)}
+                                <i class="fas fa-caret-down" style="font-size:10px;"></i>
+                            </button>
+                            <div class="quick-dropdown-content" id="quick-drop-${escapeHtml(category)}">
+                                ${subcats.map(subcat => `
+                                    <div class="quick-dropdown-item" onclick="showQuickQuestions('${escapeHtml(category)}', '${escapeHtml(subcat)}')">
+                                        ${escapeHtml(subcat)}
+                                        <span class="count">${menuData[category][subcat].length}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+            container.innerHTML = html;
+        }
+
+        function toggleQuickDropdown(category, event) {
+            event.stopPropagation();
+            const dropdown = document.getElementById(`quick-drop-${category}`);
+            const allDropdowns = document.querySelectorAll('.quick-dropdown-content');
+            allDropdowns.forEach(d => {
+                if (d !== dropdown) d.classList.remove('show');
+            });
+            dropdown.classList.toggle('show');
+        }
+
+        function showQuickQuestions(category, subcategory) {
+            // Cerrar dropdown
+            document.querySelectorAll('.quick-dropdown-content').forEach(d => d.classList.remove('show'));
+
+            // Expadir en el menú lateral
+            expandedCategories.add(category);
+            expandedSubcategories.add(`${category}-${subcategory}`);
+            currentCategory = category;
+            currentSubcategory = subcategory;
+            renderMenu();
+
+            // Scroll al menú
+            document.getElementById('menuContainer').scrollTop = 0;
+        }
+
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
