@@ -20,6 +20,7 @@ if project_root not in sys.path:
 from config.settings import settings, print_config_summary
 from config.models import ChatRequest, ChatResponse, FeedbackRequest
 from rag.core import RAGSystem
+from data.build_menu_json import build_menu_json, load_menu_json
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -50,6 +51,9 @@ rag_system = RAGSystem()
 feedback_store = {}
 conversation_store = {}
 
+# Estado del menú jerárquico
+app.state.menu = {}
+
 # Montar archivos estáticos
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -57,14 +61,38 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 async def startup_event():
     """Inicializar sistema al arrancar"""
     try:
-        print_config_summary()  # <-- MUESTRA CONFIGURACIÓN
+        print_config_summary()
+        
         # Cargar intents
         rag_system.load_intents("data/intents.json")
+        
+        # Cargar o generar menú jerárquico
+        menu_json_path = "data/menu.json"
+        excel_path = "data/Navegación Jerárquica_FER.xlsx"
+        
+        if os.path.exists(menu_json_path):
+            app.state.menu = load_menu_json(menu_json_path)
+            logger.info(f"✅ Menú cargado desde: {menu_json_path}")
+            logger.info(f"   Categorías: {len(app.state.menu)}")
+        elif os.path.exists(excel_path):
+            logger.info("📋 Generando menú desde Excel...")
+            if build_menu_json(excel_path, menu_json_path):
+                app.state.menu = load_menu_json(menu_json_path)
+                logger.info(f"✅ Menú generado y cargado: {len(app.state.menu)} categorías")
+            else:
+                logger.warning("⚠️ No se pudo generar el menú desde Excel")
+                app.state.menu = {}
+        else:
+            logger.warning(f"⚠️ Archivo Excel no encontrado: {excel_path}")
+            logger.warning("   El menú jerárquico no estará disponible")
+            app.state.menu = {}
+        
         logger.info("Sistema RAG inicializado correctamente")
         logger.info("Interfaz web disponible en: http://localhost:8000")
         logger.info("API Docs disponible en: http://localhost:8000/api/docs")
     except Exception as e:
         logger.error(f"Error inicializando RAG: {e}")
+        app.state.menu = {}
 
 @app.get("/")
 async def root():
@@ -230,6 +258,13 @@ async def get_rag_stats():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/menu")
+async def get_menu():
+    """Endpoint para obtener la estructura del menú jerárquico"""
+    if hasattr(app.state, 'menu') and app.state.menu:
+        return {"menu": app.state.menu}
+    return {"menu": {}}
 
 if __name__ == "__main__":
     import uvicorn

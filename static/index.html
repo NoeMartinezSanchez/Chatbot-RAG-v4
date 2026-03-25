@@ -123,6 +123,144 @@
             transform: translateX(5px);
         }
 
+        /* Menú jerárquico */
+        .menu-section {
+            margin-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 20px;
+        }
+
+        .menu-section h3 {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .menu-container {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .menu-category {
+            margin-bottom: 8px;
+        }
+
+        .menu-btn {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.15);
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            color: white;
+            cursor: pointer;
+            text-align: left;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+
+        .menu-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateX(5px);
+        }
+
+        .menu-btn.active {
+            background: var(--accent-color);
+        }
+
+        .menu-btn i {
+            transition: transform 0.3s;
+        }
+
+        .menu-btn.expanded i {
+            transform: rotate(90deg);
+        }
+
+        .menu-subcategory {
+            display: none;
+            margin-left: 20px;
+            margin-top: 5px;
+        }
+
+        .menu-subcategory.visible {
+            display: block;
+        }
+
+        .menu-question {
+            display: none;
+            margin-left: 20px;
+            margin-top: 5px;
+        }
+
+        .menu-question.visible {
+            display: block;
+        }
+
+        .subcategory-btn {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 6px;
+            padding: 10px;
+            color: white;
+            cursor: pointer;
+            text-align: left;
+            font-size: 13px;
+            margin-bottom: 5px;
+            transition: all 0.3s;
+        }
+
+        .subcategory-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .question-btn {
+            width: 100%;
+            background: rgba(26, 188, 156, 0.2);
+            border: 1px solid rgba(26, 188, 156, 0.3);
+            border-radius: 6px;
+            padding: 8px 10px;
+            color: white;
+            cursor: pointer;
+            text-align: left;
+            font-size: 12px;
+            margin-bottom: 4px;
+            transition: all 0.3s;
+        }
+
+        .question-btn:hover {
+            background: rgba(26, 188, 156, 0.4);
+        }
+
+        .menu-back-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: white;
+            cursor: pointer;
+            font-size: 13px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+
+        .menu-back-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .menu-empty {
+            text-align: center;
+            padding: 20px;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 14px;
+        }
+
         /* Área principal del chat */
         .main-content {
             flex: 1;
@@ -415,6 +553,13 @@
                     ¿Cuál es el proceso de reingreso?
                 </div>
             </div>
+
+            <div class="menu-section">
+                <h3><i class="fas fa-folder-tree"></i> Navegación por Temas</h3>
+                <div id="menuContainer" class="menu-container">
+                    <div class="menu-empty">Cargando menú...</div>
+                </div>
+            </div>
         </div>
 
         <!-- Área principal -->
@@ -474,6 +619,11 @@
         let messageCount = 0;
         let ragResponseCount = 0;
         let totalConfidence = 0;
+        
+        // Estado del menú jerárquico
+        let menuData = {};
+        let currentCategory = null;
+        let currentSubcategory = null;
 
         // Inicialización
         document.addEventListener('DOMContentLoaded', function() {
@@ -486,6 +636,9 @@
             
             // Cargar estadísticas iniciales
             loadStats();
+            
+            // Cargar menú jerárquico
+            loadMenu();
             
             // Enfocar el input
             document.getElementById('messageInput').focus();
@@ -757,6 +910,130 @@
             } catch (error) {
                 console.log('No se pudieron cargar estadísticas iniciales');
             }
+        }
+
+        // Cargar menú jerárquico
+        async function loadMenu() {
+            try {
+                const response = await fetch(`${API_URL}/menu`);
+                if (response.ok) {
+                    const data = await response.json();
+                    menuData = data.menu || {};
+                    renderMenuCategories();
+                } else {
+                    document.getElementById('menuContainer').innerHTML = '<div class="menu-empty">Menú no disponible</div>';
+                }
+            } catch (error) {
+                console.error('Error cargando menú:', error);
+                document.getElementById('menuContainer').innerHTML = '<div class="menu-empty">Error al cargar menú</div>';
+            }
+        }
+
+        // Renderizar categorías
+        function renderMenuCategories() {
+            const container = document.getElementById('menuContainer');
+            
+            if (Object.keys(menuData).length === 0) {
+                container.innerHTML = '<div class="menu-empty">No hay temas disponibles</div>';
+                return;
+            }
+            
+            let html = '';
+            Object.keys(menuData).forEach(category => {
+                html += `
+                    <div class="menu-category">
+                        <button class="menu-btn" onclick="toggleCategory('${escapeHtml(category)}')">
+                            <i class="fas fa-chevron-right"></i>
+                            ${escapeHtml(category)}
+                        </button>
+                        <div class="menu-subcategory" id="subcat-${escapeHtml(category)}">
+                            ${renderSubcategories(category)}
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // Renderizar subcategorías
+        function renderSubcategories(category) {
+            const subcategories = menuData[category];
+            let html = '';
+            
+            Object.keys(subcategories).forEach(subcat => {
+                const questions = subcategories[subcat];
+                html += `
+                    <button class="subcategory-btn" onclick="toggleSubcategory('${escapeHtml(category)}', '${escapeHtml(subcat)}')">
+                        <i class="fas fa-folder"></i> ${escapeHtml(subcat)} (${questions.length})
+                    </button>
+                    <div class="menu-question" id="ques-${escapeHtml(category)}-${escapeHtml(subcat)}">
+                        ${renderQuestions(category, subcat)}
+                    </div>
+                `;
+            });
+            
+            return html;
+        }
+
+        // Renderizar preguntas
+        function renderQuestions(category, subcategory) {
+            const questions = menuData[category][subcategory];
+            let html = '';
+            
+            questions.forEach((q, idx) => {
+                html += `
+                    <button class="question-btn" onclick="showAnswer('${escapeHtml(category)}', '${escapeHtml(subcategory)}', ${idx})">
+                        <i class="fas fa-question-circle"></i> ${escapeHtml(q.question)}
+                    </button>
+                `;
+            });
+            
+            return html;
+        }
+
+        // Alternar categoría
+        function toggleCategory(category) {
+            const subcatDiv = document.getElementById(`subcat-${category}`);
+            const btn = subcatDiv.previousElementSibling;
+            
+            subcatDiv.classList.toggle('visible');
+            btn.classList.toggle('expanded');
+        }
+
+        // Alternar subcategoría
+        function toggleSubcategory(category, subcategory) {
+            const quesDiv = document.getElementById(`ques-${category}-${subcategory}`);
+            quesDiv.classList.toggle('visible');
+        }
+
+        // Mostrar respuesta en el chat
+        function showAnswer(category, subcategory, questionIdx) {
+            const question = menuData[category][subcategory][questionIdx];
+            
+            const chatMessages = document.getElementById('chatMessages');
+            
+            // Crear mensaje del bot
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message bot-message';
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = `
+                <strong><i class="fas fa-folder-tree"></i> Asistente:</strong><br>
+                <span style="font-size: 12px; color: var(--accent-color);">Tema: ${escapeHtml(category)} > ${escapeHtml(subcategory)}</span><br><br>
+                <strong>Pregunta:</strong> ${escapeHtml(question.question)}<br><br>
+                <strong>Respuesta:</strong><br>${escapeHtml(question.answer)}
+            `;
+            
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = getCurrentTime();
+            
+            messageDiv.appendChild(contentDiv);
+            messageDiv.appendChild(timeDiv);
+            chatMessages.appendChild(messageDiv);
+            
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
         // Seguridad: escapar HTML
