@@ -139,3 +139,19 @@ python scripts/load_chunks_to_rag.py --chunks "..\Documentos RAG\output\chunks\r
 python debug_chunks_pdf_simple.py
 
 python debug_chunks_pdf_simple.py --name mi_prueba_marzo
+
+
+#------------FLUJO DE TRABAJO ACTUAL CON HFS----------------------------
+
+# 1. Trabajas en tu copia local
+cd D:\PythonProjects\MachineLearning\ChatBot\Chatbot-RAG-Fuente-Base
+
+# 2. Haces cambios en tu código
+# ...
+
+# 3. Subes a GitHub
+git add .
+git commit -m "Descripción de tus cambios"
+git push github main
+
+# 4. ¡Automáticamente se actualiza tu Space en HF!
