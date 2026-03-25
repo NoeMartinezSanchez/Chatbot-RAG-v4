@@ -53,8 +53,15 @@ def get_column_value(row: pd.Series, possible_names: List[str]) -> Optional[str]
         Valor de la columna o None si no se encuentra
     """
     for col_name in possible_names:
-        if col_name in row.index and pd.notna(row[col_name]):
-            return str(row[col_name]).strip()
+        # Buscar coincidencia exacta o parcial
+        for actual_col in row.index:
+            if actual_col.lower().strip() == col_name.lower().strip():
+                if pd.notna(row[actual_col]):
+                    return str(row[actual_col]).strip()
+            # También buscar si contiene el nombre
+            if col_name.lower() in actual_col.lower():
+                if pd.notna(row[actual_col]):
+                    return str(row[actual_col]).strip()
     return None
 
 
@@ -68,13 +75,20 @@ def extract_additional_columns(row: pd.Series) -> Dict[str, Any]:
     Returns:
         Diccionario con columnas adicionales
     """
-    main_columns = {'categoria', 'subcategoria', 'asunto', 'solucion', 'respuesta'}
+    main_columns = {'categoria', 'subcategoria', 'subcategoría', 'asunto', 'solucion', 'solución', 'respuesta', 'categoría', 'solución /acción'}
     additional = {}
     
     for col in row.index:
         col_normalized = normalize_column_name(col)
-        if col_normalized not in main_columns and pd.notna(row[col]):
-            additional[col_normalized] = str(row[col]).strip()
+        # Ignorar columnas principales
+        is_main = False
+        for main in main_columns:
+            if main in col_normalized or col_normalized in main:
+                is_main = True
+                break
+        if not is_main and pd.notna(row[col]):
+            clean_col = col.strip()
+            additional[clean_col] = str(row[col]).strip()
     
     return additional
 
@@ -113,12 +127,23 @@ def build_menu_json(excel_path: str, output_json_path: str) -> bool:
                     logger.warning(f"  ⚠️ Hoja vacía: {sheet_name}")
                     continue
                 
+                # La categoría puede ser el nombre de la hoja O una columna
                 category_name = sheet_name.strip()
                 subcategories: Dict[str, List[Dict]] = {}
                 
                 for idx, row in df.iterrows():
-                    subcategory = get_column_value(row, ['subcategoria', 'asunto', 'categoría', 'subcategoría'])
-                    question = get_column_value(row, ['solucion', 'pregunta', 'solución', 'pregunta'])
+                    # La categoría puede estar en columna "Categoría" o usar el nombre de la hoja
+                    category_col = get_column_value(row, ['categoria', 'categoría', 'categoría'])
+                    if category_col:
+                        category_name = category_col
+                    
+                    # Subcategoría puede ser "Asunto" 
+                    subcategory = get_column_value(row, ['subcategoria', 'subcategoría', 'asunto', 'asunto'])
+                    
+                    # Pregunta puede estar en "Solución" o "Solución /Acción"
+                    question = get_column_value(row, ['solucion', 'solución', 'pregunta', 'solución /acción'])
+                    
+                    # Respuesta
                     answer = get_column_value(row, ['respuesta'])
                     
                     if not question or not answer:
@@ -142,7 +167,8 @@ def build_menu_json(excel_path: str, output_json_path: str) -> bool:
                 
                 if subcategories:
                     menu_structure[category_name] = subcategories
-                    logger.info(f"    ✓ Categoría '{category_name}': {len(subcategories)} subcategorías")
+                    total_q = sum(len(v) for v in subcategories.values())
+                    logger.info(f"    ✓ Categoría '{category_name}': {len(subcategories)} subcategorías, {total_q} preguntas")
                 else:
                     logger.warning(f"    ⚠️ Sin datos válidos: {sheet_name}")
                     
@@ -191,16 +217,55 @@ def load_menu_json(json_path: str) -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
-    excel_path = "data/Navegación Jerárquica_FER.xlsx"
-    output_path = "data/menu.json"
+    import argparse
     
-    logger.info("🚀 Iniciando generación de menú JSON")
+    parser = argparse.ArgumentParser(
+        description="Genera menu.json desde Excel para el chatbot RAG"
+    )
+    parser.add_argument(
+        "--excel", 
+        default="data/Navegación Jerárquica_FER.xlsx",
+        help="Ruta al archivo Excel de navegación jerárquica"
+    )
+    parser.add_argument(
+        "--output", 
+        default="data/menu.json",
+        help="Ruta de salida para el archivo JSON"
+    )
     
-    success = build_menu_json(excel_path, output_path)
+    args = parser.parse_args()
+    
+    logger.info("=" * 50)
+    logger.info("🚀 GENERADOR DE MENÚ JSON")
+    logger.info("=" * 50)
+    logger.info(f"📄 Excel: {args.excel}")
+    logger.info(f"📁 Salida: {args.output}")
+    logger.info("=" * 50)
+    
+    success = build_menu_json(args.excel, args.output)
     
     if success:
-        logger.info("✅ Proceso completado")
-        menu = load_menu_json(output_path)
-        logger.info(f"Estructura: {json.dumps(menu, ensure_ascii=False, indent=2)[:500]}...")
+        logger.info("=" * 50)
+        logger.info("✅ PROCESO COMPLETADO")
+        logger.info("=" * 50)
+        
+        # Mostrar resumen
+        menu = load_menu_json(args.output)
+        total_cats = len(menu)
+        total_subcats = sum(len(v) for v in menu.values())
+        total_questions = sum(len(w) for v in menu.values() for w in v.values())
+        
+        logger.info(f"📊 Resumen:")
+        logger.info(f"   - Categorías: {total_cats}")
+        logger.info(f"   - Subcategorías: {total_subcats}")
+        logger.info(f"   - Preguntas: {total_questions}")
+        logger.info("")
+        logger.info(f"📁 Archivo generado: {os.path.abspath(args.output)}")
+        logger.info("")
+        logger.info("💡 Este archivo (menu.json) debe subirse al repositorio.")
+        logger.info("   NO subir el archivo Excel (*.xlsx)")
     else:
-        logger.error("❌ Proceso fallido")
+        logger.error("=" * 50)
+        logger.error("❌ PROCESO FALLIDO")
+        logger.error("=" * 50)
+        logger.error(f"Verifica que el archivo Excel exista en: {args.excel}")

@@ -41,10 +41,12 @@ logs/
 # Docker
 *.dockerignore
 
-# Data files - Excel and generated JSON
+# Data files - Excel (NO subir a HF Spaces)
 *.xlsx
 data/*.xlsx
-data/menu.json
+
+# menu.json SÍ se sube (es ligero, texto plano)
+# data/menu.json
 
 # Pickle files - excluir data/ pero permitir vector_store/
 data/*.pkl
