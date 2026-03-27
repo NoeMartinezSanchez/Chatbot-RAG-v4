@@ -1,5 +1,6 @@
 #Para arrancar el ambiente virtual
-tinyllama_env\Scripts\activate 
+.\tinyllama_env\Scripts\Activate.ps1
+.\tinyllama_env\Scripts\Activate.ps1
 
 #Para verificar si la api esta corriendo
 netstat -ano | findstr :8000

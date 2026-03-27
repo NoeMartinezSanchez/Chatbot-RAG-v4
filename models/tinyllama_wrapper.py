@@ -108,12 +108,12 @@ class TinyLlamaWrapper:
     def generate(
         self,
         prompt: str,
-        max_new_tokens: int = 256,
-        temperature: float = 0.7,
-        top_p: float = 0.95,
-        repetition_penalty: float = 1.0,
-        early_stopping: bool = False,
-        no_repeat_ngram_size: int = 0,
+        max_new_tokens: int = 180,
+        temperature: float = 0.3,
+        top_p: float = 0.85,
+        repetition_penalty: float = 1.1,
+        early_stopping: bool = True,
+        no_repeat_ngram_size: int = 3,
     ) -> str:
         """Generate a response from a prompt.
 
@@ -181,7 +181,7 @@ class TinyLlamaWrapper:
         self,
         context: str,
         question: str,
-        max_new_tokens: int = 256,
+        max_new_tokens: int = 180,
     ) -> str:
         """Generate a response given context and a question (RAG mode).
 
@@ -196,29 +196,28 @@ class TinyLlamaWrapper:
         if len(context) > 1500:
             context = context[:1500] + "..."
 
-        prompt = f"""Eres un asistente virtual amable de Prepa en Línea SEP. 
-Debes responder SIEMPRE en español, de forma clara y útil.
-
-Contexto relevante:
+        prompt = f"""<|system|>
+Eres un asistente virtual experto de Prepa en Línea SEP. Tu función es responder preguntas basándote ESTRICTAMENTE en el contexto oficial proporcionado. Siempre respondes en español neutro, de forma clara, útil y profesional. Si la respuesta no está en el contexto, dices exactamente: "Lo siento, no encontré información específica sobre eso en los materiales disponibles. Por favor, consulta los canales oficiales."
+<|end|>
+<|user|>
+Contexto oficial:
 {context}
 
 Pregunta del estudiante:
 {question}
-
-Instrucciones:
-- Responde ÚNICAMENTE con la información del contexto proporcionado
-- Si la información no está en el contexto, di: "Lo siento, no encontré información específica sobre eso en los materiales disponibles."
-- Mantén un tono amable y profesional
-- Responde SIEMPRE en español, NUNCA en inglés
-
-Respuesta en español:"""
+<|end|>
+<|assistant|>
+De acuerdo a la información oficial:"""
 
         logger.info(f"RAG generation - Context length: {len(context)}, Question: {question[:50]}...")
         return self.generate(
             prompt,
             max_new_tokens=max_new_tokens,
             temperature=0.3,
-            top_p=0.95,
+            top_p=0.85,
+            repetition_penalty=1.1,
+            no_repeat_ngram_size=3,
+            early_stopping=True,
         )
 
     def _log_error(self, error_msg: str) -> None:
