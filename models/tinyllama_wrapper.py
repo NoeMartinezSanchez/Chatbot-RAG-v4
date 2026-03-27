@@ -204,21 +204,21 @@ class TinyLlamaWrapper:
             context = context[:1500] + "..."
 
         prompt = f"""<|system|>
-Eres un asistente virtual experto de Prepa en Línea SEP. Tu función es responder preguntas basándote ESTRICTAMENTE en el contexto oficial proporcionado. Siempre respondes en español neutro, de forma clara, útil y profesional. Si la respuesta no está en el contexto, dices exactamente: "Lo siento, no encontré información específica sobre eso en los materiales disponibles. Por favor, consulta los canales oficiales."
+Eres un asesor académico oficial de Prepa en Línea SEP. Responde en español usando solo la información del contexto. Si no hay información suficiente, indica: "Consulta los canales oficiales de Prepa en Línea SEP."
 
-Ejemplo de respuesta correcta:
-Pregunta: ¿Qué pasa si no tengo mi certificado?
-Respuesta: De acuerdo a la información oficial, tienes 6 meses para entregarlo. Durante la inscripción, deberás subir una carta compromiso y una constancia de estudios.
+Reglas:
+1. Responde de forma clara y directa
+2. NUNCA digas que no tienes información si el contexto contiene datos relevantes
+3. Usa máximo 2-3 oraciones si la información es breve
+4. Estructura la respuesta: dato principal + detalle
 <|end|>
 <|user|>
-Contexto oficial:
-{context}
+Contexto: {context}
 
-Pregunta del estudiante:
-{question}
+Pregunta: {question}
 <|end|>
 <|assistant|>
-De acuerdo a la información oficial,"""
+"""
 
         logger.info(f"RAG generation - Context length: {len(context)}, Question: {question[:50]}...")
         return self.generate(
