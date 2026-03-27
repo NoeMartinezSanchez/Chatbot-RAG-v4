@@ -109,8 +109,9 @@ class TinyLlamaWrapper:
         self,
         prompt: str,
         max_new_tokens: int = 180,
-        temperature: float = 0.5,
-        top_p: float = 0.85,
+        min_new_tokens: int = 0,
+        temperature: float = 0.7,
+        top_p: float = 0.9,
         repetition_penalty: float = 1.1,
         early_stopping: bool = False,
         no_repeat_ngram_size: int = 3,
@@ -120,6 +121,7 @@ class TinyLlamaWrapper:
         Args:
             prompt: The input prompt string.
             max_new_tokens: Maximum number of tokens to generate.
+            min_new_tokens: Minimum number of tokens to generate (forces at least this many).
             temperature: Sampling temperature (higher = more random).
             top_p: Nucleus sampling threshold.
             repetition_penalty: Penalty for repeating tokens (1.0 = no penalty).
@@ -148,6 +150,7 @@ class TinyLlamaWrapper:
                 outputs = self.model.generate(
                     **inputs,
                     max_new_tokens=max_new_tokens,
+                    min_new_tokens=min_new_tokens,
                     temperature=temperature,
                     top_p=top_p,
                     repetition_penalty=repetition_penalty,
@@ -164,6 +167,10 @@ class TinyLlamaWrapper:
             )
 
             response = generated_text[len(prompt):].strip()
+
+            if len(response) < 10:
+                logger.warning(f"Response too short ({len(response)} chars), using fallback")
+                response = "Lo siento, no pude generar una respuesta específica. Por favor, reformula tu pregunta o consulta los materiales oficiales."
 
             elapsed = time.time() - start_time
             tokens_generated = len(outputs[0]) - len(inputs["input_ids"][0])
@@ -198,6 +205,10 @@ class TinyLlamaWrapper:
 
         prompt = f"""<|system|>
 Eres un asistente virtual experto de Prepa en Línea SEP. Tu función es responder preguntas basándote ESTRICTAMENTE en el contexto oficial proporcionado. Siempre respondes en español neutro, de forma clara, útil y profesional. Si la respuesta no está en el contexto, dices exactamente: "Lo siento, no encontré información específica sobre eso en los materiales disponibles. Por favor, consulta los canales oficiales."
+
+Ejemplo de respuesta correcta:
+Pregunta: ¿Qué pasa si no tengo mi certificado?
+Respuesta: De acuerdo a la información oficial, tienes 6 meses para entregarlo. Durante la inscripción, deberás subir una carta compromiso y una constancia de estudios.
 <|end|>
 <|user|>
 Contexto oficial:
@@ -207,17 +218,18 @@ Pregunta del estudiante:
 {question}
 <|end|>
 <|assistant|>
-De acuerdo a la información oficial:"""
+De acuerdo a la información oficial,"""
 
         logger.info(f"RAG generation - Context length: {len(context)}, Question: {question[:50]}...")
         return self.generate(
             prompt,
             max_new_tokens=max_new_tokens,
-            temperature=0.5,
-            top_p=0.85,
+            temperature=0.7,
+            top_p=0.9,
             repetition_penalty=1.1,
             no_repeat_ngram_size=3,
             early_stopping=False,
+            min_new_tokens=20,
         )
 
     def _log_error(self, error_msg: str) -> None:
