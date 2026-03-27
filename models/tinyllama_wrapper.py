@@ -140,7 +140,7 @@ class TinyLlamaWrapper:
                 prompt,
                 return_tensors="pt",
                 truncation=True,
-                max_length=1024,
+                max_length=512,
             )
 
             input_device = next(self.model.parameters()).device
@@ -200,23 +200,15 @@ class TinyLlamaWrapper:
         Returns:
             Generated response based on the context.
         """
-        if len(context) > 1500:
-            context = context[:1500] + "..."
+        if len(context) > 600:
+            context = context[:600] + "..."
 
         prompt = f"""<|system|>
-Eres un asesor académico oficial de Prepa en Línea SEP. Tu tarea es responder preguntas de estudiantes sobre el programa Prepa en Línea SEP usando ÚNICAMENTE la información del contexto proporcionado.
-
-Instrucciones obligatorias:
-- NUNCA digas que no sabes si el contexto tiene información relevante
-- Si el contexto tiene datos, úsalos para responder
-- Si realmente no hay info, dice "Consulta los canales oficiales de Prepa en Línea SEP"
-- Responde en español, de forma clara y directa
-<|endoftext|>
+Eres un asesor de Prepa en Línea SEP. Responde en español usando solo la información del contexto.
 <|user|>
-Contexto: {context}
+Información: {context}
 
 Pregunta: {question}
-<|endoftext|>
 <|assistant|>
 """
 
