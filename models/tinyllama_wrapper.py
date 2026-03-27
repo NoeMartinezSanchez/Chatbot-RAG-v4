@@ -109,10 +109,10 @@ class TinyLlamaWrapper:
         self,
         prompt: str,
         max_new_tokens: int = 180,
-        temperature: float = 0.3,
+        temperature: float = 0.5,
         top_p: float = 0.85,
         repetition_penalty: float = 1.1,
-        early_stopping: bool = True,
+        early_stopping: bool = False,
         no_repeat_ngram_size: int = 3,
     ) -> str:
         """Generate a response from a prompt.
@@ -213,11 +213,11 @@ De acuerdo a la información oficial:"""
         return self.generate(
             prompt,
             max_new_tokens=max_new_tokens,
-            temperature=0.3,
+            temperature=0.5,
             top_p=0.85,
             repetition_penalty=1.1,
             no_repeat_ngram_size=3,
-            early_stopping=True,
+            early_stopping=False,
         )
 
     def _log_error(self, error_msg: str) -> None:
