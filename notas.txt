@@ -156,3 +156,13 @@ git commit -m "Descripción de tus cambios"
 git push github main
 
 # 4. ¡Automáticamente se actualiza tu Space en HF!
+
+--------trabajo en Oracle cloud------------------
+
+Conexion a la nube por ssh
+
+ssh -i C:\Users\mecat\.ssh\oci_key ubuntu@140.84.189.188
+
+Verificar que el servicio este corriendo
+
+sudo systemctl status chatbot
