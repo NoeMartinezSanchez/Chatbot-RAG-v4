@@ -120,24 +120,23 @@ class TinyLlamaGenerator:
         if not clean_context or len(clean_context) < 50:
             return "Lo siento, no encontré información específica sobre eso en los materiales de Prepa en Línea SEP."
 
-        prompt = f"""Eres un asesor académico amigable de Prepa en Línea SEP. Solo responde sobre este programa.
+        prompt = f"""Eres un asesor académico de Prepa en Línea SEP. Responde solo usando esta información del contexto.
 
-INFORMACIÓN DE CONTEXTO:
-{clean_context}
+Contexto: {clean_context}
 
-PREGUNTA: {question}
+Pregunta: {question}
 
-Responde de forma clara y concisa en 2-3 oraciones máximo. Usa solo la información del contexto. Si no hay información suficiente, dilo."""
+Respuesta directa y completa:"""
 
         logger.info(f"RAG generation - Context: {len(clean_context)} chars, Question: {question[:50]}...")
 
         try:
             return self.wrapper.generate(
                 prompt=prompt,
-                max_new_tokens=100,
-                temperature=0.2,
-                top_p=0.8,
-                min_new_tokens=20,
+                max_new_tokens=150,
+                temperature=0.1,
+                top_p=0.7,
+                min_new_tokens=40,
             )
         except Exception as e:
             logger.error(f"Error in generate_with_context: {e}")
