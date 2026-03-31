@@ -19,7 +19,7 @@ class RAGSystem:
     def __init__(self):
         self.embedder = EmbeddingModel()
         self.vector_store = VectorStoreFAISS()  # <-- CORREGIDO
-        self.generator = TinyLlamaGenerator(use_quantization=True)
+        self.generator = TinyLlamaGenerator(use_quantization=False)
         self.intents_loaded = False
 
         self.top_k = settings.TOP_K_RESULTS
