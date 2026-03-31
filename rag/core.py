@@ -19,7 +19,7 @@ class RAGSystem:
     def __init__(self):
         self.embedder = EmbeddingModel()
         self.vector_store = VectorStoreFAISS()  # <-- CORREGIDO
-        self.generator = TinyLlamaGenerator(use_quantization=False)
+        self.generator = TinyLlamaGenerator(use_quantization=True)
         self.intents_loaded = False
 
         self.top_k = settings.TOP_K_RESULTS
@@ -158,7 +158,8 @@ class RAGSystem:
             # 4. Verificar si la similitud es suficientemente alta
             if doc_results['distances'] and doc_results['distances'][0]:
                 distance = doc_results['distances'][0][0]
-                if distance > 1.5:
+                # Umbral más permisivo para permitir más respuestas
+                if distance > 2.5:
                     return "No encontré información específica sobre eso en los materiales de Prepa en Línea SEP.", False, 0.0, []
             
             # 5. Generar respuesta RAG

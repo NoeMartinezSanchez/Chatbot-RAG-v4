@@ -168,9 +168,11 @@ class TinyLlamaWrapper:
 
             response = generated_text[len(prompt):].strip()
 
-            if len(response) < 10:
-                logger.warning(f"Response too short ({len(response)} chars), using fallback")
-                response = "Lo siento, no pude generar una respuesta específica. Por favor, reformula tu pregunta o consulta los materiales oficiales."
+            if len(response) < 20:
+                logger.warning(f"Response too short ({len(response)} chars), returning anyway")
+                # En lugar de fallback, devolver lo que generó
+                if response.strip():
+                    return response.strip()
 
             elapsed = time.time() - start_time
             tokens_generated = len(outputs[0]) - len(inputs["input_ids"][0])
@@ -213,16 +215,16 @@ Pregunta: {question}
 """
 
         logger.info(f"RAG generation - Context length: {len(context)}, Question: {question[:50]}...")
-        return self.generate(
-            prompt,
-            max_new_tokens=max_new_tokens,
-            temperature=0.7,
-            top_p=0.9,
-            repetition_penalty=1.1,
-            no_repeat_ngram_size=3,
-            early_stopping=False,
-            min_new_tokens=20,
-        )
+            return self.generate(
+                prompt=prompt,
+                max_new_tokens=max_new_tokens,
+                temperature=0.2,
+                top_p=0.8,
+                repetition_penalty=1.3,
+                no_repeat_ngram_size=3,
+                early_stopping=True,
+                min_new_tokens=30,
+            )
 
     def _log_error(self, error_msg: str) -> None:
         """Log an error message.

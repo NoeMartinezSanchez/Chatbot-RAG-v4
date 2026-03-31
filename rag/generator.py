@@ -91,7 +91,7 @@ class TinyLlamaGenerator:
         self,
         context: str,
         question: str,
-        max_new_tokens: int = 150,
+        max_new_tokens: int = 200,
     ) -> str:
         """Genera respuesta basada en contexto para Prepa en Línea SEP."""
         import re
@@ -114,8 +114,8 @@ class TinyLlamaGenerator:
 
         clean_context = ' '.join(clean_lines)
 
-        if len(clean_context) > 1200:
-            clean_context = clean_context[:1200] + "..."
+        if len(clean_context) > 1500:
+            clean_context = clean_context[:1500] + "..."
 
         if not clean_context or len(clean_context) < 50:
             return "Lo siento, no encontré información específica sobre eso en los materiales de Prepa en Línea SEP."
@@ -125,10 +125,10 @@ class TinyLlamaGenerator:
 CONTEXTO OFICIAL:
 {clean_context}
 
-PREGUNTA:
+PREGUNTA DEL ESTUDIANTE:
 {question}
 
-Responde usando SOLO la información del contexto. Si no hay información suficiente, dilo claramente. Sé breve y directo."""
+RESPUESTA DEL ASESOR (usa el contexto acima):"""
 
         logger.info(f"RAG generation - Context: {len(clean_context)} chars, Question: {question[:50]}...")
 
@@ -136,8 +136,10 @@ Responde usando SOLO la información del contexto. Si no hay información sufici
             return self.wrapper.generate(
                 prompt=prompt,
                 max_new_tokens=max_new_tokens,
-                temperature=0.5,
-                top_p=0.95,
+                temperature=0.3,
+                top_p=0.85,
+                min_new_tokens=50,
+                repetition_penalty=1.2,
             )
         except Exception as e:
             logger.error(f"Error in generate_with_context: {e}")
