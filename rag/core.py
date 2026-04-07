@@ -12,6 +12,7 @@ from config.settings import settings
 from .embeddings import EmbeddingModel
 from .retriever import VectorStoreFAISS
 from .generator import TinyLlamaGenerator
+from .gemma_generator import GemmaGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ class RAGSystem:
     def __init__(self):
         self.embedder = EmbeddingModel()
         self.vector_store = VectorStoreFAISS()  # <-- CORREGIDO
-        self.generator = TinyLlamaGenerator(use_quantization=False)
+        self.generator = GemmaGenerator()
         self.intents_loaded = False
 
         self.top_k = settings.TOP_K_RESULTS
