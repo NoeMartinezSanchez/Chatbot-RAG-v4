@@ -11,7 +11,9 @@ from typing import Optional
 
 import torch
 from loguru import logger
+from requests.adapters import HTTPAdapter
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from urllib3.util.retry import Retry
 
 
 class GemmaWrapper:
@@ -50,6 +52,25 @@ class GemmaWrapper:
             level="INFO",
         )
 
+    def _create_session_with_retry(self):
+        """Create a requests session with retry strategy for downloads."""
+        session = torch.huggingface_hub.hf_hub_download
+        
+        adapter = HTTPAdapter(
+            max_retries=Retry(
+                total=3,
+                backoff_factor=2,
+                status_forcelist=[500, 502, 503, 504],
+            ),
+            timeout=300,
+        )
+        
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        
+        logger.info("Created HTTP session with retry strategy (3 retries, 300s timeout)")
+        return session
+
     def _load_model(self) -> None:
         """Load the Gemma model and tokenizer."""
         try:
@@ -62,25 +83,34 @@ class GemmaWrapper:
             else:
                 logger.warning("HF_TOKEN not found in environment variables")
 
-            logger.info("Loading tokenizer...")
+            logger.info("Downloading tokenizer... (this may take a few minutes)")
+            download_start = time.time()
             self.tokenizer = AutoTokenizer.from_pretrained(
                 self.model_name,
                 cache_dir=self.cache_dir,
                 token=hf_token,
+                timeout=300,
             )
+            download_time = time.time() - download_start
+            logger.info(f"Tokenizer downloaded in {download_time:.1f}s")
 
             if self.tokenizer.pad_token is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
                 logger.info("Set pad_token = eos_token")
 
-            logger.info("Loading model with device_map='cpu' and torch.float32...")
+            logger.info("Downloading model... (this may take 5-10 minutes, please wait)")
+            logger.info("Model size: ~4-5 GB. Using 300s timeout for download.")
+            model_start = time.time()
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_name,
                 device_map="cpu",
                 torch_dtype=torch.float32,
                 cache_dir=self.cache_dir,
                 token=hf_token,
+                timeout=300,
             )
+            model_time = time.time() - model_start
+            logger.info(f"Model downloaded in {model_time:.1f}s")
 
             self.model.eval()
             logger.info("Model loaded successfully on CPU with float32")
