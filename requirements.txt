@@ -25,7 +25,7 @@ torch==2.4.1
 transformers==4.38.0
 accelerate==0.31.0  # Esencial para carga optimizada en GPU/CPU
 huggingface-hub==0.23.0
-tokenizers==0.19.0
+tokenizers==0.18.0
 safetensors==0.4.3  # Seguro y rápido para guardar/cargar pesos
 
 # Quantization 4-bit (bitsandbytes)
