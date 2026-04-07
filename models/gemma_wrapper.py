@@ -5,6 +5,7 @@ responses in a RAG architecture, optimized for CPU-only inference without quanti
 """
 
 import gc
+import os
 import time
 from typing import Optional
 
@@ -55,10 +56,17 @@ class GemmaWrapper:
             logger.info(f"Initializing Gemma model: {self.model_name}")
             logger.info(f"Loading on CPU with float32 (no quantization)")
 
+            hf_token = os.getenv("HF_TOKEN")
+            if hf_token:
+                logger.info("HF_TOKEN found in environment variables")
+            else:
+                logger.warning("HF_TOKEN not found in environment variables")
+
             logger.info("Loading tokenizer...")
             self.tokenizer = AutoTokenizer.from_pretrained(
                 self.model_name,
                 cache_dir=self.cache_dir,
+                token=hf_token,
             )
 
             if self.tokenizer.pad_token is None:
@@ -71,6 +79,7 @@ class GemmaWrapper:
                 device_map="cpu",
                 torch_dtype=torch.float32,
                 cache_dir=self.cache_dir,
+                token=hf_token,
             )
 
             self.model.eval()
