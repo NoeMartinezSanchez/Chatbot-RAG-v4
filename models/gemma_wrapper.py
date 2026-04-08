@@ -6,14 +6,41 @@ responses in a RAG architecture, optimized for CPU-only inference without quanti
 
 import gc
 import os
+import sys
 import time
 from typing import Optional
 
 import torch
+import transformers
 from loguru import logger
 from requests.adapters import HTTPAdapter
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from urllib3.util.retry import Retry
+
+
+MODEL_VARIANTS = [
+    "google/gemma-2-2b-it",
+    "google/gemma-1.1-2b-it",
+    "google/gemma-2b-it",
+]
+
+MIN_TRANSFORMERS_VERSION = "4.40.0"
+
+
+def _check_transformers_version():
+    """Verify transformers version meets minimum requirement."""
+    installed = transformers.__version__
+    major, minor, _ = installed.split(".")[:3]
+    required_major, required_minor = MIN_TRANSFORMERS_VERSION.split(".")[:2]
+    
+    if (int(major) < int(required_major) or 
+        (int(major) == int(required_major) and int(minor) < int(required_minor))):
+        logger.warning(
+            f"transformers {installed} may be incompatible. "
+            f"Recommended: >= {MIN_TRANSFORMERS_VERSION}"
+        )
+    else:
+        logger.info(f"transformers version: {installed} (OK)")
 
 
 class GemmaWrapper:
@@ -34,6 +61,8 @@ class GemmaWrapper:
             model_name: Hugging Face model identifier.
             cache_dir: Directory to cache the model files.
         """
+        _check_transformers_version()
+        
         self.model_name = model_name
         self.cache_dir = cache_dir
         self.device = "cpu"
@@ -52,73 +81,79 @@ class GemmaWrapper:
             level="INFO",
         )
 
-    def _create_session_with_retry(self):
-        """Create a requests session with retry strategy for downloads."""
-        session = torch.huggingface_hub.hf_hub_download
-        
-        adapter = HTTPAdapter(
-            max_retries=Retry(
-                total=3,
-                backoff_factor=2,
-                status_forcelist=[500, 502, 503, 504],
-            ),
-            timeout=300,
-        )
-        
-        session.mount("http://", adapter)
-        session.mount("https://", adapter)
-        
-        logger.info("Created HTTP session with retry strategy (3 retries, 300s timeout)")
-        return session
-
     def _load_model(self) -> None:
-        """Load the Gemma model and tokenizer."""
-        try:
-            logger.info(f"Initializing Gemma model: {self.model_name}")
-            logger.info(f"Loading on CPU with float32 (no quantization)")
+        """Load the Gemma model and tokenizer with fallback strategy."""
+        hf_token = os.getenv("HF_TOKEN")
+        if hf_token:
+            logger.info("HF_TOKEN found in environment variables")
+        else:
+            logger.warning("HF_TOKEN not found in environment variables")
 
-            hf_token = os.getenv("HF_TOKEN")
-            if hf_token:
-                logger.info("HF_TOKEN found in environment variables")
-            else:
-                logger.warning("HF_TOKEN not found in environment variables")
+        loaded = False
+        last_error = None
+        
+        for model_variant in MODEL_VARIANTS:
+            if model_variant != MODEL_VARIANTS[0] and not loaded:
+                logger.info(f"Trying fallback model: {model_variant}")
+            
+            try:
+                logger.info(f"Loading tokenizer from {model_variant}...")
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    model_variant,
+                    cache_dir=self.cache_dir,
+                    token=hf_token,
+                    timeout=300,
+                    trust_remote_code=True,
+                    force_download=True,
+                )
+                
+                if self.tokenizer.pad_token is None:
+                    self.tokenizer.pad_token = self.tokenizer.eos_token
+                    logger.info("Set pad_token = eos_token")
 
-            logger.info("Downloading tokenizer... (this may take a few minutes)")
-            download_start = time.time()
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.model_name,
-                cache_dir=self.cache_dir,
-                token=hf_token,
-                timeout=300,
+                logger.info(f"Loading model from {model_variant}...")
+                logger.info("Model size: ~4-5 GB. Using 300s timeout for download.")
+                model_start = time.time()
+                
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    model_variant,
+                    device_map="cpu",
+                    torch_dtype=torch.float32,
+                    cache_dir=self.cache_dir,
+                    token=hf_token,
+                    timeout=300,
+                    trust_remote_code=True,
+                    force_download=True,
+                )
+                
+                model_time = time.time() - model_start
+                logger.info(f"Model loaded successfully in {model_time:.1f}s")
+                
+                self.model_name = model_variant
+                loaded = True
+                break
+                
+            except KeyError as e:
+                logger.error(f"KeyError loading {model_variant}: {e}")
+                last_error = e
+                continue
+            except Exception as e:
+                logger.error(f"Error loading {model_variant}: {str(e)}")
+                last_error = e
+                continue
+
+        if not loaded:
+            error_msg = (
+                f"Failed to load any Gemma variant. "
+                f"Last error: {last_error}. "
+                f"Tried: {MODEL_VARIANTS}"
             )
-            download_time = time.time() - download_start
-            logger.info(f"Tokenizer downloaded in {download_time:.1f}s")
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
 
-            if self.tokenizer.pad_token is None:
-                self.tokenizer.pad_token = self.tokenizer.eos_token
-                logger.info("Set pad_token = eos_token")
-
-            logger.info("Downloading model... (this may take 5-10 minutes, please wait)")
-            logger.info("Model size: ~4-5 GB. Using 300s timeout for download.")
-            model_start = time.time()
-            self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_name,
-                device_map="cpu",
-                torch_dtype=torch.float32,
-                cache_dir=self.cache_dir,
-                token=hf_token,
-                timeout=300,
-            )
-            model_time = time.time() - model_start
-            logger.info(f"Model downloaded in {model_time:.1f}s")
-
-            self.model.eval()
-            logger.info("Model loaded successfully on CPU with float32")
-            logger.info(f"Model memory footprint: ~5-6 GB RAM")
-
-        except Exception as e:
-            logger.error(f"Failed to load model: {str(e)}")
-            raise RuntimeError(f"Model initialization failed: {str(e)}") from e
+        self.model.eval()
+        logger.info(f"Model loaded on CPU with float32: {self.model_name}")
+        logger.info(f"Model memory footprint: ~5-6 GB RAM")
 
     def generate(
         self,
