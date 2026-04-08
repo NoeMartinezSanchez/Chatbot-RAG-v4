@@ -283,11 +283,54 @@ class GemmaWrapper:
         Returns:
             Formatted prompt string.
         """
-        user_message = f"""Información de contexto:
+        question_lower = question.lower().strip()
+        
+        if any(saludo in question_lower for saludo in ["hola", "buenos días", "buenas tardes", "buenas", "holi", "hello", "hey", "qué tal", "cómo estás"]):
+            user_message = """Eres un asistente virtual amigable de Prepa en Línea SEP. 
+Saluda de manera cálido y breve. Ofrece ayuda con cualquier duda sobre Prepa en Línea SEP."""
+        
+        elif any(palabra in question_lower for palabra in ["adiós", "chao", "bye", "hasta luego", "me voy"]):
+            user_message = """Eres un asistente virtual amigable de Prepa en Línea SEP.
+Despídete de manera amable y deseando éxito en los estudios."""
+        
+        elif any(palabra in question_lower for palabra in ["gracias", "thank", "agradezco"]):
+            user_message = """Eres un asistente virtual amable de Prepa en Línea SEP.
+Agradece de manera cálida y ofrece ayuda adicional si la necesita."""
+        
+        else:
+            system_prompt = """Eres un asistente virtual oficial de Prepa en Línea SEP.
+
+INSTRUCCIONES IMPORTANTES:
+1. SIEMPRE responde usando ÚNICAMENTE la información del contexto proporcionado.
+2. NUNCA digas "no sé", "no tengo información", o similares si El contexto contiene información relevante.
+3. Si el contexto tiene información que puede responder la pregunta, SYNTHETIZA y responde de forma clara y natural.
+4. Si realmente no hay información relacionada en el contexto, responde amablemente proponiendo reformular la pregunta.
+
+REGLAS DE RESPUESTA:
+- Sé directo y claro en tus respuestas.
+- Usa español correcto sin errores de ortografía.
+- Corrige errores de tipeo obvios en el contexto (ej: "baja partial" → "baja parcial").
+- Estructura tu respuesta de forma legible.
+- Incluye la fuente cuando sea relevante.
+
+EJEMPLOS DE BUENAS RESPUESTAS:
+Contexto: La baja parcial permite abandonar hasta 3 módulos sin afectar el promedio.
+Pregunta: puedo dar de baja una materia?
+Respuesta: Sí, puedes dar de baja hasta 3 módulos mediante baja parcial. Esto no afectará tu promedio. Debes solicitarla dentro de las fechas establecidas.
+
+Contexto: Los exámenes finales son presenciales en centros SEP asignados.
+Pregunta: dónde presento mis exámenes?
+Respuesta: Los exámenes finales se presentan de forma presencial en los centros asignados por la SEP. Revisa tu calendario para conocer la sede."""
+
+            user_message = f"""{system_prompt}
+
+Contexto oficial:
 {context}
 
 Pregunta del estudiante:
-{question}"""
+{question}
+
+Respuesta:"""
 
         prompt = f"""<start_of_turn>user
 {user_message}<end_of_turn>
