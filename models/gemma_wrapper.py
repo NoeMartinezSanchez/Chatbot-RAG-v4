@@ -220,6 +220,8 @@ class GemmaWrapper:
 
             response = generated_text[len(prompt):].strip()
 
+            response = self._clean_response(response)
+
             if len(response) < 10:
                 logger.warning(f"Response very short ({len(response)} chars)")
                 return response.strip() if response.strip() else "No se pudo generar una respuesta."
@@ -256,25 +258,22 @@ class GemmaWrapper:
         Returns:
             Generated response based on the context.
         """
-        if len(context) > 800:
-            context = context[:800] + "..."
-
-        prompt = self._build_gemma_prompt(context, question)
+        prompt = self._build_optimized_prompt(context, question)
 
         logger.info(f"RAG generation - Context length: {len(context)}, Question: {question[:50]}...")
         return self.generate(
             prompt=prompt,
-            max_new_tokens=max_new_tokens,
-            temperature=0.7,
-            top_p=0.9,
-            repetition_penalty=1.1,
-            no_repeat_ngram_size=3,
+            max_new_tokens=512,
+            temperature=0.3,
+            top_p=0.85,
+            repetition_penalty=1.15,
+            no_repeat_ngram_size=4,
             early_stopping=True,
-            min_new_tokens=30,
+            min_new_tokens=50,
         )
 
-    def _build_gemma_prompt(self, context: str, question: str) -> str:
-        """Build the prompt in Gemma chat format.
+    def _build_optimized_prompt(self, context: str, question: str) -> str:
+        """Build optimized prompt for Gemma.
 
         Args:
             context: Retrieved context from RAG.
@@ -285,59 +284,100 @@ class GemmaWrapper:
         """
         question_lower = question.lower().strip()
         
-        if any(saludo in question_lower for saludo in ["hola", "buenos días", "buenas tardes", "buenas", "holi", "hello", "hey", "qué tal", "cómo estás"]):
-            user_message = """Eres un asistente virtual amigable de Prepa en Línea SEP. 
-Saluda de manera cálido y breve. Ofrece ayuda con cualquier duda sobre Prepa en Línea SEP."""
+        saludos_keywords = ["hola", "buenos días", "buenas tardes", "buenas", "holi", "hello", "hey", "qué tal", "cómo estás", "qué onda", "buen día"]
+        despedidas_keywords = ["adiós", "chao", "bye", "hasta luego", "me voy", "nos vemos", "me retiro"]
+        gracias_keywords = ["gracias", "thank", "agradezco", "te agradezco", "muchas gracias"]
         
-        elif any(palabra in question_lower for palabra in ["adiós", "chao", "bye", "hasta luego", "me voy"]):
-            user_message = """Eres un asistente virtual amigable de Prepa en Línea SEP.
-Despídete de manera amable y deseando éxito en los estudios."""
+        if any(saludo in question_lower for saludo in saludos_keywords):
+            user_message = """¡Hola! Bienvenido a Prepa en Línea SEP. Estoy aquí para ayudarte con cualquier duda sobre trámites, fechas, inscripciones y académicas. ¿En qué puedo ayudarte hoy?"""
         
-        elif any(palabra in question_lower for palabra in ["gracias", "thank", "agradezco"]):
-            user_message = """Eres un asistente virtual amable de Prepa en Línea SEP.
-Agradece de manera cálida y ofrece ayuda adicional si la necesita."""
+        elif any(palabra in question_lower for palabra in despedidas_keywords):
+            user_message = """¡Hasta luego! Éxito en tu camino por Prepa en Línea SEP. Cuando tengas dudas, vuelve por aquí. ¡Tú puedes!"""
+        
+        elif any(palabra in question_lower for palabra in gracias_keywords):
+            user_message = """¡De nada! Estoy para ayudarte. Si tienes más dudas sobre Prepa en Línea SEP, escríbeme cuando quieras."""
         
         else:
-            system_prompt = """Eres un asistente virtual oficial de Prepa en Línea SEP.
+            system_prompt = """Eres el asistente virtual oficial de Prepa en Línea SEP.
 
-INSTRUCCIONES IMPORTANTES:
-1. SIEMPRE responde usando ÚNICAMENTE la información del contexto proporcionado.
-2. NUNCA digas "no sé", "no tengo información", o similares si El contexto contiene información relevante.
-3. Si el contexto tiene información que puede responder la pregunta, SYNTHETIZA y responde de forma clara y natural.
-4. Si realmente no hay información relacionada en el contexto, responde amablemente proponiendo reformular la pregunta.
+REGLAS ESTRICTAS:
+1. NO uses hashtags (#), emojis, asteriscos, ni caracteres especiales.
+2. NO repitas preguntas ni frases del contexto.
+3. Lee y considera TODO el contexto antes de responder.
+4. Si el contexto tiene información, síntela en 2-3 oraciones claras.
+5. Si NO hay información relacionada en el contexto, DI: "No encontré información específica sobre eso en los materiales disponibles. ¿Podrías reformular tu pregunta?"
+6. NO inventes respuestas. Solo usa información del contexto.
+7. NO comiences con palabras truncadas o cortadas.
+8. NO menciones "contexto", "documento", o "fuente" en tu respuesta.
+9. Responde en español claro y directo, como un asesor escolar.
 
-REGLAS DE RESPUESTA:
-- Sé directo y claro en tus respuestas.
-- Usa español correcto sin errores de ortografía.
-- Corrige errores de tipeo obvios en el contexto (ej: "baja partial" → "baja parcial").
-- Estructura tu respuesta de forma legible.
-- Incluye la fuente cuando sea relevante.
-
-EJEMPLOS DE BUENAS RESPUESTAS:
-Contexto: La baja parcial permite abandonar hasta 3 módulos sin afectar el promedio.
-Pregunta: puedo dar de baja una materia?
-Respuesta: Sí, puedes dar de baja hasta 3 módulos mediante baja parcial. Esto no afectará tu promedio. Debes solicitarla dentro de las fechas establecidas.
-
-Contexto: Los exámenes finales son presenciales en centros SEP asignados.
-Pregunta: dónde presento mis exámenes?
-Respuesta: Los exámenes finales se presentan de forma presencial en los centros asignados por la SEP. Revisa tu calendario para conocer la sede."""
+Ejemplo de formato de respuesta:
+---
+Pregunta: [pregunta del estudiante]
+Respuesta: [respuesta clara y síntesis de la información relevante]
+---"""
 
             user_message = f"""{system_prompt}
 
-Contexto oficial:
+CONTENDO OFICIAL (lee completo):
 {context}
 
-Pregunta del estudiante:
+Responde a esta pregunta:
 {question}
 
-Respuesta:"""
+---"""
 
         prompt = f"""<start_of_turn>user
 {user_message}<end_of_turn>
 <start_of_turn>model
-"""
+Respuesta: """
 
         return prompt
+
+    def _clean_response(self, response: str) -> str:
+        """Clean and post-process generated response.
+
+        Args:
+            response: Raw response from the model.
+
+        Returns:
+            Cleaned response.
+        """
+        import re
+        
+        lines = response.strip().split('\n')
+        clean_lines = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith('#'):
+                continue
+            if re.match(r'^---+$', line):
+                continue
+            clean_lines.append(line)
+        
+        response = ' '.join(clean_lines)
+        
+        response = re.sub(r'#\w+', '', response)
+        
+        response = re.sub(r'\*+', '', response)
+        
+        response = re.sub(r'[{}\[\]()]', '', response)
+        
+        response = re.sub(r'\s+', ' ', response).strip()
+        
+        if response.startswith('Pre ') or response.startswith('El '):
+            pass
+        elif response.startswith('Res ') or response.startswith('Te '):
+            pass
+        elif len(response) > 0 and not response[0].isalpha():
+            words = response.split()
+            if words:
+                response = ' '.join(words)
+        
+        return response
 
     def _clear_cache(self) -> None:
         """Clear Python and PyTorch garbage and cache."""
