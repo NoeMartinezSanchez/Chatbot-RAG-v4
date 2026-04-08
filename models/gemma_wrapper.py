@@ -92,27 +92,27 @@ class GemmaWrapper:
         loaded = False
         last_error = None
         
-        for model_variant in MODEL_VARIANTS:
-            if model_variant != MODEL_VARIANTS[0] and not loaded:
+        for i, model_variant in enumerate(MODEL_VARIANTS):
+            if i > 0:
                 logger.info(f"Trying fallback model: {model_variant}")
             
             try:
                 logger.info(f"Loading tokenizer from {model_variant}...")
+                download_start = time.time()
                 self.tokenizer = AutoTokenizer.from_pretrained(
                     model_variant,
                     cache_dir=self.cache_dir,
                     token=hf_token,
-                    timeout=300,
                     trust_remote_code=True,
-                    force_download=True,
                 )
+                logger.info(f"Tokenizer downloaded in {time.time() - download_start:.1f}s")
                 
                 if self.tokenizer.pad_token is None:
                     self.tokenizer.pad_token = self.tokenizer.eos_token
                     logger.info("Set pad_token = eos_token")
 
                 logger.info(f"Loading model from {model_variant}...")
-                logger.info("Model size: ~4-5 GB. Using 300s timeout for download.")
+                logger.info("Model size: ~4-5 GB, may take several minutes...")
                 model_start = time.time()
                 
                 self.model = AutoModelForCausalLM.from_pretrained(
@@ -121,9 +121,7 @@ class GemmaWrapper:
                     torch_dtype=torch.float32,
                     cache_dir=self.cache_dir,
                     token=hf_token,
-                    timeout=300,
                     trust_remote_code=True,
-                    force_download=True,
                 )
                 
                 model_time = time.time() - model_start
@@ -135,6 +133,11 @@ class GemmaWrapper:
                 
             except KeyError as e:
                 logger.error(f"KeyError loading {model_variant}: {e}")
+                last_error = e
+                continue
+            except TypeError as e:
+                if "timeout" in str(e):
+                    logger.error(f"timeout parameter not supported in {model_variant}: {e}")
                 last_error = e
                 continue
             except Exception as e:
