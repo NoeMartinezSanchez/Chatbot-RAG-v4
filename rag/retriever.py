@@ -318,13 +318,14 @@ class VectorStoreFAISS:
             'distances': [distances],
             'metadatas': [results]
         }
-    def search_documents(self, query_embedding: np.ndarray, top_k: int = 3) -> Dict:
+    def search_documents(self, query_embedding: np.ndarray, top_k: int = 5, min_similarity: float = 0.6) -> Dict:
         """
         Buscar documentos similares al embedding de consulta.
         
         Args:
             query_embedding: Embedding de la consulta
             top_k: Número de resultados a retornar
+            min_similarity: Umbral mínimo de similitud (0-1)
         
         Returns:
             Diccionario con formato compatible con ChromaDB
@@ -345,16 +346,26 @@ class VectorStoreFAISS:
             min(top_k, self.index.ntotal)
         )
         
-        # Formatear resultados
+        # Formatear resultados con filtrado por similitud
         documents_result = []
         metadatas_result = []
         distances_result = []
         
         for i, idx in enumerate(indices[0]):
             if idx < len(self.documents):
-                documents_result.append(self.documents[idx])
-                metadatas_result.append(self.metadata[idx])
-                distances_result.append(float(distances[0][i]))
+                similarity = float(distances[0][i])
+                if similarity >= min_similarity:
+                    documents_result.append(self.documents[idx])
+                    metadatas_result.append(self.metadata[idx])
+                    distances_result.append(similarity)
+        
+        # Si no hay resultados con suficiente similitud,返回 vacío
+        if not documents_result:
+            return {
+                'documents': [[]],
+                'distances': [[]],
+                'metadatas': [[]]
+            }
         
         return {
             'documents': [documents_result],

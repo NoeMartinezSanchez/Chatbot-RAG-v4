@@ -129,10 +129,32 @@ async def chat(request: ChatRequest):
         user_id = request.user_id or str(uuid.uuid4())
         conversation_id = request.conversation_id or str(uuid.uuid4())
         
-        # Procesar consulta
-        response_text, is_rag, confidence, sources = rag_system.process_query(
-            request.message
-        )
+        # Detectar saludos y responder directamente sin RAG
+        msg_lower = request.message.lower().strip()
+        saludos = ["hola", "buenos días", "buenas tardes", "buenas", "holi", "hello", "hey", "qué tal", "cómo estás", "buen día"]
+        despedidas = ["adiós", "chao", "bye", "hasta luego", "me voy", "nos vemos", "me retiro"]
+        gracias = ["gracias", "thank", "agradezco", "muchas gracias", "te agradezco"]
+        
+        if any(s in msg_lower for s in saludos):
+            response_text = "¡Hola! Bienvenido a Prepa en Línea SEP. Estoy aquí para ayudarte con tus dudas sobre el programa. ¿Qué necesitas saber?"
+            is_rag = False
+            confidence = 1.0
+            sources = []
+        elif any(s in msg_lower for s in despedidas):
+            response_text = "¡Hasta luego! Éxito en tus estudios. Cuando tengas dudas sobre Prepa en Línea, vuelve a escribirme."
+            is_rag = False
+            confidence = 1.0
+            sources = []
+        elif any(s in msg_lower for s in gracias):
+            response_text = "¡De nada! Si tienes más dudas sobre Prepa en Línea, con gusto te ayudo. ¡Éxito en tus estudios!"
+            is_rag = False
+            confidence = 1.0
+            sources = []
+        else:
+            # Procesar consulta normal con RAG
+            response_text, is_rag, confidence, sources = rag_system.process_query(
+                request.message
+            )
         
         # DEBUG: Verificar qué se recibe
         logger.info(f"🔍 DEBUG - response_text tipo: {type(response_text)}, largo: {len(response_text) if response_text else 0}")

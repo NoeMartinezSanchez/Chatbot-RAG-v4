@@ -263,10 +263,10 @@ question: str,
         logger.info(f"RAG generation - Context length: {len(context)}, Question: {question[:50]}...")
         raw_response = self.generate(
             prompt=prompt,
-            max_new_tokens=512,
-            temperature=0.6,
-            top_p=0.9,
-            repetition_penalty=1.15,
+            max_new_tokens=256,
+            temperature=0.5,
+            top_p=0.85,
+            repetition_penalty=1.1,
         )
 
         response = self._clean_and_fix_response(raw_response)
@@ -353,10 +353,19 @@ Responde de forma clara y útil en español. Si no tienes información suficient
         
         response = re.sub(r'\s+', ' ', response).strip()
         
+        # Fix truncated responses - remove short truncated first words
         if len(response) >= 2:
             first_word = response.split()[0] if response.split() else ""
             if len(first_word) <= 2 and first_word.islower():
                 response = response[len(first_word):].strip()
+        
+        # Fix non-alphabetic characters at start
+        while response and not response[0].isalpha():
+            response = response[1:].strip()
+        
+        # Ensure minimum length
+        if not response or len(response) < 20:
+            response = "No encontré información específica sobre ese tema en los materiales disponibles. Te recomiendo consultar la guía del aspirante de Prepa en Línea SEP."
         
         response = response.lower()
         
@@ -375,8 +384,6 @@ Responde de forma clara y útil en español. Si no tienes información suficient
             response = ''.join(fixed)
         
         response = response.strip()
-        if not response or len(response) < 5:
-            response = "Lo siento, no pude generar una respuesta adecuada. ¿Podrías reformular tu pregunta?"
         
         return response
 
