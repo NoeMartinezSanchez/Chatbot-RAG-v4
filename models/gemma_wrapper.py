@@ -258,22 +258,22 @@ question: str,
         Returns:
             Generated response based on the context.
         """
-        prompt = self._build_improved_prompt(context, question)
+        prompt = self._build_literal_prompt(context, question)
 
         logger.info(f"RAG generation - Context length: {len(context)}, Question: {question[:50]}...")
         raw_response = self.generate(
             prompt=prompt,
-            max_new_tokens=256,
-            temperature=0.5,
-            top_p=0.85,
-            repetition_penalty=1.1,
+            max_new_tokens=300,
+            temperature=0.2,
+            top_p=0.8,
+            repetition_penalty=1.0,
         )
 
         response = self._clean_and_fix_response(raw_response)
         return response
 
-    def _build_improved_prompt(self, context: str, question: str) -> str:
-        """Build improved prompt with better handling of common topics.
+    def _build_literal_prompt(self, context: str, question: str) -> str:
+        """Build literal copy prompt - extracts context verbatim.
 
         Args:
             context: Retrieved context from RAG.
@@ -298,21 +298,20 @@ question: str,
             user_message = """¡De nada! Si tienes más dudas sobre Prepa en Línea, con gusto te ayudo."""
         
         else:
-            if "propedéutico" in question_lower or "curso propedéutico" in question_lower:
-                context_hint = "El curso propedéutico es obligatorio para tous los estudiantes de Prepa en Línea. Tiene una duración aproximada de 3 semanas y debes completarlo antes de comenzar el primer semestre formal."
-            else:
-                context_hint = ""
-            
-            user_message = f"""Eres un asistente de Prepa en Línea SEP. Responde preguntas de estudiantes usando la información del contexto proporcionado.
+            user_message = f"""Eres un asistente de Prepa en Línea SEP. Tu tarea es EXTRAER y COPIAR TEXTUALMENTE la información del contexto proporcionado.
 
-{context_hint}
+REGLAS ESTRICTAS:
+1. COPIA LA INFORMACIÓN EXACTAMENTE como aparece en el contexto
+2. NO parafrasees, NO resumas, NO cambies las palabras
+3. Si el contexto dice "Tienes 6 meses", responde "Tienes 6 meses"
+4. Si no hay información relevante, responde honestamente
 
 Contexto:
 {context}
 
 Pregunta: {question}
 
-Responde de forma clara y útil en español. Si no tienes información suficiente, dilo honestamente."""
+RESPUESTA (copia textual del contexto):"""
 
         prompt = f"""<start_of_turn>user
 {user_message}<end_of_turn>
