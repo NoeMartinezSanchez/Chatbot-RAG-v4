@@ -221,6 +221,7 @@ class GemmaWrapper:
             response = generated_text[len(prompt):].strip()
 
             response = self._clean_response(response)
+            response = self.fix_common_errors(response)
 
             if len(response) < 10:
                 logger.warning(f"Response very short ({len(response)} chars)")
@@ -264,7 +265,7 @@ question: str,
         return self.generate(
             prompt=prompt,
             max_new_tokens=400,
-            min_new_tokens=50,
+            min_new_tokens=20,
             temperature=0.2,
             top_p=0.85,
             repetition_penalty=1.15,
@@ -280,10 +281,13 @@ INSTRUCCIONES IMPORTANTES:
 - NO inventes información
 - NO uses conocimiento externo
 - Si la respuesta NO está en el contexto, responde EXACTAMENTE:
-  "No encontré información suficiente en los documentos proporcionados"
+  "No encontré información sobre eso en los documentos disponibles. ¿Quieres que intente con otra pregunta?"
 - Resume y redacta con tus propias palabras (no copies literal)
 - Sé claro, preciso y directo
 - Responde en máximo 4 líneas
+- Usa español correcto y claro
+- No inventes palabras ni deformes términos
+- Escribe oraciones completas y bien redactadas
 
 TAREA:
 1. Identifica qué parte del contexto responde la pregunta
@@ -295,6 +299,10 @@ CONTEXTO:
 
 PREGUNTA:
 {question}
+
+FORMATO DE RESPUESTA:
+- Si es una lista, usa viñetas con "-"
+- Si es explicación, usa máximo 3 a 4 oraciones
 
 RESPUESTA:
 """
@@ -310,10 +318,32 @@ RESPUESTA:
             return text
 
         import re
+
+        # eliminar basura al inicio (ej: "Tud", "U", símbolos raros)
+        text = re.sub(r'^[^a-zA-ZáéíóúÁÉÍÓÚ¿¡]+', '', text)
+
+        # normalizar espacios
         text = re.sub(r'\s+', ' ', text).strip()
 
+        # capitalizar primera letra
         if text and text[0].islower():
             text = text[0].upper() + text[1:]
+
+        return text
+
+    def fix_common_errors(self, text: str) -> str:
+        replacements = {
+            "constatancia": "constancia",
+            "constatancoa": "constancia",
+            "secondary": "secundaria",
+            "otografía": "fotografía",
+            "credenciación": "credencial",
+            "cartascompromiso": "carta compromiso",
+            "carta compromiso ": "carta compromiso ",
+        }
+
+        for wrong, correct in replacements.items():
+            text = text.replace(wrong, correct)
 
         return text
 
