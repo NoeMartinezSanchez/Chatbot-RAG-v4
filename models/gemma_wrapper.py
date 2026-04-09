@@ -289,20 +289,24 @@ question: str,
         
         if any(s in question_lower for s in saludos):
             user_message = """¡Hola! Soy el asistente virtual de Prepa en Línea SEP. Estoy aquí para ayudarte con tus dudas sobre el programa. ¿Qué necesitas saber?"""
-        elif any(s in question_lower for s in despedidas):
+        elif any(s in question_lower for s in despedida_keywords):
             user_message = """¡Hasta luego! Éxito en tus estudios. Cuando tengas dudas, vuelve a escribirme."""
-        elif any(s in question_lower for s in gracias):
+        elif any(s in question_lower for s in gracias_keywords):
             user_message = """¡De nada! Si tienes más dudas sobre Prepa en Línea, con gusto te ayudo."""
+        elif "propedéutico" in question_lower:
+            user_message = """El curso propedéutico es obligatorio para todos los estudiantes de Prepa en Línea. Tienes 3 semanas para completarlo antes del primer semestre."""
+        
         else:
-            user_message = f"""Eres un asistente de Prepa en Línea SEP. Responde con la información del PRIMER documento del contexto.
+            user_message = f"""Eres un asistente de Prepa en Línea SEP. Lee todos los documentos del contexto y responde con la información más relevante.
 
 INSTRUCCIONES:
-1. Lee solo el PRIMER documento completo
-2. Busca la respuesta EXACTA a la pregunta en ese documento
-3. Si no hay respuesta clara, devuelve: "No tengo esa información"
-4. NO inventes información de otros documentos
+1. Lee todos los documentos del contexto
+2. Identifica la información que responde la pregunta
+3. Si hay información en múltiples documentos, combínalas de forma coherente
+4. Si no hay información en ninguno, di: "No tengo esa información"
+5. NO inventes datos
 
-Contexto (documento 1 es el más importante):
+Contexto (múltiples documentos):
 {context}
 
 Pregunta: {question}
