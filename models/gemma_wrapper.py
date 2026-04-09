@@ -207,7 +207,7 @@ class GemmaWrapper:
                     top_p=top_p,
                     repetition_penalty=repetition_penalty,
                     no_repeat_ngram_size=no_repeat_ngram_size,
-                    do_sample=True,
+                    do_sample=False,
                     pad_token_id=self.tokenizer.pad_token_id,
                     eos_token_id=self.tokenizer.eos_token_id,
                     early_stopping=early_stopping,
@@ -263,119 +263,59 @@ question: str,
         logger.info(f"RAG generation - Context length: {len(context)}, Question: {question[:50]}...")
         return self.generate(
             prompt=prompt,
-            max_new_tokens=512,
-            min_new_tokens=80,
-            temperature=0.7,
-            top_p=0.9,
-            repetition_penalty=1.1,
-            no_repeat_ngram_size=2,
+            max_new_tokens=400,
+            min_new_tokens=50,
+            temperature=0.2,
+            top_p=0.85,
+            repetition_penalty=1.15,
+            no_repeat_ngram_size=3,
         )
 
     def _build_simple_prompt(self, context: str, question: str) -> str:
-        """Build simple prompt - direct and minimal.
+        user_message = f"""
+Eres un asistente especializado en Prepa en Línea SEP.
 
-        Args:
-            context: Retrieved context from RAG.
-            question: User question.
+INSTRUCCIONES IMPORTANTES:
+- Responde SOLO con información contenida en el contexto
+- NO inventes información
+- NO uses conocimiento externo
+- Si la respuesta NO está en el contexto, responde EXACTAMENTE:
+  "No encontré información suficiente en los documentos proporcionados"
+- Resume y redacta con tus propias palabras (no copies literal)
+- Sé claro, preciso y directo
+- Responde en máximo 4 líneas
 
-        Returns:
-            Formatted prompt string.
-        """
-        question_lower = question.lower().strip()
-        
-        saludos = ["hola", "buenos días", "buenas tardes", "buenas", "holi", "hello", "hey", "qué tal", "cómo estás"]
-        despedidas = ["adiós", "chao", "bye", "hasta luego", "me voy", "nos vemos"]
-        gracias = ["gracias", "thank", "agradezco", "muchas gracias"]
-        
-        if any(s in question_lower for s in saludos):
-            user_message = """¡Hola! Soy el asistente virtual de Prepa en Línea SEP. Estoy aquí para ayudarte con tus dudas sobre el programa. ¿Qué necesitas saber?"""
-        elif any(s in question_lower for s in despedidas):
-            user_message = """¡Hasta luego! Éxito en tus estudios. Cuando tengas dudas, vuelve a escribirme."""
-        elif any(s in question_lower for s in gracias):
-            user_message = """¡De nada! Si tienes más dudas sobre Prepa en Línea, con gusto te ayudo."""
-        
-        else:
-            user_message = f"""Eres un asistente de Prepa en Línea SEP. Responde preguntas de estudiantes usando la información del contexto proporcionado.
+TAREA:
+1. Identifica qué parte del contexto responde la pregunta
+2. Usa solo esa información relevante
+3. Si hay múltiples fragmentos útiles, combínalos
 
-Contexto:
+CONTEXTO:
 {context}
 
-Pregunta: {question}
+PREGUNTA:
+{question}
 
-Responde de forma clara y útil en español."""
+RESPUESTA:
+"""
 
         prompt = f"""<start_of_turn>user
 {user_message}<end_of_turn>
 <start_of_turn>model
 """
-
         return prompt
 
-    def _clean_and_fix_response(self, response: str) -> str:
-        """Clean and fix generated response - handles truncations and formatting.
+    def _clean_response(self, text: str) -> str:
+        if not text:
+            return text
 
-        Args:
-            response: Raw response from the model.
-
-        Returns:
-            Cleaned and fixed response.
-        """
         import re
-        
-        lines = response.strip().split('\n')
-        clean_lines = []
-        
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            if line.startswith('#'):
-                continue
-            if re.match(r'^---+$', line):
-                continue
-            clean_lines.append(line)
-        
-        response = ' '.join(clean_lines)
-        
-        response = re.sub(r'#\w+', '', response)
-        response = re.sub(r'\*+', '', response)
-        response = re.sub(r'[{}\[\]()]', '', response)
-        
-        response = re.sub(r'\s+', ' ', response).strip()
-        
-        # Fix truncated responses - remove short truncated first words
-        if len(response) >= 2:
-            first_word = response.split()[0] if response.split() else ""
-            if len(first_word) <= 2 and first_word.islower():
-                response = response[len(first_word):].strip()
-        
-        # Fix non-alphabetic characters at start
-        while response and not response[0].isalpha():
-            response = response[1:].strip()
-        
-        # Ensure minimum length
-        if not response or len(response) < 20:
-            response = "No encontré información específica sobre ese tema en los materiales disponibles. Te recomiendo consultar la guía del aspirante de Prepa en Línea SEP."
-        
-        response = response.lower()
-        
-        sentences = re.split(r'([.!?]+)', response)
-        if sentences:
-            fixed = []
-            for i, part in enumerate(sentences):
-                if i % 2 == 0:
-                    if part:
-                        part = part.strip()
-                        if part:
-                            part = part[0].upper() + part[1:] if len(part) > 1 else part.upper()
-                            fixed.append(part)
-                else:
-                    fixed.append(part)
-            response = ''.join(fixed)
-        
-        response = response.strip()
-        
-        return response
+        text = re.sub(r'\s+', ' ', text).strip()
+
+        if text and text[0].islower():
+            text = text[0].upper() + text[1:]
+
+        return text
 
     def _clear_cache(self) -> None:
         """Clear Python and PyTorch garbage and cache."""
@@ -397,47 +337,22 @@ Responde de forma clara y útil en español."""
             "parameters": "2B",
             "quantization": "none",
         }
+        """Clear Python and PyTorch garbage and cache."""
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        logger.debug("Cleared memory cache")
 
-    def _clean_response(self, text: str) -> str:
-        """Clean response text - fix formatting issues.
-
-        Args:
-            text: Raw response text.
+    def get_model_info(self) -> dict:
+        """Get information about the loaded model.
 
         Returns:
-            Cleaned response text.
+            Dictionary with model metadata.
         """
-        if not text:
-            return text
-        text = text.lstrip()
-        
-        # Fix truncated start - if first word is 1-3 lowercase letters, remove it
-        words = text.split()
-        if words:
-            first_word = words[0]
-            if len(first_word) <= 3 and first_word.islower():
-                text = ' '.join(words[1:])
-                text = text.lstrip()
-        
-        import re
-        
-        # Fix "6 mes" -> "6 meses"
-        text = re.sub(r'(\d+)\s+mes(es)?(?!\w)', r'\1 meses', text, flags=re.IGNORECASE)
-        
-        # Fix "cartas" -> "carta" (when referring to single document)
-        text = re.sub(r'\bcartas\b', 'carta', text, flags=re.IGNORECASE)
-        
-        # Fix mixed case errors like "constANCIA" -> "constancia"
-        text = re.sub(r'([a-z]+)([A-Z]+)', lambda m: m.group(1).lower() + m.group(2).lower(), text)
-        
-        # Fix missing spaces like "lasmaterias" -> "las materias"
-        text = re.sub(r'([a-z])([A-Z])', lambda m: m.group(1).lower() + ' ' + m.group(2).lower(), text)
-        
-        # Fix multiple spaces
-        text = re.sub(r'\s+', ' ', text).strip()
-        
-        # Capitalize first letter if lowercase
-        if text and text[0].islower():
-            text = text[0].upper() + text[1:]
-        
-        return text
+        return {
+            "model_name": self.model_name,
+            "device": self.device,
+            "dtype": "float32",
+            "parameters": "2B",
+            "quantization": "none",
+        }
