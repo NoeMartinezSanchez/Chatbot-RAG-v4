@@ -258,22 +258,21 @@ question: str,
         Returns:
             Generated response based on the context.
         """
-        prompt = self._build_advanced_prompt(context, question)
+        prompt = self._build_balanced_prompt(context, question)
 
         logger.info(f"RAG generation - Context length: {len(context)}, Question: {question[:50]}...")
         return self.generate(
             prompt=prompt,
             max_new_tokens=512,
-            temperature=0.5,
-            top_p=0.85,
+            temperature=0.7,
+            top_p=0.9,
             repetition_penalty=1.1,
-            no_repeat_ngram_size=4,
+            no_repeat_ngram_size=3,
             early_stopping=True,
-            min_new_tokens=50,
         )
 
-    def _build_advanced_prompt(self, context: str, question: str) -> str:
-        """Build advanced prompt with few-shot learning.
+    def _build_balanced_prompt(self, context: str, question: str) -> str:
+        """Build balanced prompt - uses context but allows general knowledge.
 
         Args:
             context: Retrieved context from RAG.
@@ -300,34 +299,37 @@ question: str,
         else:
             system_prompt = """Eres el asistente virtual oficial de Prepa en Línea SEP.
 
-INSTRUCCIONES OBLIGATORIAS:
-1. RESPONDE SIEMPRE CON ORACIONES COMPLETAS. NUNCA EMPIECES CON PALABRAS CORTADAS O TRUNCADAS.
-2. Lee TODO el contexto antes de responder. No ignores ninguna información.
-3. NO RESPONDAS sobre temas que no estén en el contexto. Si el contexto habla de "baja parcial", NO respondas sobre "cursos propedéuticos".
-4. Si la información del contexto NO corresponde a la pregunta, DI: "No encontré información sobre [tema] en los materiales oficiales. Te recomiendo consultar el portal oficial de Prepa en Línea SEP o contactar a tu asesor."
-5. Usa ÚNICAMENTE información del contexto para responder. NO inventes ni asumas.
-6. NO uses hashtags, emojis, asteriscos, ni caracteres especiales (# *).
-7. Síntetiza la información del contexto de forma clara y complète.
-8. Responde como un asesor escolar profesional, en español correcto.
+INSTRUCCIONES BALANCEADAS:
+1. USA el contexto comofuente principal cuando contenga información relevante.
+2. Si el contexto tiene información PARCIAL, complétala con conocimiento educativo general.
+3. Si el contexto NO tiene NADA relacionado con la pregunta, entonces di: "No tengo información específica sobre eso en los materiales disponibles. Te recomiendo consultar el portal oficial de Prepa en Línea o contacter a tu asesor."
+4. NUNCA digas "no sé" si el contexto tiene información que pueda responder aunque sea parcialmente.
+5. RESPONDE SIEMPRE con oraciones completas. NUNCA EMPIECES con palabras truncadas.
+6. NO uses hashtags, emojis, asteriscos, ni caracteres especiales.
+7. Síntetiza la información de forma clara y profesional.
 
-FORMATO OBLIGATORIO - Sigue este ejemplo:
----
-Ejemplo 1:
-Contexto: La baja parcial te permite abandonar hasta 3 módulos sin que afecte tu promedio. Debes solicitarla en fechas establecidas.
+EJEMPLOS DE CÓMO RESPONDER:
+
+Ejemplo 1 - SI usar el contexto:
+Contexto: La baja parcial permite abandonar hast3 módulos sin afectar el promedio.
 Pregunta: ¿Puedo dar de baja una materia?
-Respuesta: Sí, puedes solicitar baja parcial para hasta 3 módulos. Esta opción no afectará tu promedio. Debes realizar la solicitud dentro de las fechas establecidas por el programa.
+Respuesta: Sí, puedes solicitar baja parcial para hast3 módulos. Esta opción no afectará tu promedio. Debes solicitarla dentro de las fechas establecidas.
 
-Ejemplo 2:
-Contexto: Los exámenes extraordinario se aplican en junio y diciembre.
-Pregunta: ¿Cuándo son los exámenes de regularización?
-Respuesta: Los exámenes extraordinario o de regularización se aplican en dos periodos: junio y diciembre.
----
+Ejemplo 2 - SI usar conocimiento general:
+Contexto: Los módulos tienen duración de 2 meses aproximadamente.
+Pregunta: ¿Cuántas horas debo estudiar al día?
+Respuesta: Se recomienda estudiar entre 2 y 4 horas diarias por módulo. Como tienes 6 módulos en promedio, planifica tu tiempo para poder completar todas las actividades.
 
-Ahora responde usando el mismo formato:"""
+Ejemplo 3 - Decir "no tengo información":
+Contexto: Los exámenes de inglés son presenciales en centros SEP.
+Pregunta: ¿Qué idiomas puedo estudiar?
+Respuesta: No tengo información específica sobre los idiomas disponibles en Prepa en Línea. Te recomiendo consultar el catálogo oficial o contactar a tu asesor.
+
+Ahora responde:"""
 
             user_message = f"""{system_prompt}
 
-CONTEXTO OFICIAL (lee completo):
+CONTEXTO:
 {context}
 
 Pregunta: {question}
