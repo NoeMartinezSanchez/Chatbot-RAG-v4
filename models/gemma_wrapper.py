@@ -277,17 +277,18 @@ question: str,
 Eres un asistente especializado en Prepa en Línea SEP.
 
 INSTRUCCIONES IMPORTANTES:
-- Responde SOLO con información contenida en el contexto
-- NO inventes información
-- NO uses conocimiento externo
+- Usa principalmente la información del contexto
+- No inventes información que no esté respaldada por el contexto
+- No uses conocimiento externo
 - Si la respuesta NO está en el contexto, responde EXACTAMENTE:
   "No encontré información sobre eso en los documentos disponibles. ¿Quieres que intente con otra pregunta?"
 - Resume y redacta con tus propias palabras (no copies literal)
 - Sé claro, preciso y directo
-- Responde en máximo 4 líneas
 - Usa español correcto y claro
 - No inventes palabras ni deformes términos
 - Escribe oraciones completas y bien redactadas
+- Antes de responder, asegúrate de que la respuesta sea una oración completa y clara
+- Ignora partes del contexto que no respondan directamente la pregunta
 
 TAREA:
 1. Identifica qué parte del contexto responde la pregunta
@@ -301,8 +302,10 @@ PREGUNTA:
 {question}
 
 FORMATO DE RESPUESTA:
+- Escribe en párrafos cortos o listas claras
 - Si es una lista, usa viñetas con "-"
-- Si es explicación, usa máximo 3 a 4 oraciones
+- Evita fragmentos incompletos
+- Redacta como una explicación natural
 
 RESPUESTA:
 """
@@ -319,8 +322,13 @@ RESPUESTA:
 
         import re
 
-        # eliminar basura al inicio (ej: "Tud", "U", símbolos raros)
+        # eliminar basura inicial (símbolos o texto corrupto)
         text = re.sub(r'^[^a-zA-ZáéíóúÁÉÍÓÚ¿¡]+', '', text)
+
+        # eliminar palabras muy cortas al inicio (ej: "U", "O", etc.)
+        words = text.split()
+        if len(words) > 1 and len(words[0]) <= 2:
+            text = ' '.join(words[1:])
 
         # normalizar espacios
         text = re.sub(r'\s+', ' ', text).strip()
