@@ -400,3 +400,19 @@ Responde de forma clara y útil en español. Si no tienes información suficient
             "parameters": "2B",
             "quantization": "none",
         }
+
+    def _clean_response(self, text: str) -> str:
+        """Clean response text - fix formatting issues.
+
+        Args:
+            text: Raw response text.
+
+        Returns:
+            Cleaned response text.
+        """
+        if not text:
+            return text
+        text = text.lstrip()
+        if text and text[0].islower():
+            text = text[0].upper() + text[1:]
+        return text

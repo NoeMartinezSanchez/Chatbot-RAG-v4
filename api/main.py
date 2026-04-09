@@ -140,12 +140,13 @@ async def chat(request: ChatRequest):
         logger.info(f"🔍 DEBUG - sources count: {len(sources) if sources else 0}")
         logger.info(f"📤 Respuesta generada: {'RAG' if is_rag else 'Intent'} - Confianza: {confidence:.2%}")
         
-        # Crear respuesta - NO mostrar confianza al usuario
+        # Crear respuesta
+        conf_value = confidence if confidence is not None else 0.5
         response = ChatResponse(
             response=response_text,
             sources=sources,
             is_rag_response=is_rag,
-            confidence=None  # Ocultar confianza del usuario
+            confidence=conf_value
         )
         
         # Almacenar conversación
