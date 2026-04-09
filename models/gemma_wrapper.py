@@ -294,16 +294,15 @@ question: str,
         elif any(s in question_lower for s in gracias):
             user_message = """¡De nada! Si tienes más dudas sobre Prepa en Línea, con gusto te ayudo."""
         else:
-            user_message = f"""Eres un asistente de Prepa en Línea SEP. Usa EXACTAMENTE la información que responde la pregunta del contexto.
+            user_message = f"""Eres un asistente de Prepa en Línea SEP. Responde con la información del PRIMER documento del contexto.
 
-INSTRUCCIONES IMPORTANTES:
-1. Busca en el contexto la pregunta EXACTA o similar
-2. Responde solo con la información de ESA pregunta
-3. NO combines información de diferentes preguntas
-4. COPIA textualmente las fechas y plazos del contexto
-5. Si no hay información que responda la pregunta, di: "No tengo esa información en los materiales disponibles."
+INSTRUCCIONES:
+1. Lee solo el PRIMER documento completo
+2. Busca la respuesta EXACTA a la pregunta en ese documento
+3. Si no hay respuesta clara, devuelve: "No tengo esa información"
+4. NO inventes información de otros documentos
 
-Contexto:
+Contexto (documento 1 es el más importante):
 {context}
 
 Pregunta: {question}
