@@ -263,11 +263,11 @@ question: str,
         logger.info(f"RAG generation - Context length: {len(context)}, Question: {question[:50]}...")
         return self.generate(
             prompt=prompt,
-            max_new_tokens=256,
-            min_new_tokens=30,
-            temperature=0.7,
-            top_p=0.9,
-            repetition_penalty=1.1,
+            max_new_tokens=300,
+            min_new_tokens=50,
+            temperature=0.3,
+            top_p=0.85,
+            repetition_penalty=1.15,
         )
 
     def _build_simple_prompt(self, context: str, question: str) -> str:
@@ -296,14 +296,20 @@ question: str,
             user_message = """¡De nada! Si tienes más dudas sobre Prepa en Línea, con gusto te ayudo."""
         
         else:
-            user_message = f"""Eres un asistente de Prepa en Línea SEP. Responde preguntas de estudiantes usando la información del contexto proporcionado.
+            user_message = f"""Eres un asistente de Prepa en Línea SEP. Responde usando ÚNICAMENTE la información del contexto.
+
+INSTRUCCIONES:
+1. Si la respuesta está en el contexto, CÓPIALA textualmente
+2. Si el contexto tiene la información pero no es exacta, usa lo que dige el contexto
+3. NO INVENTES información que no esté en el contexto
+4. Si no hay información relacionada, di: "No encontré información sobre eso en los materiales disponibles."
 
 Contexto:
 {context}
 
 Pregunta: {question}
 
-Responde de forma clara y útil en español."""
+Responde:"""
 
         prompt = f"""<start_of_turn>user
 {user_message}<end_of_turn>
@@ -412,13 +418,23 @@ Responde de forma clara y útil en español."""
             return text
         text = text.lstrip()
         
-        # Fix truncated start - if first word is 1-2 lowercase letters, remove it
+        # Fix truncated start - if first word is 1-3 lowercase letters, remove it
         words = text.split()
         if words:
             first_word = words[0]
-            if len(first_word) <= 2 and first_word.islower():
+            if len(first_word) <= 3 and first_word.islower():
                 text = ' '.join(words[1:])
                 text = text.lstrip()
+        
+        # Fix mixed case errors like "constANCIA" -> "constancia"
+        import re
+        text = re.sub(r'([a-z]+)([A-Z]+)', lambda m: m.group(1).lower() + m.group(2).lower(), text)
+        
+        # Fix missing spaces like "lasmaterias" -> "las materias"
+        text = re.sub(r'([a-z])([A-Z])', lambda m: m.group(1).lower() + ' ' + m.group(2).lower(), text)
+        
+        # Fix multiple spaces
+        text = re.sub(r'\s+', ' ', text).strip()
         
         # Capitalize first letter if lowercase
         if text and text[0].islower():
