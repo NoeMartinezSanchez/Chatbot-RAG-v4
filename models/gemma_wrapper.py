@@ -264,6 +264,7 @@ question: str,
         return self.generate(
             prompt=prompt,
             max_new_tokens=256,
+            min_new_tokens=30,
             temperature=0.7,
             top_p=0.9,
             repetition_penalty=1.1,
@@ -410,6 +411,17 @@ Responde de forma clara y útil en español."""
         if not text:
             return text
         text = text.lstrip()
+        
+        # Fix truncated start - if first word is 1-2 lowercase letters, remove it
+        words = text.split()
+        if words:
+            first_word = words[0]
+            if len(first_word) <= 2 and first_word.islower():
+                text = ' '.join(words[1:])
+                text = text.lstrip()
+        
+        # Capitalize first letter if lowercase
         if text and text[0].islower():
             text = text[0].upper() + text[1:]
+        
         return text
