@@ -263,11 +263,12 @@ question: str,
         logger.info(f"RAG generation - Context length: {len(context)}, Question: {question[:50]}...")
         return self.generate(
             prompt=prompt,
-            max_new_tokens=400,
-            min_new_tokens=60,
-            temperature=0.1,
-            top_p=0.8,
-            repetition_penalty=1.05,
+            max_new_tokens=512,
+            min_new_tokens=80,
+            temperature=0.7,
+            top_p=0.9,
+            repetition_penalty=1.1,
+            no_repeat_ngram_size=2,
         )
 
     def _build_simple_prompt(self, context: str, question: str) -> str:
@@ -288,21 +289,19 @@ question: str,
         
         if any(s in question_lower for s in saludos):
             user_message = """¡Hola! Soy el asistente virtual de Prepa en Línea SEP. Estoy aquí para ayudarte con tus dudas sobre el programa. ¿Qué necesitas saber?"""
-        
         elif any(s in question_lower for s in despedidas):
             user_message = """¡Hasta luego! Éxito en tus estudios. Cuando tengas dudas, vuelve a escribirme."""
-        
         elif any(s in question_lower for s in gracias):
             user_message = """¡De nada! Si tienes más dudas sobre Prepa en Línea, con gusto te ayudo."""
-        
         else:
-            user_message = f"""Eres un asistente de Prepa en Línea SEP. Responde usando ÚNICAMENTE la información del contexto.
+            user_message = f"""Eres un asistente de Prepa en Línea SEP. Usa EXACTAMENTE la información que responde la pregunta del contexto.
 
-INSTRUCCIONES:
-1. Si la respuesta está en el contexto, CÓPIALA textualmente
-2. Si el contexto tiene la información pero no es exacta, usa lo que dige el contexto
-3. NO INVENTES información que no esté en el contexto
-4. Si no hay información relacionada, di: "No encontré información sobre eso en los materiales disponibles."
+INSTRUCCIONES IMPORTANTES:
+1. Busca en el contexto la pregunta EXACTA o similar
+2. Responde solo con la información de ESA pregunta
+3. NO combines información de diferentes preguntas
+4. COPIA textualmente las fechas y plazos del contexto
+5. Si no hay información que responda la pregunta, di: "No tengo esa información en los materiales disponibles."
 
 Contexto:
 {context}
