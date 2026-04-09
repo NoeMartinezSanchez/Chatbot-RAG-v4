@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     INTENTS_ENABLED: bool = True  # Si quieres poder desactivar intents fácilmente
     
     # Búsqueda y recuperación
-    TOP_K_RESULTS: int = Field(default=3, ge=1, le=10)
+    TOP_K_RESULTS: int = Field(default=5, ge=1, le=10)
     SIMILARITY_THRESHOLD: float = Field(default=0.75, ge=0.1, le=1.0)
     MAX_CONTEXT_LENGTH: int = 4000  # Tokens máximos para contexto
     

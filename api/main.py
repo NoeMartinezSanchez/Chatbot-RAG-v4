@@ -140,12 +140,12 @@ async def chat(request: ChatRequest):
         logger.info(f"🔍 DEBUG - sources count: {len(sources) if sources else 0}")
         logger.info(f"📤 Respuesta generada: {'RAG' if is_rag else 'Intent'} - Confianza: {confidence:.2%}")
         
-        # Crear respuesta
+        # Crear respuesta - NO mostrar confianza al usuario
         response = ChatResponse(
             response=response_text,
             sources=sources,
             is_rag_response=is_rag,
-            confidence=confidence
+            confidence=None  # Ocultar confianza del usuario
         )
         
         # Almacenar conversación
@@ -163,13 +163,12 @@ async def chat(request: ChatRequest):
             "sources": sources
         })
         
-        # Añadir headers con IDs
+        # Añadir headers con IDs (sin confianza)
         headers = {
             "X-User-ID": user_id,
             "X-Conversation-ID": conversation_id,
             "X-Message-ID": message_id,
             "X-Response-Type": "rag" if is_rag else "intent",
-            "X-Confidence": str(confidence)
         }
         
         return JSONResponse(

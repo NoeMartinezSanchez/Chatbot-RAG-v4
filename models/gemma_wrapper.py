@@ -258,19 +258,22 @@ question: str,
         Returns:
             Generated response based on the context.
         """
-        prompt = self._build_simple_prompt(context, question)
+        prompt = self._build_improved_prompt(context, question)
 
         logger.info(f"RAG generation - Context length: {len(context)}, Question: {question[:50]}...")
-        return self.generate(
+        raw_response = self.generate(
             prompt=prompt,
             max_new_tokens=512,
-            temperature=0.7,
+            temperature=0.6,
             top_p=0.9,
-            repetition_penalty=1.0,
+            repetition_penalty=1.15,
         )
 
-    def _build_simple_prompt(self, context: str, question: str) -> str:
-        """Build simple prompt - direct and minimal.
+        response = self._clean_and_fix_response(raw_response)
+        return response
+
+    def _build_improved_prompt(self, context: str, question: str) -> str:
+        """Build improved prompt with better handling of common topics.
 
         Args:
             context: Retrieved context from RAG.
@@ -295,14 +298,21 @@ question: str,
             user_message = """¡De nada! Si tienes más dudas sobre Prepa en Línea, con gusto te ayudo."""
         
         else:
+            if "propedéutico" in question_lower or "curso propedéutico" in question_lower:
+                context_hint = "El curso propedéutico es obligatorio para tous los estudiantes de Prepa en Línea. Tiene una duración aproximada de 3 semanas y debes completarlo antes de comenzar el primer semestre formal."
+            else:
+                context_hint = ""
+            
             user_message = f"""Eres un asistente de Prepa en Línea SEP. Responde preguntas de estudiantes usando la información del contexto proporcionado.
+
+{context_hint}
 
 Contexto:
 {context}
 
 Pregunta: {question}
 
-Responde de forma clara y útil en español."""
+Responde de forma clara y útil en español. Si no tienes información suficiente, dilo honestamente."""
 
         prompt = f"""<start_of_turn>user
 {user_message}<end_of_turn>
@@ -311,14 +321,14 @@ Responde de forma clara y útil en español."""
 
         return prompt
 
-    def _clean_response(self, response: str) -> str:
-        """Clean and post-process generated response.
+    def _clean_and_fix_response(self, response: str) -> str:
+        """Clean and fix generated response - handles truncations and formatting.
 
         Args:
             response: Raw response from the model.
 
         Returns:
-            Cleaned response.
+            Cleaned and fixed response.
         """
         import re
         
@@ -338,21 +348,35 @@ Responde de forma clara y útil en español."""
         response = ' '.join(clean_lines)
         
         response = re.sub(r'#\w+', '', response)
-        
         response = re.sub(r'\*+', '', response)
-        
         response = re.sub(r'[{}\[\]()]', '', response)
         
         response = re.sub(r'\s+', ' ', response).strip()
         
-        if response.startswith('Pre ') or response.startswith('El '):
-            pass
-        elif response.startswith('Res ') or response.startswith('Te '):
-            pass
-        elif len(response) > 0 and not response[0].isalpha():
-            words = response.split()
-            if words:
-                response = ' '.join(words)
+        if len(response) >= 2:
+            first_word = response.split()[0] if response.split() else ""
+            if len(first_word) <= 2 and first_word.islower():
+                response = response[len(first_word):].strip()
+        
+        response = response.lower()
+        
+        sentences = re.split(r'([.!?]+)', response)
+        if sentences:
+            fixed = []
+            for i, part in enumerate(sentences):
+                if i % 2 == 0:
+                    if part:
+                        part = part.strip()
+                        if part:
+                            part = part[0].upper() + part[1:] if len(part) > 1 else part.upper()
+                            fixed.append(part)
+                else:
+                    fixed.append(part)
+            response = ''.join(fixed)
+        
+        response = response.strip()
+        if not response or len(response) < 5:
+            response = "Lo siento, no pude generar una respuesta adecuada. ¿Podrías reformular tu pregunta?"
         
         return response
 
