@@ -258,7 +258,7 @@ question: str,
         Returns:
             Generated response based on the context.
         """
-        prompt = self._build_balanced_prompt(context, question)
+        prompt = self._build_simple_prompt(context, question)
 
         logger.info(f"RAG generation - Context length: {len(context)}, Question: {question[:50]}...")
         return self.generate(
@@ -266,13 +266,11 @@ question: str,
             max_new_tokens=512,
             temperature=0.7,
             top_p=0.9,
-            repetition_penalty=1.1,
-            no_repeat_ngram_size=3,
-            early_stopping=True,
+            repetition_penalty=1.0,
         )
 
-    def _build_balanced_prompt(self, context: str, question: str) -> str:
-        """Build balanced prompt - uses context but allows general knowledge.
+    def _build_simple_prompt(self, context: str, question: str) -> str:
+        """Build simple prompt - direct and minimal.
 
         Args:
             context: Retrieved context from RAG.
@@ -283,58 +281,28 @@ question: str,
         """
         question_lower = question.lower().strip()
         
-        saludos_keywords = ["hola", "buenos días", "buenas tardes", "buenas", "holi", "hello", "hey", "qué tal", "cómo estás", "qué onda", "buen día", "saludos"]
-        despedidas_keywords = ["adiós", "chao", "bye", "hasta luego", "me voy", "nos vemos", "me retiro", "nos piet"]
-        gracias_keywords = ["gracias", "thank", "agradezco", "te agradezco", "muchas gracias", "mil gracias"]
+        saludos = ["hola", "buenos días", "buenas tardes", "buenas", "holi", "hello", "hey", "qué tal", "cómo estás"]
+        despedidas = ["adiós", "chao", "bye", "hasta luego", "me voy", "nos vemos"]
+        gracias = ["gracias", "thank", "agradezco", "muchas gracias"]
         
-        if any(saludo in question_lower for saldo in saludos_keywords):
-            user_message = """¡Hola! Bienvenido a Prepa en Línea SEP. Estoy aquí para resolver todas tus dudas sobre el programa de Prepa en Línea. ¿En qué puedo ayudarte hoy?"""
+        if any(s in question_lower for s in saludos):
+            user_message = """¡Hola! Soy el asistente virtual de Prepa en Línea SEP. Estoy aquí para ayudarte con tus dudas sobre el programa. ¿Qué necesitas saber?"""
         
-        elif any(palabra in question_lower for palabra in despedidas_keywords):
-            user_message = """¡Hasta luego! Te deseo mucho éxito en tu trayectoria por Prepa en Línea SEP. Cuando tengas alguna duda, no dudes en escribirme. ¡Tú puedes lograr tus objetivos!"""
+        elif any(s in question_lower for s in despedidas):
+            user_message = """¡Hasta luego! Éxito en tus estudios. Cuando tengas dudas, vuelve a escribirme."""
         
-        elif any(palabra in question_lower for palabra in gracias_keywords):
-            user_message = """¡De nada! Para eso estoy. Si tienes cualquier otra duda sobre Prepa en Línea SEP, con gusto te ayudo. ¡Éxito en tus estudios!"""
+        elif any(s in question_lower for s in gracias):
+            user_message = """¡De nada! Si tienes más dudas sobre Prepa en Línea, con gusto te ayudo."""
         
         else:
-            system_prompt = """Eres el asistente virtual oficial de Prepa en Línea SEP.
+            user_message = f"""Eres un asistente de Prepa en Línea SEP. Responde preguntas de estudiantes usando la información del contexto proporcionado.
 
-INSTRUCCIONES BALANCEADAS:
-1. USA el contexto comofuente principal cuando contenga información relevante.
-2. Si el contexto tiene información PARCIAL, complétala con conocimiento educativo general.
-3. Si el contexto NO tiene NADA relacionado con la pregunta, entonces di: "No tengo información específica sobre eso en los materiales disponibles. Te recomiendo consultar el portal oficial de Prepa en Línea o contacter a tu asesor."
-4. NUNCA digas "no sé" si el contexto tiene información que pueda responder aunque sea parcialmente.
-5. RESPONDE SIEMPRE con oraciones completas. NUNCA EMPIECES con palabras truncadas.
-6. NO uses hashtags, emojis, asteriscos, ni caracteres especiales.
-7. Síntetiza la información de forma clara y profesional.
-
-EJEMPLOS DE CÓMO RESPONDER:
-
-Ejemplo 1 - SI usar el contexto:
-Contexto: La baja parcial permite abandonar hast3 módulos sin afectar el promedio.
-Pregunta: ¿Puedo dar de baja una materia?
-Respuesta: Sí, puedes solicitar baja parcial para hast3 módulos. Esta opción no afectará tu promedio. Debes solicitarla dentro de las fechas establecidas.
-
-Ejemplo 2 - SI usar conocimiento general:
-Contexto: Los módulos tienen duración de 2 meses aproximadamente.
-Pregunta: ¿Cuántas horas debo estudiar al día?
-Respuesta: Se recomienda estudiar entre 2 y 4 horas diarias por módulo. Como tienes 6 módulos en promedio, planifica tu tiempo para poder completar todas las actividades.
-
-Ejemplo 3 - Decir "no tengo información":
-Contexto: Los exámenes de inglés son presenciales en centros SEP.
-Pregunta: ¿Qué idiomas puedo estudiar?
-Respuesta: No tengo información específica sobre los idiomas disponibles en Prepa en Línea. Te recomiendo consultar el catálogo oficial o contactar a tu asesor.
-
-Ahora responde:"""
-
-            user_message = f"""{system_prompt}
-
-CONTEXTO:
+Contexto:
 {context}
 
 Pregunta: {question}
 
-Respuesta:"""
+Responde de forma clara y útil en español."""
 
         prompt = f"""<start_of_turn>user
 {user_message}<end_of_turn>
