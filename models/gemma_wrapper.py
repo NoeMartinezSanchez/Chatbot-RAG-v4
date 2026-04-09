@@ -245,7 +245,7 @@ class GemmaWrapper:
     def generate_with_context(
         self,
         context: str,
-        question: str,
+question: str,
         max_new_tokens: int = 256,
     ) -> str:
         """Generate a response given context and a question (RAG mode).
@@ -258,22 +258,22 @@ class GemmaWrapper:
         Returns:
             Generated response based on the context.
         """
-        prompt = self._build_optimized_prompt(context, question)
+        prompt = self._build_advanced_prompt(context, question)
 
         logger.info(f"RAG generation - Context length: {len(context)}, Question: {question[:50]}...")
         return self.generate(
             prompt=prompt,
             max_new_tokens=512,
-            temperature=0.3,
+            temperature=0.5,
             top_p=0.85,
-            repetition_penalty=1.15,
+            repetition_penalty=1.1,
             no_repeat_ngram_size=4,
             early_stopping=True,
             min_new_tokens=50,
         )
 
-    def _build_optimized_prompt(self, context: str, question: str) -> str:
-        """Build optimized prompt for Gemma.
+    def _build_advanced_prompt(self, context: str, question: str) -> str:
+        """Build advanced prompt with few-shot learning.
 
         Args:
             context: Retrieved context from RAG.
@@ -284,53 +284,60 @@ class GemmaWrapper:
         """
         question_lower = question.lower().strip()
         
-        saludos_keywords = ["hola", "buenos días", "buenas tardes", "buenas", "holi", "hello", "hey", "qué tal", "cómo estás", "qué onda", "buen día"]
-        despedidas_keywords = ["adiós", "chao", "bye", "hasta luego", "me voy", "nos vemos", "me retiro"]
-        gracias_keywords = ["gracias", "thank", "agradezco", "te agradezco", "muchas gracias"]
+        saludos_keywords = ["hola", "buenos días", "buenas tardes", "buenas", "holi", "hello", "hey", "qué tal", "cómo estás", "qué onda", "buen día", "saludos"]
+        despedidas_keywords = ["adiós", "chao", "bye", "hasta luego", "me voy", "nos vemos", "me retiro", "nos piet"]
+        gracias_keywords = ["gracias", "thank", "agradezco", "te agradezco", "muchas gracias", "mil gracias"]
         
-        if any(saludo in question_lower for saludo in saludos_keywords):
-            user_message = """¡Hola! Bienvenido a Prepa en Línea SEP. Estoy aquí para ayudarte con cualquier duda sobre trámites, fechas, inscripciones y académicas. ¿En qué puedo ayudarte hoy?"""
+        if any(saludo in question_lower for saldo in saludos_keywords):
+            user_message = """¡Hola! Bienvenido a Prepa en Línea SEP. Estoy aquí para resolver todas tus dudas sobre el programa de Prepa en Línea. ¿En qué puedo ayudarte hoy?"""
         
         elif any(palabra in question_lower for palabra in despedidas_keywords):
-            user_message = """¡Hasta luego! Éxito en tu camino por Prepa en Línea SEP. Cuando tengas dudas, vuelve por aquí. ¡Tú puedes!"""
+            user_message = """¡Hasta luego! Te deseo mucho éxito en tu trayectoria por Prepa en Línea SEP. Cuando tengas alguna duda, no dudes en escribirme. ¡Tú puedes lograr tus objetivos!"""
         
         elif any(palabra in question_lower for palabra in gracias_keywords):
-            user_message = """¡De nada! Estoy para ayudarte. Si tienes más dudas sobre Prepa en Línea SEP, escríbeme cuando quieras."""
+            user_message = """¡De nada! Para eso estoy. Si tienes cualquier otra duda sobre Prepa en Línea SEP, con gusto te ayudo. ¡Éxito en tus estudios!"""
         
         else:
             system_prompt = """Eres el asistente virtual oficial de Prepa en Línea SEP.
 
-REGLAS ESTRICTAS:
-1. NO uses hashtags (#), emojis, asteriscos, ni caracteres especiales.
-2. NO repitas preguntas ni frases del contexto.
-3. Lee y considera TODO el contexto antes de responder.
-4. Si el contexto tiene información, síntela en 2-3 oraciones claras.
-5. Si NO hay información relacionada en el contexto, DI: "No encontré información específica sobre eso en los materiales disponibles. ¿Podrías reformular tu pregunta?"
-6. NO inventes respuestas. Solo usa información del contexto.
-7. NO comiences con palabras truncadas o cortadas.
-8. NO menciones "contexto", "documento", o "fuente" en tu respuesta.
-9. Responde en español claro y directo, como un asesor escolar.
+INSTRUCCIONES OBLIGATORIAS:
+1. RESPONDE SIEMPRE CON ORACIONES COMPLETAS. NUNCA EMPIECES CON PALABRAS CORTADAS O TRUNCADAS.
+2. Lee TODO el contexto antes de responder. No ignores ninguna información.
+3. NO RESPONDAS sobre temas que no estén en el contexto. Si el contexto habla de "baja parcial", NO respondas sobre "cursos propedéuticos".
+4. Si la información del contexto NO corresponde a la pregunta, DI: "No encontré información sobre [tema] en los materiales oficiales. Te recomiendo consultar el portal oficial de Prepa en Línea SEP o contactar a tu asesor."
+5. Usa ÚNICAMENTE información del contexto para responder. NO inventes ni asumas.
+6. NO uses hashtags, emojis, asteriscos, ni caracteres especiales (# *).
+7. Síntetiza la información del contexto de forma clara y complète.
+8. Responde como un asesor escolar profesional, en español correcto.
 
-Ejemplo de formato de respuesta:
+FORMATO OBLIGATORIO - Sigue este ejemplo:
 ---
-Pregunta: [pregunta del estudiante]
-Respuesta: [respuesta clara y síntesis de la información relevante]
----"""
+Ejemplo 1:
+Contexto: La baja parcial te permite abandonar hasta 3 módulos sin que afecte tu promedio. Debes solicitarla en fechas establecidas.
+Pregunta: ¿Puedo dar de baja una materia?
+Respuesta: Sí, puedes solicitar baja parcial para hasta 3 módulos. Esta opción no afectará tu promedio. Debes realizar la solicitud dentro de las fechas establecidas por el programa.
+
+Ejemplo 2:
+Contexto: Los exámenes extraordinario se aplican en junio y diciembre.
+Pregunta: ¿Cuándo son los exámenes de regularización?
+Respuesta: Los exámenes extraordinario o de regularización se aplican en dos periodos: junio y diciembre.
+---
+
+Ahora responde usando el mismo formato:"""
 
             user_message = f"""{system_prompt}
 
-CONTENDO OFICIAL (lee completo):
+CONTEXTO OFICIAL (lee completo):
 {context}
 
-Responde a esta pregunta:
-{question}
+Pregunta: {question}
 
----"""
+Respuesta:"""
 
         prompt = f"""<start_of_turn>user
 {user_message}<end_of_turn>
 <start_of_turn>model
-Respuesta: """
+"""
 
         return prompt
 

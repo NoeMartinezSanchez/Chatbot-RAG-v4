@@ -21,7 +21,7 @@ torch==2.4.1
 #torchvision==0.18.0
 #torchaudio==2.3.0
 
-# Hugging Face Transformers (última versión estable con soporte TinyLlama)
+# Hugging Face Transformers
 transformers==4.41.0
 accelerate==0.31.0  # Esencial para carga optimizada en GPU/CPU
 huggingface-hub==0.23.0
