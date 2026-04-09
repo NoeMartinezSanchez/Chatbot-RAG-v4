@@ -263,11 +263,11 @@ question: str,
         logger.info(f"RAG generation - Context length: {len(context)}, Question: {question[:50]}...")
         return self.generate(
             prompt=prompt,
-            max_new_tokens=300,
-            min_new_tokens=50,
-            temperature=0.3,
-            top_p=0.85,
-            repetition_penalty=1.15,
+            max_new_tokens=400,
+            min_new_tokens=60,
+            temperature=0.1,
+            top_p=0.8,
+            repetition_penalty=1.05,
         )
 
     def _build_simple_prompt(self, context: str, question: str) -> str:
@@ -426,8 +426,15 @@ Responde:"""
                 text = ' '.join(words[1:])
                 text = text.lstrip()
         
-        # Fix mixed case errors like "constANCIA" -> "constancia"
         import re
+        
+        # Fix "6 mes" -> "6 meses"
+        text = re.sub(r'(\d+)\s+mes(es)?(?!\w)', r'\1 meses', text, flags=re.IGNORECASE)
+        
+        # Fix "cartas" -> "carta" (when referring to single document)
+        text = re.sub(r'\bcartas\b', 'carta', text, flags=re.IGNORECASE)
+        
+        # Fix mixed case errors like "constANCIA" -> "constancia"
         text = re.sub(r'([a-z]+)([A-Z]+)', lambda m: m.group(1).lower() + m.group(2).lower(), text)
         
         # Fix missing spaces like "lasmaterias" -> "las materias"
