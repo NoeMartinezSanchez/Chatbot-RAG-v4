@@ -273,45 +273,23 @@ question: str,
         )
 
     def _build_simple_prompt(self, context: str, question: str) -> str:
-        user_message = f"""
-Eres un asistente especializado en Prepa en Línea SEP.
+        prompt = f"""Eres un asistente de Prepa en Línea SEP. Responde usando EXACTAMENTE la información de los siguientes fragmentos.
 
-INSTRUCCIONES IMPORTANTES:
-- Usa principalmente la información del contexto
-- No inventes información que no esté respaldada por el contexto
-- No uses conocimiento externo
-- Si la respuesta NO está en el contexto, responde EXACTAMENTE:
-  "No encontré información sobre eso en los documentos disponibles. ¿Quieres que intente con otra pregunta?"
-- Resume y redacta con tus propias palabras (no copies literal)
-- Sé claro, preciso y directo
-- Usa español correcto y claro
-- No inventes palabras ni deformes términos
-- Escribe oraciones completas y bien redactadas
-- Antes de responder, asegúrate de que la respuesta sea una oración completa y clara
-- Ignora partes del contexto que no respondan directamente la pregunta
+REGLAS IMPORTANTES:
+1. SOLO usa información que aparezca TEXTUALMENTE en los fragmentos
+2. Si la información no está en los fragmentos, di "No encontré esa información en los documentos"
+3. NO inventes, NO resumas, NO agregues información
+4. Puedes copiar textualmente las listas de documentos
 
-TAREA:
-1. Identifica qué parte del contexto responde la pregunta
-2. Usa solo esa información relevante
-3. Si hay múltiples fragmentos útiles, combínalos
-
-CONTEXTO:
+FRAGMENTOS:
 {context}
 
-PREGUNTA:
-{question}
+PREGUNTA: {question}
 
-FORMATO DE RESPUESTA:
-- Escribe en párrafos cortos o listas claras
-- Si es una lista, usa viñetas con "-"
-- Evita fragmentos incompletos
-- Redacta como una explicación natural
-
-RESPUESTA:
-"""
+RESPUESTA (SOLO con información de los fragmentos):"""
 
         prompt = f"""<start_of_turn>user
-{user_message}<end_of_turn>
+{prompt}<end_of_turn>
 <start_of_turn>model
 """
         return prompt
