@@ -13,20 +13,22 @@ from .embeddings import EmbeddingModel
 from .retriever import VectorStoreFAISS
 from .generator import TinyLlamaGenerator
 from .gemma_generator import GemmaGenerator
+from .optimized_retriever import OptimizedRetriever
 
 logger = logging.getLogger(__name__)
 
 class RAGSystem:
     def __init__(self):
         self.embedder = EmbeddingModel()
-        self.vector_store = VectorStoreFAISS()  # <-- CORREGIDO
+        self.vector_store = VectorStoreFAISS()
         self.generator = GemmaGenerator()
+        self.optimized_retriever = OptimizedRetriever(self.vector_store)
         self.intents_loaded = False
 
         self.top_k = settings.TOP_K_RESULTS
         self.similarity_threshold = settings.SIMILARITY_THRESHOLD
         
-        logger.info("RAG System initialized con FAISS")
+        logger.info("RAG System initialized con OptimizedRetriever")
     
     def load_intents(self, intents_file: str = "data/vector_store/intents.json"):
         """Carga intents al sistema"""
@@ -137,55 +139,50 @@ class RAGSystem:
     
     def _rag_process(self, query: str) -> Tuple[str, bool, float, list]:
         """
-        Procesar consulta usando RAG (para preguntas técnicas/complejas).
+        Procesar consulta usando RAG con OptimizedRetriever.
         """
         try:
             # 1. Generar embedding de la consulta
             query_embedding = self.embedder.embed_text(query)
             
-            # 2. Buscar documentos relevantes
-            doc_results = self.vector_store.search_documents(
+            # 2. Usar OptimizedRetriever para búsqueda avanzada
+            results = self.optimized_retriever.retrieve(
+                query, 
                 query_embedding, 
                 top_k=settings.TOP_K_RESULTS
             )
             
-            # 3. Verificar si hay documentos relevantes
-            if (not doc_results['documents'] or 
-                not doc_results['documents'][0] or
-                len(doc_results['documents'][0]) == 0):
-                
+            # 3. Verificar si hay resultados relevantes
+            if not results:
                 return "No encontré información específica sobre eso en los materiales de Prepa en Línea SEP.", False, 0.0, []
 
-            # 4. Verificar si la similitud es suficientemente alta
-            if doc_results['distances'] and doc_results['distances'][0]:
-                distance = doc_results['distances'][0][0]
-                # Umbral más permisivo para permitir más respuestas
-                if distance > 2.5:
-                    return "No encontré información específica sobre eso en los materiales de Prepa en Línea SEP.", False, 0.0, []
-            
-            # 5. Generar respuesta RAG
-            contexts = doc_results['documents'][0]
-            metadata_list = doc_results['metadatas'][0]
+            # 4. Extraer contextos y metadatos
+            contexts = [r.get("content", r.get("text", "")) for r in results]
+            metadatas = [r.get("metadata", {}) for r in results]
             context_str = " ".join(contexts)
             
-            # Usar TinyLlama generativo
+            if not context_str.strip():
+                return "No encontré información específica sobre eso en los materiales de Prepa en Línea SEP.", False, 0.0, []
+            
+            # 5. Generar respuesta RAG con Gemma
             response = self.generator.generate(query, context_str)
             
             # 6. Preparar fuentes para mostrar
             sources = []
-            for i, (context, metadata) in enumerate(zip(contexts, metadata_list)):
-                if i < 3:  # Mostrar máximo 3 fuentes
+            for i, (context, metadata) in enumerate(zip(contexts, metadatas)):
+                if i < 3 and context:
                     source_info = {
-                        "content": context,  # Contenido completo del chunk
+                        "content": context,
                         "metadata": metadata
                     }
                     sources.append(source_info)
             
-            # 7. Calcular confianza basada en distancia (convertir a similitud)
+            # 7. Calcular confianza basada en reranked_score
             confidence = 0.0
-            if doc_results['distances'] and doc_results['distances'][0]:
-                distance = doc_results['distances'][0][0]
-                confidence = 1 / (1 + distance) if distance > 0 else 1.0
+            if results and results[0].get("reranked_score"):
+                confidence = results[0]["reranked_score"]
+            elif results and results[0].get("similarity"):
+                confidence = results[0]["similarity"]
             
             return response, True, confidence, sources
             
@@ -214,8 +211,8 @@ class RAGSystem:
                 if intent_results.get('metadatas') and intent_results['metadatas'][0]:
                     return self._format_intent_response(intent_results)
         
-        # Para TODO lo demás (incluyendo saludos), usar RAG con TinyLlama
-        logger.info(f"Usando RAG + TinyLlama para: '{query[:50]}...'")
+        # Para TODO lo demás (incluyendo saludos), usar RAG con OptimizedRetriever
+        logger.info(f"Usando RAG + OptimizedRetriever para: '{query[:50]}...'")
         return self._rag_process(query)
     
     def add_document(self, content: str, metadata: Dict[str, Any] = None):

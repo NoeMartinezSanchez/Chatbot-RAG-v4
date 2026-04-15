@@ -101,17 +101,37 @@ class ChunksRAGLoader:
                 content = self._create_rag_content(chunk)
                 texts_for_embedding.append(content)
                 
-                # Preparar documento para FAISS
+                # Consolidar TODOS los metadatos del chunk original
+                all_metadata = {
+                    **metadata,
+                    'chunk_id': chunk_id,
+                    'doc_type': doc_type,
+                    'source_file': source_file,
+                    'page_range': chunk.get('page_range', '1-1'),
+                    'imported_at': datetime.now().isoformat()
+                }
+                
+                all_metadata.update({
+                    'chunk_type': chunk.get('chunk_type', self._infer_chunk_type(doc_type, metadata)),
+                    'importance': chunk.get('importance', 0.5),
+                    'severity': chunk.get('severity', ''),
+                    'action_type': chunk.get('action_type', ''),
+                    'has_dates': chunk.get('has_dates', self._contains_dates(content)),
+                    'title': metadata.get('title', ''),
+                    'section': metadata.get('section', ''),
+                    'term': metadata.get('term', ''),
+                    'article': metadata.get('article', ''),
+                    'chapter': metadata.get('chapter', ''),
+                    'step_number': metadata.get('step_number', ''),
+                    'principle_number': metadata.get('principle_number', ''),
+                    'conduct_name': metadata.get('conduct_name', ''),
+                    'rule_title': metadata.get('rule_title', ''),
+                    'section_number': metadata.get('section_number', '')
+                })
+                
                 doc = {
                     'content': content,
-                    'metadata': {
-                        'chunk_id': chunk_id,
-                        'doc_type': doc_type,
-                        'source_file': source_file,
-                        'page_range': chunk.get('page_range', '1-1'),
-                        'original_metadata': metadata,
-                        'imported_at': datetime.now().isoformat()
-                    }
+                    'metadata': all_metadata
                 }
                 documents.append(doc)
                 
@@ -205,6 +225,50 @@ class ChunksRAGLoader:
         parts.append(f"\n📚 Fuente: {source_file}")
         
         return "\n".join(parts)
+    
+    def _infer_chunk_type(self, doc_type: str, metadata: Dict) -> str:
+        """Inferir chunk_type basado en doc_type y metadatos"""
+        doc_type_lower = doc_type.lower()
+        
+        if 'guia' in doc_type_lower or 'aspirante' in doc_type_lower:
+            return 'paso'
+        elif 'normativa' in doc_type_lower or 'reglamento' in doc_type_lower:
+            return 'articulo'
+        elif 'protocolo' in doc_type_lower:
+            return 'conducta'
+        elif 'decalogo' in doc_type_lower:
+            return 'principio'
+        elif 'glosario' in doc_type_lower:
+            return 'termino'
+        elif 'reglas_comunicacion' in doc_type_lower:
+            return 'regla'
+        elif 'convocatoria' in doc_type_lower:
+            return 'pregunta'
+        
+        if metadata.get('step_number'):
+            return 'paso'
+        if metadata.get('article'):
+            return 'articulo'
+        if metadata.get('principle_number'):
+            return 'principio'
+        if metadata.get('term'):
+            return 'termino'
+        if metadata.get('conduct_name'):
+            return 'conducta'
+        
+        return 'general'
+    
+    def _contains_dates(self, text: str) -> bool:
+        """Detectar si el texto contiene fechas o plazos"""
+        import re
+        date_patterns = [
+            r'\d{1,2}/\d{1,2}/\d{2,4}',
+            r'\d{1,2}-\d{1,2}-\d{2,4}',
+            r'\d{4}-\d{2}-\d{2}',
+            r'enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre',
+            r'vigencia|vence|plazo|días?|fecha'
+        ]
+        return any(re.search(p, text, re.IGNORECASE) for p in date_patterns)
     
     def _generate_report(self, chunks_path: str):
         """Genera un reporte de carga"""
