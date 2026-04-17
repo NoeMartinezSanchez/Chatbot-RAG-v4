@@ -22,9 +22,9 @@ torch==2.4.1
 # Hugging Face Transformers - >= 4.42.0 para Gemma 2
 transformers>=4.42.0
 accelerate>=0.28.0  # Esencial para carga optimizada en CPU/GPU
-huggingface-hub==0.23.0
-tokenizers==0.19.1
-safetensors==0.4.3  # Seguro y rápido para guardar/cargar pesos
+huggingface-hub>=0.23.2,<1.0.0
+tokenizers>=0.19.1
+safetensors>=0.4.3
 
 # Sentence Transformers (para embeddings)
 sentence-transformers==2.7.0
