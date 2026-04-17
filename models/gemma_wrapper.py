@@ -24,11 +24,11 @@ MODEL_VARIANTS = [
     "google/gemma-2b-it",
 ]
 
-MIN_TRANSFORMERS_VERSION = "4.40.0"
+MIN_TRANSFORMERS_VERSION = "4.42.0"
 
 
 def _check_transformers_version():
-    """Verify transformers version meets minimum requirement."""
+    """Verify transformers version meets minimum requirement for Gemma 2."""
     installed = transformers.__version__
     major, minor, _ = installed.split(".")[:3]
     required_major, required_minor = MIN_TRANSFORMERS_VERSION.split(".")[:2]
@@ -36,11 +36,12 @@ def _check_transformers_version():
     if (int(major) < int(required_major) or 
         (int(major) == int(required_major) and int(minor) < int(required_minor))):
         logger.warning(
-            f"transformers {installed} may be incompatible. "
-            f"Recommended: >= {MIN_TRANSFORMERS_VERSION}"
+            f"⚠️ transformers {installed} incompatible con gemma-2. "
+            f"Requiere >= {MIN_TRANSFORMERS_VERSION}. "
+            f"Se usará fallback gemma-1.1-2b-it"
         )
     else:
-        logger.info(f"transformers version: {installed} (OK)")
+        logger.info(f"✅ transformers version: {installed} (compatible con gemma-2)")
 
 
 class GemmaWrapper:
@@ -83,21 +84,26 @@ class GemmaWrapper:
 
     def _load_model(self) -> None:
         """Load the Gemma model and tokenizer with fallback strategy."""
+        logger.info("=" * 60)
+        logger.info("🚀 INICIANDO CARGA DEL MODELO GEMMA")
+        logger.info("=" * 60)
+        
         hf_token = os.getenv("HF_TOKEN")
         if hf_token:
-            logger.info("HF_TOKEN found in environment variables")
+            logger.info("✅ HF_TOKEN encontrado en variables de entorno")
         else:
-            logger.warning("HF_TOKEN not found in environment variables")
+            logger.warning("⚠️ HF_TOKEN no encontrado en variables de entorno")
+            logger.info("   (El modelo debe ser público o tener HF_TOKEN configurado)")
 
         loaded = False
         last_error = None
         
         for i, model_variant in enumerate(MODEL_VARIANTS):
             if i > 0:
-                logger.info(f"Trying fallback model: {model_variant}")
+                logger.info(f"🔄 Intentando fallback: {model_variant}")
             
             try:
-                logger.info(f"Loading tokenizer from {model_variant}...")
+                logger.info(f"📥 [1/4] Descargando tokenizer de: {model_variant}")
                 download_start = time.time()
                 self.tokenizer = AutoTokenizer.from_pretrained(
                     model_variant,
@@ -105,16 +111,19 @@ class GemmaWrapper:
                     token=hf_token,
                     trust_remote_code=True,
                 )
-                logger.info(f"Tokenizer downloaded in {time.time() - download_start:.1f}s")
+                logger.info(f"   ✅ Tokenizer descargado en {time.time() - download_start:.1f}s")
                 
                 if self.tokenizer.pad_token is None:
                     self.tokenizer.pad_token = self.tokenizer.eos_token
-                    logger.info("Set pad_token = eos_token")
+                    logger.info("   ✅ pad_token = eos_token (configurado)")
+                else:
+                    logger.info(f"   ✅ pad_token ya configurado: {self.tokenizer.pad_token}")
 
-                logger.info(f"Loading model from {model_variant}...")
-                logger.info("Model size: ~4-5 GB, may take several minutes...")
+                logger.info(f"📥 [2/4] Descargando modelo: {model_variant}")
+                logger.info("   ℹ️ Tamaño: ~4-5 GB, puede tomar varios minutos...")
                 model_start = time.time()
                 
+                logger.info("   ℹ️ Configuración: device_map=cpu, torch_dtype=float32")
                 self.model = AutoModelForCausalLM.from_pretrained(
                     model_variant,
                     device_map="cpu",
@@ -125,38 +134,50 @@ class GemmaWrapper:
                 )
                 
                 model_time = time.time() - model_start
-                logger.info(f"Model loaded successfully in {model_time:.1f}s")
+                logger.info(f"   ✅ Modelo descargado en {model_time:.1f}s")
+                
+                logger.info("   ℹ️ Ejecutando model.eval()...")
+                self.model.eval()
                 
                 self.model_name = model_variant
                 loaded = True
+                
+                logger.info("=" * 60)
+                logger.info(f"✅ MODELO CARGADO EXITOSAMENTE: {self.model_name}")
+                logger.info(f"   📍 Device: CPU (float32)")
+                logger.info(f"   💾 Memoria aproximada: ~5-6 GB RAM")
+                logger.info(f"   ⏱️ Tiempo total: {model_time:.1f}s")
+                logger.info("=" * 60)
                 break
                 
             except KeyError as e:
-                logger.error(f"KeyError loading {model_variant}: {e}")
+                logger.error(f"❌ KeyError con {model_variant}: {e}")
+                logger.info("   → Intentando siguiente variante...")
                 last_error = e
                 continue
             except TypeError as e:
                 if "timeout" in str(e):
-                    logger.error(f"timeout parameter not supported in {model_variant}: {e}")
+                    logger.error(f"❌ Timeout con {model_variant}: {e}")
+                else:
+                    logger.error(f"❌ TypeError con {model_variant}: {e}")
+                logger.info("   → Intentando siguiente variante...")
                 last_error = e
                 continue
             except Exception as e:
-                logger.error(f"Error loading {model_variant}: {str(e)}")
+                logger.error(f"❌ Error cargando {model_variant}: {str(e)}")
+                logger.info("   → Intentando siguiente variante...")
                 last_error = e
                 continue
 
         if not loaded:
             error_msg = (
-                f"Failed to load any Gemma variant. "
-                f"Last error: {last_error}. "
-                f"Tried: {MODEL_VARIANTS}"
+                f"❌ Falló la carga de todas las variantes de Gemma. "
+                f"Último error: {last_error}. "
+                f"Modelos intentados: {MODEL_VARIANTS}. "
+                f"Asegúrate de tener transformers>={MIN_TRANSFORMERS_VERSION}"
             )
             logger.error(error_msg)
             raise RuntimeError(error_msg)
-
-        self.model.eval()
-        logger.info(f"Model loaded on CPU with float32: {self.model_name}")
-        logger.info(f"Model memory footprint: ~5-6 GB RAM")
 
     def generate(
         self,
