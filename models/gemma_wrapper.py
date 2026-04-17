@@ -201,13 +201,14 @@ class GemmaWrapper:
             with torch.no_grad():
                 outputs = self.model.generate(
                     **inputs,
-                    max_new_tokens=max_new_tokens,
-                    min_new_tokens=min_new_tokens,
+                    do_sample=True,
                     temperature=temperature,
                     top_p=top_p,
+                    top_k=40,
+                    max_new_tokens=max_new_tokens,
+                    min_new_tokens=min_new_tokens,
                     repetition_penalty=repetition_penalty,
                     no_repeat_ngram_size=no_repeat_ngram_size,
-                    do_sample=False,
                     pad_token_id=self.tokenizer.pad_token_id,
                     eos_token_id=self.tokenizer.eos_token_id,
                     early_stopping=early_stopping,
@@ -264,34 +265,35 @@ question: str,
         logger.info(f"RAG generation - Context length: {len(context)}, Question: {question[:50]}...")
         return self.generate(
             prompt=prompt,
-            max_new_tokens=400,
-            min_new_tokens=20,
-            temperature=0.2,
+            max_new_tokens=200,
+            min_new_tokens=15,
+            temperature=0.3,
             top_p=0.85,
-            repetition_penalty=1.15,
+            repetition_penalty=1.1,
             no_repeat_ngram_size=3,
         )
 
     def _build_simple_prompt(self, context: str, question: str) -> str:
-        prompt = f"""Eres un asistente de Prepa en Línea SEP. Responde usando EXACTAMENTE la información de los siguientes fragmentos.
+        """Build a prompt for Gemma following its exact expected format."""
+        
+        system_message = """Eres un asistente de Prepa en Línea SEP. 
+        
+REGLAS ESTRICTAS:
+1. Responde SOLO usando la información de los FRAGMENTOS que se te proporcionan
+2. Si los fragmentos NO contienen la respuesta, responde: "No encontré esa información en los documentos disponibles"
+3. NO inventes información
+4. NO uses conocimiento externo
+5. Responde en español, de forma clara y directa"""
 
-REGLAS IMPORTANTES:
-1. SOLO usa información que aparezca TEXTUALMENTE en los fragmentos
-2. Si la información no está en los fragmentos, di "No encontré esa información en los documentos"
-3. NO inventes, NO resumas, NO agregues información
-4. Puedes copiar textualmente las listas de documentos
-
-FRAGMENTOS:
+        user_message = f"""FRAGMENTOS DE LA CONVOCATORIA:
 {context}
 
-PREGUNTA: {question}
+PREGUNTA DEL USUARIO: {question}
 
-RESPUESTA (SOLO con información de los fragmentos):"""
+RESPUESTA (basada ESTRICTAMENTE en los fragmentos):"""
 
-        prompt = f"""<start_of_turn>user
-{prompt}<end_of_turn>
-<start_of_turn>model
-"""
+        prompt = f"<start_of_turn>user\n{system_message}\n\n{user_message}<end_of_turn>\n<start_of_turn>model\n"
+        
         return prompt
 
     def _clean_response(self, text: str) -> str:
@@ -334,25 +336,6 @@ RESPUESTA (SOLO con información de los fragmentos):"""
         return text
 
     def _clear_cache(self) -> None:
-        """Clear Python and PyTorch garbage and cache."""
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        logger.debug("Cleared memory cache")
-
-    def get_model_info(self) -> dict:
-        """Get information about the loaded model.
-
-        Returns:
-            Dictionary with model metadata.
-        """
-        return {
-            "model_name": self.model_name,
-            "device": self.device,
-            "dtype": "float32",
-            "parameters": "2B",
-            "quantization": "none",
-        }
         """Clear Python and PyTorch garbage and cache."""
         gc.collect()
         if torch.cuda.is_available():
