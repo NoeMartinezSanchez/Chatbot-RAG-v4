@@ -6,6 +6,9 @@
 │   ├── 📄 models.py
 │   └── 📄 settings.py
 ├── 📁 data/
+│   ├── 📁 backups/
+│   │   ├── 📁 backup_20260414_085008/
+│   │   └── 📁 backup_20260414_225227/
 │   ├── 📁 vector_store/
 │   │   ├── 📄 documents.pkl
 │   │   ├── 📄 faiss_index.bin
@@ -16,18 +19,30 @@
 │   ├── 📄 intents.json
 │   ├── 📄 menu.json
 │   └── 📄 tickets_config.json
+├── 📁 evaluation/
+│   ├── 📄 __init__.py
+│   ├── 📄 automated_evaluator.py
+│   ├── 📄 generate_dashboard.py
+│   ├── 📄 logger.py
+│   ├── 📄 performance_logger.py
+│   └── 📄 test_set.json
 ├── 📁 logs/
+│   └── 📄 gemma_wrapper.log
 ├── 📁 models/
 │   ├── 📁 cache/
 │   │   ├── 📁 .locks/
-│   │   └── 📁 models--TinyLlama--TinyLlama-1.1B-Chat-v1.0/
+│   │   ├── 📁 models--TinyLlama--TinyLlama-1.1B-Chat-v1.0/
+│   │   └── 📁 models--google--gemma-1.1-2b-it/
 │   ├── 📄 __init__.py
+│   ├── 📄 gemma_wrapper.py
 │   └── 📄 tinyllama_wrapper.py
 ├── 📁 rag/
 │   ├── 📄 __init__.py
 │   ├── 📄 core.py
 │   ├── 📄 embeddings.py
+│   ├── 📄 gemma_generator.py
 │   ├── 📄 generator.py
+│   ├── 📄 optimized_retriever.py
 │   └── 📄 retriever.py
 ├── 📁 scripts/
 │   ├── 📄 debug_rag_loader.py
@@ -39,6 +54,48 @@
 ├── 📁 tests/
 │   ├── 📄 test_api.py
 │   └── 📄 test_rag.py
+├── 📁 tinyllama_env/
+│   ├── 📁 Include/
+│   ├── 📁 Lib/
+│   │   └── 📁 site-packages/
+│   ├── 📁 Library/
+│   │   ├── 📁 bin/
+│   │   ├── 📁 lib/
+│   │   └── 📁 share/
+│   ├── 📁 Scripts/
+│   │   ├── 📄 Activate.ps1
+│   │   ├── 📄 accelerate-config.exe
+│   │   ├── 📄 accelerate-estimate-memory.exe
+│   │   ├── 📄 accelerate-launch.exe
+│   │   ├── 📄 accelerate-merge-weights.exe
+│   │   ├── 📄 accelerate.exe
+│   │   ├── 📄 activate
+│   │   ├── 📄 activate.bat
+│   │   ├── 📄 convert-caffe2-to-onnx.exe
+│   │   ├── 📄 convert-onnx-to-caffe2.exe
+│   │   ├── 📄 deactivate.bat
+│   │   ├── 📄 dotenv.exe
+│   │   ├── 📄 f2py.exe
+│   │   ├── 📄 httpx.exe
+│   │   ├── 📄 huggingface-cli.exe
+│   │   ├── 📄 isympy.exe
+│   │   ├── 📄 normalizer.exe
+│   │   ├── 📄 pip.exe
+│   │   ├── 📄 pip3.12.exe
+│   │   ├── 📄 pip3.exe
+│   │   ├── 📄 py.test.exe
+│   │   ├── 📄 pytest.exe
+│   │   ├── 📄 python.exe
+│   │   ├── 📄 pythonw.exe
+│   │   ├── 📄 torchrun.exe
+│   │   ├── 📄 tqdm.exe
+│   │   ├── 📄 transformers-cli.exe
+│   │   ├── 📄 uvicorn.exe
+│   │   ├── 📄 watchfiles.exe
+│   │   ├── 📄 websockets.exe
+│   │   └── 📄 wheel.exe
+│   └── 📁 share/
+│       └── 📁 man/
 ├── 📄 .cursorrules
 ├── 📄 .dockerignore
 ├── 📄 .env
@@ -52,5 +109,7 @@
 ├── 📄 generate_tree.py
 ├── 📄 notas.txt
 ├── 📄 packages.txt
+├── 📄 reporte.html
 ├── 📄 requirements.txt
+├── 📄 reset_faiss.py
 └── 📄 verificar_memoria.py

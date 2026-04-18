@@ -122,6 +122,24 @@ async def startup_event():
         logger.error(f"Error inicializando RAG: {e}")
         app.state.menu = {}
 
+@app.get("/dashboard", response_class=HTMLResponse)
+async def serve_dashboard():
+    """Servir el dashboard HTML de evaluación"""
+    dashboard_path = "/tmp/dashboard.html"
+    logger.info(f"📊 Intentando servir dashboard desde: {dashboard_path}")
+    
+    if os.path.exists(dashboard_path):
+        with open(dashboard_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        logger.info(f"✅ Dashboard encontrado, tamaño: {len(content)} bytes")
+        return HTMLResponse(content=content)
+    
+    logger.warning(f"⚠️ Dashboard no encontrado en: {dashboard_path}")
+    return HTMLResponse(
+        content="<h1>Dashboard no encontrado</h1><p>La evaluación aún no ha terminado o el archivo no se generó.</p>",
+        status_code=404
+    )
+
 @app.get("/")
 async def root():
     """Servir la interfaz web principal"""
