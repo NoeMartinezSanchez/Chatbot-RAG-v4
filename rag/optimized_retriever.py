@@ -43,11 +43,11 @@ class OptimizedRetriever:
         """
         self.vs = vector_store
         
-        # Configuración por defecto (basada en tu reporte)
+        # Configuración por defecto (optimizada para velocidad)
         self.config = config or {
             "top_k_initial": 10,     # Recuperar más para filtrar
-            "top_k_final": 5,         # Entregar los mejores
-            "min_similarity": 0.6,    # Umbral base
+            "top_k_final": 3,         # Menos contexto = más rápido
+            "min_similarity": 0.7,   # Chunks más relevantes
             "use_metadata_filter": True,
             "use_reranking": True,
             "use_query_expansion": True,

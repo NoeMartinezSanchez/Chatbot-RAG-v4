@@ -181,10 +181,10 @@ class GemmaWrapper:
     def generate(
         self,
         prompt: str,
-        max_new_tokens: int = 256,
-        min_new_tokens: int = 30,
-        temperature: float = 0.7,
-        top_p: float = 0.9,
+        max_new_tokens: int = 50,
+        min_new_tokens: int = 10,
+        temperature: float = 0.3,
+        top_p: float = 0.85,
         repetition_penalty: float = 1.1,
         early_stopping: bool = True,
         no_repeat_ngram_size: int = 3,
@@ -273,7 +273,7 @@ class GemmaWrapper:
         self,
         context: str,
         question: str,
-        max_new_tokens: int = 256,
+        max_new_tokens: int = 60,
         on_tokens_generated: Optional[Callable[[int, float], None]] = None,
     ) -> str:
         """Generate a response given context and a question (RAG mode).
@@ -292,8 +292,8 @@ class GemmaWrapper:
         logger.info(f"RAG generation - Context length: {len(context)}, Question: {question[:50]}...")
         return self.generate(
             prompt=prompt,
-            max_new_tokens=200,
-            min_new_tokens=15,
+            max_new_tokens=60,
+            min_new_tokens=10,
             temperature=0.3,
             top_p=0.85,
             repetition_penalty=1.1,
@@ -302,22 +302,18 @@ class GemmaWrapper:
         )
 
     def _build_simple_prompt(self, context: str, question: str) -> str:
-        """Build a prompt for Gemma optimized for RAG with source citation."""
+        """Build a prompt for Gemma optimized for RAG with short responses."""
         
-        prompt = f"""Eres asistente de Prepa en Línea SEP. Usa los fragmentos debajo.
+        prompt = f"""Responde la pregunta con UNA frase corta usando SOLO el contexto.
 
-REGLAS:
-- Si la pregunta es sí/no, responde DIRECTAMENTE "Sí" o "No" seguido de la explicación breve
-- Busca la respuesta donde esté explícitamente dicha (cualquier documento)
-- Cita la fuente al final: (Fuente: [nombre del documento])
-- Si no hay respuesta, dice "No encontré esa información"
-
-FRAGMENTOS:
+Contexto:
 {context}
 
-PREGUNTA: {question}
+Pregunta: {question}
 
-RESPUESTA:"""
+Respuesta (máximo 15 palabras):"""
+        
+        return f"<start_of_turn>user\n{prompt}<end_of_turn>\n<start_of_turn>model\n"
 
         return f"<start_of_turn>user\n{prompt}<end_of_turn>\n<start_of_turn>model\n"
 
