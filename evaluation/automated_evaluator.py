@@ -34,10 +34,7 @@ def _evaluate_response(response: str, palabras_clave: List[str]) -> tuple[bool, 
     response_lower = response.lower()
     palabras_lower = [p.lower() for p in palabras_clave]
     
-    # Método 1: TODAS las palabras clave deben estar presentes
     metodo1 = all(p in response_lower for p in palabras_lower)
-    
-    # Método 2: AL MENOS UNA palabra clave debe estar presente
     metodo2 = any(p in response_lower for p in palabras_lower)
     
     if metodo1:
@@ -60,7 +57,6 @@ def _run_single_test(
     start_time = time.time()
     retrieval_start = start_time
     
-    # Get retrieval results
     try:
         import numpy as np
         from rag.embeddings import EmbeddingModel
@@ -85,13 +81,11 @@ def _run_single_test(
             "error": str(e)
         }
     
-    # Extract context from results
     contexts = [r.get("content", r.get("text", "")) for r in results]
     context_str = " ".join(contexts)
     
     generation_start = time.time()
     
-    # Generate response with timeout handling
     try:
         response = generator.generate_with_context(
             context=context_str,
@@ -115,7 +109,6 @@ def _run_single_test(
             "error": str(e)
         }
     
-    # Evaluate response
     correcto, metodo = _evaluate_response(response, palabras_clave)
     
     total_time = (time.time() - start_time) * 1000
@@ -149,6 +142,16 @@ def _load_tests(test_set_path: str) -> List[Dict[str, Any]]:
         return []
 
 
+def _generate_dashboard():
+    """Generate dashboard after evaluation completes."""
+    try:
+        from evaluation.generate_dashboard import generate_dashboard
+        generate_dashboard()
+        logger.info("✅ Dashboard generado: evaluation/dashboard.html")
+    except Exception as e:
+        logger.warning(f"⚠️ Error generando dashboard: {e}")
+
+
 def run_automated_evaluation(
     retriever: Any,
     generator: Any,
@@ -170,9 +173,8 @@ def run_automated_evaluation(
         output_path = EVALUATION_LOG
     
     def _run():
-        logger.info("Starting automated evaluation...")
+        logger.info("🚀 Starting automated evaluation...")
         
-        # Load tests
         tests = _load_tests(test_set_path)
         if not tests:
             logger.warning("No tests found in test_set.json")
@@ -180,11 +182,9 @@ def run_automated_evaluation(
         
         logger.info(f"Loaded {len(tests)} test cases")
         
-        # Clear previous results
         if os.path.exists(output_path):
             os.remove(output_path)
         
-        # Run each test
         results = []
         for i, test in enumerate(tests):
             logger.info(f"Running test {i+1}/{len(tests)}: {test.get('id', 'unknown')}")
@@ -192,19 +192,16 @@ def run_automated_evaluation(
             result = _run_single_test(retriever, generator, test)
             results.append(result)
             
-            # Save to file immediately
             with open(output_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(result, ensure_ascii=False) + "\n")
         
-        # Calculate summary
         total = len(results)
         correctas = sum(1 for r in results if r["correcto"])
         incorrectas = total - correctas
         tasa_exito = (correctas / total * 100) if total > 0 else 0
         
-        logger.info(f"Evaluation complete: {correctas}/{total} correctas ({tasa_exito:.1f}%)")
+        logger.info(f"✅ Evaluation complete: {correctas}/{total} correct ({tasa_exito:.1f}%)")
         
-        # Log summary
         summary = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "total_tests": total,
@@ -222,13 +219,7 @@ def run_automated_evaluation(
         
         logger.info(f"Summary saved to {summary_path}")
         
-        # Generate dashboard
-        try:
-            from evaluation.generate_dashboard import generate_dashboard
-            generate_dashboard()
-            logger.info("Dashboard generated successfully")
-        except Exception as e:
-            logger.warning(f"Could not generate dashboard: {e}")
+        _generate_dashboard()
     
     if run_async:
         thread = threading.Thread(target=_run, daemon=True)
@@ -265,6 +256,8 @@ def run_evaluation_sync(
     
     total = len(results)
     correctas = sum(1 for r in results if r["correcto"])
+    
+    _generate_dashboard()
     
     return {
         "total": total,
