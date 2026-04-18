@@ -9,9 +9,11 @@ from pathlib import Path
 from collections import defaultdict
 
 
-LOG_DIR = Path("logs")
+# Usar directorio raíz del proyecto
+PROJECT_ROOT = Path(__file__).parent.parent
+LOG_DIR = PROJECT_ROOT / "logs"
 EVALUATION_LOG = LOG_DIR / "evaluation_results.jsonl"
-OUTPUT_PATH = Path("evaluation/dashboard.html")
+OUTPUT_PATH = PROJECT_ROOT / "evaluation" / "dashboard.html"
 
 
 def load_results() -> list:

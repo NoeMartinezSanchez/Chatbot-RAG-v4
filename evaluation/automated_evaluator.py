@@ -13,7 +13,9 @@ from typing import Optional, Dict, Any, List
 from loguru import logger
 
 
-LOG_DIR = Path("logs")
+# Usar directorio raíz del proyecto
+PROJECT_ROOT = Path(__file__).parent.parent
+LOG_DIR = PROJECT_ROOT / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 EVALUATION_LOG = LOG_DIR / "evaluation_results.jsonl"
 

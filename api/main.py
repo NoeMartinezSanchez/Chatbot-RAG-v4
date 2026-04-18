@@ -88,11 +88,26 @@ async def startup_event():
         
         # Ejecutar evaluación automática en segundo plano
         logger.info("🚀 Iniciando evaluación automática...")
-        run_automated_evaluation(
-            retriever=rag_system.optimized_retriever,
-            generator=rag_system.generator,
-            test_set_path="evaluation/test_set.json"
-        )
+        
+        # Verificar que existe el archivo de test
+        test_set_path = "evaluation/test_set.json"
+        if os.path.exists(test_set_path):
+            logger.info(f"✅ test_set.json encontrado: {test_set_path}")
+            run_automated_evaluation(
+                retriever=rag_system.optimized_retriever,
+                generator=rag_system.generator,
+                test_set_path=test_set_path
+            )
+        else:
+            logger.warning(f"⚠️ test_set.json no encontrado en: {test_set_path}")
+            logger.warning("   La evaluación automática no se ejecutará")
+            # Listar archivos en evaluation/
+            eval_dir = "evaluation"
+            if os.path.exists(eval_dir):
+                files = os.listdir(eval_dir)
+                logger.info(f"   Archivos en evaluation/: {files}")
+            else:
+                logger.warning(f"   Directorio evaluation/ no existe")
         
     except Exception as e:
         logger.error(f"Error inicializando RAG: {e}")
@@ -322,14 +337,25 @@ async def get_menu():
 @app.get("/dashboard")
 async def get_dashboard():
     """Servir el dashboard HTML de evaluación"""
-    dashboard_path = "evaluation/dashboard.html"
+    import os
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    dashboard_path = os.path.join(base_dir, "evaluation", "dashboard.html")
+    
+    logger.info(f"Looking for dashboard at: {dashboard_path}")
+    
     if os.path.exists(dashboard_path):
         return FileResponse(dashboard_path, media_type="text/html")
     else:
+        # Check what files exist in evaluation folder
+        eval_dir = os.path.join(base_dir, "evaluation")
+        files = os.listdir(eval_dir) if os.path.exists(eval_dir) else []
+        logger.info(f"Files in evaluation/: {files}")
+        
         return {
             "status": "no_evaluation",
-            "message": "El dashboard se generará automáticamente después de la primera evaluación",
-            "path": dashboard_path
+            "message": "El dashboard se generará después de la evaluación",
+            "dashboard_path": dashboard_path,
+            "eval_files": files
         }
 
 @app.get("/evaluation-results")
