@@ -4,7 +4,6 @@ Runs evaluation tests against the chatbot and logs results.
 """
 import json
 import os
-import tempfile
 import threading
 import time
 from datetime import datetime
@@ -14,15 +13,18 @@ from typing import Optional, Dict, Any, List
 from loguru import logger
 
 
-# Usar /tmp para persistencia en HF Spaces
-TEMP_DIR = Path(tempfile.gettempdir())
-LOG_DIR = TEMP_DIR / "logs"
+# Usar carpeta static para que sea visible en HF Spaces
+PROJECT_ROOT = Path(__file__).parent.parent
+STATIC_DIR = PROJECT_ROOT / "static"
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+
+LOG_DIR = PROJECT_ROOT / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 EVALUATION_LOG = LOG_DIR / "evaluation_results.jsonl"
 
-# Dashboard y summary en /tmp
-DASHBOARD_PATH = TEMP_DIR / "dashboard.html"
-SUMMARY_PATH = TEMP_DIR / "evaluation_summary.json"
+# Dashboard en carpeta static (visible en HF Spaces)
+DASHBOARD_PATH = STATIC_DIR / "dashboard.html"
+SUMMARY_PATH = LOG_DIR / "evaluation_summary.json"
 
 TIMEOUT_SECONDS = 30
 

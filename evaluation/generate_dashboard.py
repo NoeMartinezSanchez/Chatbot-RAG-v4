@@ -9,15 +9,16 @@ from pathlib import Path
 from collections import defaultdict
 
 
-# Ruta absoluta para HF Spaces - usar el directorio donde está el script
-SCRIPT_DIR = Path(__file__).parent.resolve()
-PROJECT_ROOT = SCRIPT_DIR.parent
+# Usar carpeta static del proyecto
+PROJECT_ROOT = Path(__file__).parent.parent
+STATIC_DIR = PROJECT_ROOT / "static"
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
 LOG_DIR = PROJECT_ROOT / "logs"
 EVALUATION_LOG = LOG_DIR / "evaluation_results.jsonl"
 
-# Dashboard se guarda en la misma carpeta que el script (evaluation/)
-OUTPUT_PATH = SCRIPT_DIR / "dashboard.html"
+# Dashboard se guarda en static/ (visible en HF Spaces)
+OUTPUT_PATH = STATIC_DIR / "dashboard.html"
 
 
 def load_results() -> list:
@@ -110,15 +111,13 @@ def get_category_stats(results: list) -> dict:
     }
 
 
-def generate_dashboard(output_path: Path = None):
+def generate_dashboard(output_path: Path):
     """Generate HTML dashboard from evaluation results.
     
     Args:
-        output_path: Custom path to save dashboard. If None, uses default.
+        output_path: Path where to save the dashboard HTML file.
     """
-    # Usar ruta personalizada si se proporciona, si no usar la padrão
-    if output_path is None:
-        output_path = OUTPUT_PATH
+    # output_path es obligatorio (recibido de automated_evaluator)
     
     results = load_results()
     metrics = calculate_metrics(results)
