@@ -295,27 +295,24 @@ question: str,
         )
 
     def _build_simple_prompt(self, context: str, question: str) -> str:
-        """Build a prompt for Gemma following its exact expected format."""
+        """Build a prompt for Gemma optimized for RAG with source citation."""
         
-        system_message = """Eres un asistente de Prepa en Línea SEP. 
-        
-REGLAS ESTRICTAS:
-1. Responde SOLO usando la información de los FRAGMENTOS que se te proporcionan
-2. Si los fragmentos NO contienen la respuesta, responde: "No encontré esa información en los documentos disponibles"
-3. NO inventes información
-4. NO uses conocimiento externo
-5. Responde en español, de forma clara y directa"""
+        prompt = f"""Eres asistente de Prepa en Línea SEP. Usa los fragmentos debajo.
 
-        user_message = f"""FRAGMENTOS DE LA CONVOCATORIA:
+REGLAS:
+- Si la pregunta es sí/no, responde DIRECTAMENTE "Sí" o "No" seguido de la explicación breve
+- Busca la respuesta donde esté explícitamente dicha (cualquier documento)
+- Cita la fuente al final: (Fuente: [nombre del documento])
+- Si no hay respuesta, dice "No encontré esa información"
+
+FRAGMENTOS:
 {context}
 
-PREGUNTA DEL USUARIO: {question}
+PREGUNTA: {question}
 
-RESPUESTA (basada ESTRICTAMENTE en los fragmentos):"""
+RESPUESTA:"""
 
-        prompt = f"<start_of_turn>user\n{system_message}\n\n{user_message}<end_of_turn>\n<start_of_turn>model\n"
-        
-        return prompt
+        return f"<start_of_turn>user\n{prompt}<end_of_turn>\n<start_of_turn>model\n"
 
     def _clean_response(self, text: str) -> str:
         if not text:
