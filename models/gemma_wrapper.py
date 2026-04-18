@@ -1,7 +1,7 @@
-"""Gemma-2-2b-it Wrapper for RAG-based chatbot.
+"""Phi-2 Wrapper for RAG-based chatbot.
 
-This module provides a wrapper around the google/gemma-2-2b-it model for generating
-responses in a RAG architecture, optimized for CPU-only inference without quantization.
+This module provides a wrapper around the microsoft/phi-2 model for generating
+responses in a RAG architecture, optimized for CPU-only inference.
 """
 
 import gc
@@ -19,12 +19,11 @@ from urllib3.util.retry import Retry
 
 
 MODEL_VARIANTS = [
-    "google/gemma-2-2b-it",
-    "google/gemma-1.1-2b-it",
-    "google/gemma-2b-it",
+    "microsoft/phi-2",
+    "google/gemma-1.1-2b-it"
 ]
 
-MIN_TRANSFORMERS_VERSION = "4.42.0"
+MIN_TRANSFORMERS_VERSION = "4.40.0"
 
 
 def _check_transformers_version():
