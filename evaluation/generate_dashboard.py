@@ -9,17 +9,22 @@ from pathlib import Path
 from collections import defaultdict
 
 
-# Usar directorio raíz del proyecto
-PROJECT_ROOT = Path(__file__).parent.parent
+# Ruta absoluta para HF Spaces - usar el directorio donde está el script
+SCRIPT_DIR = Path(__file__).parent.resolve()
+PROJECT_ROOT = SCRIPT_DIR.parent
+
 LOG_DIR = PROJECT_ROOT / "logs"
 EVALUATION_LOG = LOG_DIR / "evaluation_results.jsonl"
-OUTPUT_PATH = PROJECT_ROOT / "evaluation" / "dashboard.html"
+
+# Dashboard se guarda en la misma carpeta que el script (evaluation/)
+OUTPUT_PATH = SCRIPT_DIR / "dashboard.html"
 
 
 def load_results() -> list:
     """Load evaluation results from JSONL file."""
     results = []
     if not EVALUATION_LOG.exists():
+        print(f"⚠️ No se encontró: {EVALUATION_LOG}")
         return results
     
     with open(EVALUATION_LOG, "r", encoding="utf-8") as f:
@@ -317,7 +322,9 @@ def generate_dashboard():
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
         f.write(html)
     
-    print(f"Dashboard generated: {OUTPUT_PATH}")
+    absolute_path = OUTPUT_PATH.resolve()
+    print(f"✅ Dashboard guardado en: {absolute_path}")
+    print(f"✅ Existe archivo: {OUTPUT_PATH.exists()}")
     return OUTPUT_PATH
 
 

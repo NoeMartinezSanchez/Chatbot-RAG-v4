@@ -338,24 +338,32 @@ async def get_menu():
 async def get_dashboard():
     """Servir el dashboard HTML de evaluación"""
     import os
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    dashboard_path = os.path.join(base_dir, "evaluation", "dashboard.html")
+    from pathlib import Path
     
-    logger.info(f"Looking for dashboard at: {dashboard_path}")
+    # Usar la misma ruta que generate_dashboard.py
+    script_dir = Path(__file__).parent.resolve()
+    dashboard_path = script_dir / "evaluation" / "dashboard.html"
     
-    if os.path.exists(dashboard_path):
+    logger.info(f"🔍 Buscando dashboard en: {dashboard_path}")
+    logger.info(f"🔍 Ruta absoluta: {dashboard_path.resolve()}")
+    logger.info(f"🔍 Existe: {dashboard_path.exists()}")
+    
+    if dashboard_path.exists():
         return FileResponse(dashboard_path, media_type="text/html")
     else:
-        # Check what files exist in evaluation folder
-        eval_dir = os.path.join(base_dir, "evaluation")
-        files = os.listdir(eval_dir) if os.path.exists(eval_dir) else []
-        logger.info(f"Files in evaluation/: {files}")
+        # Listar archivos en evaluation/
+        eval_dir = script_dir / "evaluation"
+        if eval_dir.exists():
+            files = list(eval_dir.glob("*"))
+            logger.info(f"📁 Archivos en evaluation/: {files}")
+        else:
+            logger.warning(f"⚠️ Directorio evaluation/ no existe")
         
         return {
             "status": "no_evaluation",
             "message": "El dashboard se generará después de la evaluación",
-            "dashboard_path": dashboard_path,
-            "eval_files": files
+            "dashboard_path": str(dashboard_path),
+            "dashboard_exists": dashboard_path.exists()
         }
 
 @app.get("/evaluation-results")
