@@ -23,6 +23,7 @@ from config.models import ChatRequest, ChatResponse, FeedbackRequest
 from rag.core import RAGSystem
 from data.build_menu_json import load_menu_json
 from evaluation.performance_logger import log_latency
+from evaluation.automated_evaluator import run_automated_evaluation
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -84,6 +85,15 @@ async def startup_event():
         logger.info("Sistema RAG inicializado correctamente")
         logger.info("Interfaz web disponible en: http://localhost:8000")
         logger.info("API Docs disponible en: http://localhost:8000/api/docs")
+        
+        # Ejecutar evaluación automática en segundo plano
+        logger.info("🚀 Iniciando evaluación automática...")
+        run_automated_evaluation(
+            retriever=rag_system.optimized_retriever,
+            generator=rag_system.generator,
+            test_set_path="evaluation/test_set.json"
+        )
+        
     except Exception as e:
         logger.error(f"Error inicializando RAG: {e}")
         app.state.menu = {}
@@ -308,6 +318,39 @@ async def get_menu():
     if hasattr(app.state, 'menu') and app.state.menu:
         return {"menu": app.state.menu}
     return {"menu": {}}
+
+@app.get("/dashboard")
+async def get_dashboard():
+    """Servir el dashboard HTML de evaluación"""
+    dashboard_path = "evaluation/dashboard.html"
+    if os.path.exists(dashboard_path):
+        return FileResponse(dashboard_path, media_type="text/html")
+    else:
+        return {
+            "status": "no_evaluation",
+            "message": "El dashboard se generará automáticamente después de la primera evaluación",
+            "path": dashboard_path
+        }
+
+@app.get("/evaluation-results")
+async def get_evaluation_results():
+    """Obtener resultados de evaluación en JSON"""
+    import json
+    from pathlib import Path
+    results_path = Path("logs/evaluation_results.jsonl")
+    if not results_path.exists():
+        return {"results": [], "message": "No hay resultados de evaluación"}
+    
+    results = []
+    with open(results_path, "r", encoding="utf-8") as f:
+        for line in f:
+            try:
+                results.append(json.loads(line.strip()))
+            except json.JSONDecodeError:
+                continue
+    
+    return {"results": results, "total": len(results)}
+
 
 if __name__ == "__main__":
     import uvicorn

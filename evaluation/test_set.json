@@ -1,0 +1,222 @@
+{
+  "metadata": {
+    "fecha_creacion": "2026-04-17",
+    "total_preguntas": 20,
+    "documentos_cubiertos": [
+      "bases_convocatoria_g85.pdf",
+      "Construyendo_comunidades.pdf",
+      "guia_aspirante_g85.pdf",
+      "Normas-de-control-escolar-1.pdf",
+      "Pronunciamiento-cero-tolerancia-SEP_18-05-2023.pdf",
+      "Protocolo_convivencia_EMS.pdf",
+      "Reglas-de-comunicacion-virtual-PLS_05-12-2023.pdf"
+    ],
+    "distribucion": {
+      "facil": 7,
+      "medio": 7,
+      "dificil": 6
+    }
+  },
+  "tests": [
+    {
+      "id": "CONV_FACIL_001",
+      "pregunta": "¿El módulo propedéutico es obligatorio?",
+      "respuesta_esperada": "Sí, el módulo propedéutico es obligatorio",
+      "palabras_clave": ["obligatorio", "módulo propedéutico"],
+      "chunks_relevantes": ["31dab974d614"],
+      "dificultad": "facil",
+      "categoria": "convocatoria",
+      "tipo": "extraccion_directa"
+    },
+    {
+      "id": "CONV_FACIL_002",
+      "pregunta": "¿Cuánto dura el programa completo de Prepa en Línea SEP?",
+      "respuesta_esperada": "El programa dura 2 años y 6 meses",
+      "palabras_clave": ["2 años", "6 meses", "duración"],
+      "chunks_relevantes": ["87c90de0d963"],
+      "dificultad": "facil",
+      "categoria": "convocatoria",
+      "tipo": "extraccion_directa"
+    },
+    {
+      "id": "CONV_FACIL_003",
+      "pregunta": "¿Cuál es el periodo de registro para la Generación 85?",
+      "respuesta_esperada": "Del 26 de enero al 4 de febrero",
+      "palabras_clave": ["26 de enero", "4 de febrero", "registro"],
+      "chunks_relevantes": ["6e774ca0f562"],
+      "dificultad": "facil",
+      "categoria": "convocatoria",
+      "tipo": "extraccion_directa"
+    },
+    {
+      "id": "NORM_FACIL_004",
+      "pregunta": "¿Cuál es la calificación mínima aprobatoria en Prepa en Línea SEP?",
+      "respuesta_esperada": "La calificación mínima aprobatoria es 60",
+      "palabras_clave": ["60", "aprobatoria", "calificación"],
+      "chunks_relevantes": ["3e75150937d7"],
+      "dificultad": "facil",
+      "categoria": "normativa",
+      "tipo": "extraccion_directa"
+    },
+    {
+      "id": "GUIA_FACIL_005",
+      "pregunta": "¿La prepa en línea tiene algún costo?",
+      "respuesta_esperada": "No, el servicio es completamente gratuito",
+      "palabras_clave": ["gratuito", "costo", "gratis"],
+      "chunks_relevantes": ["e6a368566647"],
+      "dificultad": "facil",
+      "categoria": "guia",
+      "tipo": "extraccion_directa"
+    },
+    {
+      "id": "DECALOGO_FACIL_006",
+      "pregunta": "¿Qué es la escucha activa según el decálogo de convivencia?",
+      "respuesta_esperada": "Buscar comprender al otro antes de opinar",
+      "palabras_clave": ["comprender", "antes de opinar", "escucha activa"],
+      "chunks_relevantes": ["d59b1f3010ab"],
+      "dificultad": "facil",
+      "categoria": "decalogo",
+      "tipo": "extraccion_directa"
+    },
+    {
+      "id": "REGLAS_FACIL_007",
+      "pregunta": "¿Qué significa escribir en mayúsculas en comunicación virtual?",
+      "respuesta_esperada": "Significa gritar",
+      "palabras_clave": ["mayúsculas", "gritar"],
+      "chunks_relevantes": ["2609e0efb3b1"],
+      "dificultad": "facil",
+      "categoria": "reglas_comunicacion",
+      "tipo": "extraccion_directa"
+    },
+    {
+      "id": "CONV_MEDIO_008",
+      "pregunta": "¿Qué documentos necesito para completar mi inscripción después de ser promovido?",
+      "respuesta_esperada": "Fotografía tipo credencial, certificado de secundaria y comprobante de domicilio",
+      "palabras_clave": ["fotografía", "certificado", "comprobante", "domicilio"],
+      "chunks_relevantes": ["95862e65dac6", "60f7d67edf33"],
+      "dificultad": "medio",
+      "categoria": "convocatoria",
+      "tipo": "agregacion"
+    },
+    {
+      "id": "CONV_MEDIO_009",
+      "pregunta": "¿Cuáles son las fechas clave del módulo propedéutico?",
+      "respuesta_esperada": "Obtención de claves del 6 al 8 de febrero, clases del 9 al 18 de febrero, resultados del 20 al 25 de febrero",
+      "palabras_clave": ["6 al 8", "9 al 18", "20 al 25", "febrero"],
+      "chunks_relevantes": ["472d24d87c0c", "a302cf0fc984"],
+      "dificultad": "medio",
+      "categoria": "convocatoria",
+      "tipo": "agregacion"
+    },
+    {
+      "id": "NORM_MEDIO_010",
+      "pregunta": "¿Qué es un estudiante irregular según las normas de control escolar?",
+      "respuesta_esperada": "Es quien no acredita de 1 a 3 módulos. Si acumula 4 módulos no acreditados, causa baja definitiva",
+      "palabras_clave": ["irregular", "1 a 3", "4 módulos", "baja definitiva"],
+      "chunks_relevantes": ["19a9db75e88d"],
+      "dificultad": "medio",
+      "categoria": "normativa",
+      "tipo": "extraccion_compuesta"
+    },
+    {
+      "id": "GUIA_MEDIO_011",
+      "pregunta": "¿Qué necesito hacer si perdí mi folio de registro?",
+      "respuesta_esperada": "Puedes recuperarlo del 26 de enero al 4 de febrero en el apartado 'Estatus de registro' del portal",
+      "palabras_clave": ["recuperar", "folio", "estatus de registro"],
+      "chunks_relevantes": ["dce490142b76"],
+      "dificultad": "medio",
+      "categoria": "guia",
+      "tipo": "extraccion_directa"
+    },
+    {
+      "id": "PROTOCOLO_MEDIO_012",
+      "pregunta": "¿Cuál es el objetivo general del Protocolo para la Convivencia Armónica?",
+      "respuesta_esperada": "Servir como guía para generar ambientes que propicien la convivencia pacífica con enfoque de derechos humanos",
+      "palabras_clave": ["guía", "convivencia pacífica", "derechos humanos"],
+      "chunks_relevantes": ["903697c20002"],
+      "dificultad": "medio",
+      "categoria": "protocolo",
+      "tipo": "extraccion_directa"
+    },
+    {
+      "id": "REGLAS_MEDIO_013",
+      "pregunta": "Menciona al menos 3 reglas de comunicación virtual de Prepa en Línea SEP",
+      "respuesta_esperada": "Presentación, Respeto, Pertinencia, Personalización, Ortografía, etc.",
+      "palabras_clave": ["presentación", "respeto", "pertinencia", "ortografía"],
+      "chunks_relevantes": ["d24c9ce84d6f", "15474cf20741", "cd16c934e586", "b2469ec9bf87"],
+      "dificultad": "medio",
+      "categoria": "reglas_comunicacion",
+      "tipo": "enumeracion"
+    },
+    {
+      "id": "GUIA_MEDIO_014",
+      "pregunta": "¿Qué necesito para obtener mis claves de acceso (ID y contraseña)?",
+      "respuesta_esperada": "CURP, correo y folio",
+      "palabras_clave": ["CURP", "correo", "folio", "claves"],
+      "chunks_relevantes": ["03c7f79ec43b"],
+      "dificultad": "medio",
+      "categoria": "guia",
+      "tipo": "extraccion_directa"
+    },
+    {
+      "id": "CONV_DIFICIL_015",
+      "pregunta": "¿Puedo usar mi credencial del INE como comprobante de domicilio?",
+      "respuesta_esperada": "No, no se admite la credencial del INE como comprobante de domicilio",
+      "palabras_clave": ["no", "INE", "comprobante"],
+      "chunks_relevantes": ["60f7d67edf33"],
+      "dificultad": "dificil",
+      "categoria": "convocatoria",
+      "tipo": "negacion"
+    },
+    {
+      "id": "CONV_DIFICIL_016",
+      "pregunta": "¿Qué hago si terminé la secundaria pero aún no tengo mi certificado?",
+      "respuesta_esperada": "Tienes 6 meses para entregarlo. Debes firmar carta compromiso y presentar constancia de estudios",
+      "palabras_clave": ["6 meses", "carta compromiso", "constancia"],
+      "chunks_relevantes": ["969c3d2bbd74", "6b280f44dbbe", "fbe6b35a3f4f"],
+      "dificultad": "dificil",
+      "categoria": "convocatoria",
+      "tipo": "condicional_compuesta"
+    },
+    {
+      "id": "NORM_DIFICIL_017",
+      "pregunta": "¿Se puede revalidar cualquier módulo del plan de estudios?",
+      "respuesta_esperada": "No, los dos primeros módulos son obligatorios y no se pueden revalidar",
+      "palabras_clave": ["no", "dos primeros", "obligatorios", "revalidar"],
+      "chunks_relevantes": ["29180fe62ecc"],
+      "dificultad": "dificil",
+      "categoria": "normativa",
+      "tipo": "negacion"
+    },
+    {
+      "id": "CERO_DIFICIL_018",
+      "pregunta": "¿Está prohibido hacer bromas con connotación sexual en Prepa en Línea SEP?",
+      "respuesta_esperada": "Sí, está prohibido bajo la política de cero tolerancia",
+      "palabras_clave": ["prohibido", "bromas", "connotación sexual", "cero tolerancia"],
+      "chunks_relevantes": ["dc0ae349da42"],
+      "dificultad": "dificil",
+      "categoria": "cero_tolerancia",
+      "tipo": "afirmacion_con_condicion"
+    },
+    {
+      "id": "PROTOCOLO_DIFICIL_019",
+      "pregunta": "¿El Protocolo de Convivencia aplica solo dentro del horario escolar?",
+      "respuesta_esperada": "No, aplica tanto en horario escolar como en actividades extraescolares",
+      "palabras_clave": ["no", "extraescolares", "horario escolar"],
+      "chunks_relevantes": ["85cc6ba10007"],
+      "dificultad": "dificil",
+      "categoria": "protocolo",
+      "tipo": "negacion"
+    },
+    {
+      "id": "REGLAS_DIFICIL_020",
+      "pregunta": "¿Se pueden incluir imágenes en las participaciones de los foros?",
+      "respuesta_esperada": "No, se debe evitar porque ocupan espacio y dificultan la lectura",
+      "palabras_clave": ["evitar", "imágenes", "foros", "espacio"],
+      "chunks_relevantes": ["363e3df067ef"],
+      "dificultad": "dificil",
+      "categoria": "reglas_comunicacion",
+      "tipo": "negacion_con_razon"
+    }
+  ]
+}
