@@ -24,6 +24,7 @@ from rag.core import RAGSystem
 from data.build_menu_json import load_menu_json
 from evaluation.performance_logger import log_latency
 from evaluation.automated_evaluator import run_automated_evaluation
+from evaluation.show_results import show_results
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -417,8 +418,35 @@ async def serve_dashboard():
 @app.get("/evaluation-results")
 async def get_evaluation_results():
     """Obtener resultados de evaluación en JSON"""
-    import json
-    from pathlib import Path
+    return show_results()
+
+@app.get("/evaluation-summary")
+async def get_evaluation_summary():
+    """Mostrar resumen de evaluación en HTML"""
+    try:
+        from evaluation.show_results import show_results
+        import io
+        import sys
+        
+        # Capturar output
+        old_stdout = sys.stdout
+        sys.stdout = io.StringIO()
+        
+        show_results()
+        
+        output = sys.stdout.getvalue()
+        sys.stdout = old_stdout
+        
+        return HTMLResponse(content=f"""
+        <html>
+        <head><title>Resultados - Prepa en Línea SEP</title></head>
+        <body>
+        <pre>{output}</pre>
+        </body>
+        </html>
+        """)
+    except Exception as e:
+        return HTMLResponse(content=f"<h1>Error: {e}</h1>", status_code=500)
     
     # Leer desde logs/
     base_dir = Path(__file__).parent.resolve().parent
