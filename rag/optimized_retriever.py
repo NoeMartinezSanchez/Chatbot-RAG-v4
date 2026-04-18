@@ -348,7 +348,7 @@ class OptimizedRetriever:
                     "conductas muy graves",
                     "sanciones aplicables",
                     "canales de denuncia"
-                ])
+])
         
         logger.debug(f"Generadas {len(subqueries)} subqueries para consulta compleja")
         
@@ -356,7 +356,7 @@ class OptimizedRetriever:
     
     # ==================== 6. MÉTODO PRINCIPAL DE BÚSQUEDA ====================
     
-def retrieve(self, query: str, query_embedding: np.ndarray, top_k: int = None) -> List[Dict]:
+    def retrieve(self, query: str, query_embedding: np.ndarray, top_k: int = None) -> List[Dict]:
         """
         Pipeline completo de retrieval optimizado.
         
@@ -478,6 +478,6 @@ def retrieve(self, query: str, query_embedding: np.ndarray, top_k: int = None) -
         for metadata in self.vs.metadata:
             for key, value in metadata.items():
                 if isinstance(value, (str, int, float, bool)):
-                    fields[key].add(str(value)[:50])  # Limitar longitud
+                    fields[key].add(str(value)[:50])
         
         return {k: list(v)[:10] for k, v in fields.items()}

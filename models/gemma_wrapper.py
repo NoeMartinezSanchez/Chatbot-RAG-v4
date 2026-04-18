@@ -270,7 +270,7 @@ class GemmaWrapper:
             self._clear_cache()
             return "Lo siento, hubo un problema al generar la respuesta. Por favor, intenta de nuevo."
 
-def generate_with_context(
+    def generate_with_context(
         self,
         context: str,
         question: str,
@@ -328,18 +328,14 @@ RESPUESTA:"""
 
         import re
 
-        # eliminar basura inicial (símbolos o texto corrupto)
         text = re.sub(r'^[^a-zA-ZáéíóúÁÉÍÓÚ¿¡]+', '', text)
 
-        # eliminar palabras muy cortas al inicio (ej: "U", "O", etc.)
         words = text.split()
         if len(words) > 1 and len(words[0]) <= 2:
             text = ' '.join(words[1:])
 
-        # normalizar espacios
         text = re.sub(r'\s+', ' ', text).strip()
 
-        # capitalizar primera letra
         if text and text[0].islower():
             text = text[0].upper() + text[1:]
 
