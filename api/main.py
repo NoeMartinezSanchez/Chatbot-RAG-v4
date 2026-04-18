@@ -362,51 +362,57 @@ async def get_menu():
     return {"menu": {}}
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def get_dashboard():
-    """Servir el dashboard HTML de evaluación"""
-    import os
+async def serve_dashboard():
+    import subprocess
+    import tempfile
     
-    dashboard_path = "/tmp/dashboard.html"
+    # Intentar múltiples ubicaciones
+    posibles_rutas = [
+        "/tmp/dashboard.html",
+        "/app/tmp/dashboard.html", 
+        os.path.join(tempfile.gettempdir(), "dashboard.html"),
+        "evaluation/dashboard.html",
+        "/app/evaluation/dashboard.html"
+    ]
     
-    logger.info(f"🔍 Buscando dashboard en: {dashboard_path}")
+    for ruta in posibles_rutas:
+        if os.path.exists(ruta):
+            try:
+                with open(ruta, "r", encoding="utf-8") as f:
+                    content = f.read()
+                logger.info(f"✅ Dashboard encontrado en: {ruta}")
+                return HTMLResponse(content=content)
+            except Exception as e:
+                logger.error(f"Error leyendo {ruta}: {e}")
     
-    if os.path.exists(dashboard_path):
-        with open(dashboard_path, "r", encoding="utf-8") as f:
-            html_content = f.read()
-        logger.info(f"✅ Dashboard encontrado, tamaño: {len(html_content)} bytes")
-        return HTMLResponse(content=html_content)
-    else:
-        logger.warning(f"⚠️ Dashboard no encontrado en: {dashboard_path}")
-        return HTMLResponse(content="""
-        <!DOCTYPE html>
-        <html lang="es">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Dashboard - Evaluacion en Progreso</title>
-            <style>
-                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-                       background: #f5f7fa; padding: 40px; text-align: center; }
-                .container { max-width: 600px; margin: 0 auto; background: white; 
-                             padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-                h1 { color: #2c3e50; margin-bottom: 20px; }
-                p { color: #7f8c8d; margin-bottom: 10px; }
-                .loading { color: #3498db; font-weight: bold; }
-            </style>
-        </head>
+    # Si no existe, intentar generarlo de nuevo
+    try:
+        from evaluation.generate_dashboard import generate_dashboard
+        dashboard_path = generate_dashboard()
+        if dashboard_path and os.path.exists(dashboard_path):
+            with open(dashboard_path, "r", encoding="utf-8") as f:
+                return HTMLResponse(content=f.read())
+    except Exception as e:
+        logger.error(f"Error generando dashboard: {e}")
+    
+    # Mostrar estado de la evaluación
+    summary_path = "/tmp/evaluation_summary.json"
+    if os.path.exists(summary_path):
+        with open(summary_path, "r") as f:
+            summary = f.read()
+        return HTMLResponse(content=f"""
+        <html>
+        <head><title>Dashboard - Prepa en Línea SEP</title></head>
         <body>
-            <div class="container">
-                <h1>📊 Dashboard en Progreso</h1>
-                <p class="loading">La evaluación automatizada está ejecutándose...</p>
-                <p>Por favor espera unos minutos mientras se procesan las pruebas.</p>
-                <p>Puedes verificar los logs del Space para ver el progreso.</p>
-                <p style="margin-top: 30px; font-size: 12px; color: #95a5a6;">
-                    Ruta del archivo: /tmp/dashboard.html
-                </p>
-            </div>
+        <h1>📊 Resultados de Evaluación</h1>
+        <pre>{summary}</pre>
+        <p>El dashboard HTML no está disponible. Los resultados están arriba.</p>
         </body>
         </html>
         """)
+    
+    return HTMLResponse(content="<h1>Dashboard no disponible</h1><p>La evaluación aún no ha generado resultados.</p>", status_code=202)
+
 
 @app.get("/evaluation-results")
 async def get_evaluation_results():
