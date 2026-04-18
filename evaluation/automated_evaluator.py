@@ -13,18 +13,20 @@ from typing import Optional, Dict, Any, List
 from loguru import logger
 
 
-# Usar carpeta static para que sea visible en HF Spaces
-PROJECT_ROOT = Path(__file__).parent.parent
-STATIC_DIR = PROJECT_ROOT / "static"
-STATIC_DIR.mkdir(parents=True, exist_ok=True)
+# Usar /tmp para persistencia en HF Spaces (SDK Docker)
+TEMP_DIR = Path("/tmp")
+TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
+PROJECT_ROOT = Path(__file__).parent.parent
 LOG_DIR = PROJECT_ROOT / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
-EVALUATION_LOG = LOG_DIR / "evaluation_results.jsonl"
 
-# Dashboard en carpeta static (visible en HF Spaces)
-DASHBOARD_PATH = STATIC_DIR / "dashboard.html"
-SUMMARY_PATH = LOG_DIR / "evaluation_summary.json"
+# Logs en /tmp
+EVALUATION_LOG = TEMP_DIR / "evaluation_results.jsonl"
+
+# Dashboard y summary en /tmp
+DASHBOARD_PATH = TEMP_DIR / "dashboard.html"
+SUMMARY_PATH = TEMP_DIR / "evaluation_summary.json"
 
 TIMEOUT_SECONDS = 30
 

@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import logging
 import uuid
@@ -334,33 +334,52 @@ async def get_menu():
         return {"menu": app.state.menu}
     return {"menu": {}}
 
-@app.get("/dashboard")
+@app.get("/dashboard", response_class=HTMLResponse)
 async def get_dashboard():
     """Servir el dashboard HTML de evaluación"""
     import os
-    from pathlib import Path
     
-    # Leer desde static/ (visible en HF Spaces)
-    base_dir = Path(__file__).parent.resolve().parent
-    dashboard_path = base_dir / "static" / "dashboard.html"
+    dashboard_path = "/tmp/dashboard.html"
     
     logger.info(f"🔍 Buscando dashboard en: {dashboard_path}")
-    logger.info(f"🔍 Existe: {dashboard_path.exists()}")
     
-    if dashboard_path.exists():
-        return FileResponse(dashboard_path, media_type="text/html")
+    if os.path.exists(dashboard_path):
+        with open(dashboard_path, "r", encoding="utf-8") as f:
+            html_content = f.read()
+        logger.info(f"✅ Dashboard encontrado, tamaño: {len(html_content)} bytes")
+        return HTMLResponse(content=html_content)
     else:
-        static_dir = base_dir / "static"
-        if static_dir.exists():
-            files = list(static_dir.glob("*"))
-            logger.info(f"📁 Archivos en static/: {files}")
-        
-        return {
-            "status": "no_evaluation",
-            "message": "La evaluación se está ejecutando o no ha terminado",
-            "dashboard_path": str(dashboard_path),
-            "dashboard_exists": dashboard_path.exists()
-        }
+        logger.warning(f"⚠️ Dashboard no encontrado en: {dashboard_path}")
+        return HTMLResponse(content="""
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Dashboard - Evaluacion en Progreso</title>
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                       background: #f5f7fa; padding: 40px; text-align: center; }
+                .container { max-width: 600px; margin: 0 auto; background: white; 
+                             padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                h1 { color: #2c3e50; margin-bottom: 20px; }
+                p { color: #7f8c8d; margin-bottom: 10px; }
+                .loading { color: #3498db; font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>📊 Dashboard en Progreso</h1>
+                <p class="loading">La evaluación automatizada está ejecutándose...</p>
+                <p>Por favor espera unos minutos mientras se procesan las pruebas.</p>
+                <p>Puedes verificar los logs del Space para ver el progreso.</p>
+                <p style="margin-top: 30px; font-size: 12px; color: #95a5a6;">
+                    Ruta del archivo: /tmp/dashboard.html
+                </p>
+            </div>
+        </body>
+        </html>
+        """)
 
 @app.get("/evaluation-results")
 async def get_evaluation_results():
