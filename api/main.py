@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime
 import os
 import sys
+import time
 
 # AÑADIR ESTAS LÍNEAS PARA PRODUCCIÓN
 # Asegurar que el directorio raíz está en el path
@@ -21,6 +22,7 @@ from config.settings import settings, print_config_summary
 from config.models import ChatRequest, ChatResponse, FeedbackRequest
 from rag.core import RAGSystem
 from data.build_menu_json import load_menu_json
+from evaluation.performance_logger import log_latency
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -122,6 +124,9 @@ async def health():
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """Endpoint principal para chat"""
+    start_time = time.time()
+    retrieval_start = start_time
+    
     try:
         logger.info(f"📩 Mensaje recibido: {request.message[:50]}...")
         
@@ -140,21 +145,33 @@ async def chat(request: ChatRequest):
             is_rag = False
             confidence = 1.0
             sources = []
+            retrieval_time = 0
+            generation_time = 0
         elif any(s in msg_lower for s in despedidas):
             response_text = "¡Hasta luego! Éxito en tus estudios. Cuando tengas dudas sobre Prepa en Línea, vuelve a escribirme."
             is_rag = False
             confidence = 1.0
             sources = []
+            retrieval_time = 0
+            generation_time = 0
         elif any(s in msg_lower for s in gracias):
             response_text = "¡De nada! Si tienes más dudas sobre Prepa en Línea, con gusto te ayudo. ¡Éxito en tus estudios!"
             is_rag = False
             confidence = 1.0
             sources = []
+            retrieval_time = 0
+            generation_time = 0
         else:
             # Procesar consulta normal con RAG
+            retrieval_end = time.time()
+            retrieval_time = (retrieval_end - retrieval_start) * 1000
+            
+            generation_start = time.time()
             response_text, is_rag, confidence, sources = rag_system.process_query(
                 request.message
             )
+            generation_end = time.time()
+            generation_time = (generation_end - generation_start) * 1000
         
         # DEBUG: Verificar qué se recibe
         logger.info(f"🔍 DEBUG - response_text tipo: {type(response_text)}, largo: {len(response_text) if response_text else 0}")
@@ -193,6 +210,18 @@ async def chat(request: ChatRequest):
             "X-Message-ID": message_id,
             "X-Response-Type": "rag" if is_rag else "intent",
         }
+        
+        # Log de latencia
+        total_time = (time.time() - start_time) * 1000
+        tokens_generated = len(response_text.split()) if response_text else 0
+        
+        log_latency(
+            retrieval_time_ms=retrieval_time,
+            generation_time_ms=generation_time,
+            total_time_ms=total_time,
+            tokens_generated=tokens_generated,
+            question=request.message
+        )
         
         return JSONResponse(
             content=response.dict(),

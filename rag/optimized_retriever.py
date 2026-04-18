@@ -9,11 +9,18 @@ import json
 import os
 import hashlib
 import re
+import time
 from typing import List, Dict, Any, Optional, Tuple, Set
 import logging
 from logging import getLogger
 from datetime import datetime
 from collections import defaultdict
+
+try:
+    from evaluation.performance_logger import log_retrieval
+except ImportError:
+    def log_retrieval(*args, **kwargs):
+        pass
 
 logger = getLogger('optimized_retriever')
 
@@ -349,7 +356,7 @@ class OptimizedRetriever:
     
     # ==================== 6. MÉTODO PRINCIPAL DE BÚSQUEDA ====================
     
-    def retrieve(self, query: str, query_embedding: np.ndarray, top_k: int = None) -> List[Dict]:
+def retrieve(self, query: str, query_embedding: np.ndarray, top_k: int = None) -> List[Dict]:
         """
         Pipeline completo de retrieval optimizado.
         
@@ -361,10 +368,12 @@ class OptimizedRetriever:
         Returns:
             Lista de chunks recuperados y rerankeados
         """
+        start_time = time.time()
         top_k = top_k or self.config["top_k_final"]
         
         # PASO 1: Clasificar intención
         intent = self.classify_intent(query)
+        intent_name = intent.get("intent", "unknown") if isinstance(intent, dict) else "unknown"
         
         # PASO 2: Expandir query (opcional)
         expanded_query = self.expand_query(query, intent)
@@ -375,6 +384,14 @@ class OptimizedRetriever:
         
         if not results:
             logger.warning(f"No se encontraron resultados para: {query[:50]}...")
+            search_time = (time.time() - start_time) * 1000
+            log_retrieval(
+                query=query,
+                results=[],
+                search_time_ms=search_time,
+                filters={"intent": intent_name},
+                intent=intent_name
+            )
             return []
         
         # PASO 4: Filtrar por metadata
@@ -388,13 +405,10 @@ class OptimizedRetriever:
             subqueries = self.generate_subqueries(query, intent)
             if len(subqueries) > 1:
                 all_results = []
-                for subq in subqueries[:3]:  # Limitar a 3 subqueries
-                    # Nota: Necesitarías embedding para cada subquery
-                    # Por simplicidad, aquí asumimos que usas el mismo embedding
+                for subq in subqueries[:3]:
                     sub_results = self.vs.semantic_search(query_embedding, top_k=3)
                     all_results.extend(sub_results)
                 
-                # Deduplicar por doc_id
                 seen_ids = set()
                 unique_results = []
                 for r in all_results:
@@ -405,7 +419,17 @@ class OptimizedRetriever:
                 
                 results = self.rerank_results(unique_results, intent)[:top_k]
         
-        logger.info(f"Retrieved {len(results)} chunks para query: '{query[:50]}...'")
+        search_time = (time.time() - start_time) * 1000
+        
+        logger.info(f"Retrieved {len(results)} chunks para query: '{query[:50]}...' ({search_time:.1f}ms)")
+        
+        log_retrieval(
+            query=query,
+            results=results,
+            search_time_ms=search_time,
+            filters={"intent": intent_name},
+            intent=intent_name
+        )
         
         return results
     

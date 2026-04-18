@@ -8,7 +8,7 @@ import gc
 import os
 import sys
 import time
-from typing import Optional
+from typing import Optional, Callable
 
 import torch
 import transformers
@@ -189,6 +189,7 @@ class GemmaWrapper:
         repetition_penalty: float = 1.1,
         early_stopping: bool = True,
         no_repeat_ngram_size: int = 3,
+        on_tokens_generated: Optional[Callable[[int, float], None]] = None,
     ) -> str:
         """Generate a response from a prompt.
 
@@ -201,6 +202,7 @@ class GemmaWrapper:
             repetition_penalty: Penalty for repeating tokens (1.0 = no penalty).
             early_stopping: Whether to stop when reaching end of sentence.
             no_repeat_ngram_size: Prevents repeating n-grams of this size.
+            on_tokens_generated: Callback to report tokens and elapsed time.
 
         Returns:
             Generated response string (without the prompt).
@@ -255,7 +257,10 @@ class GemmaWrapper:
                 f"Generated {tokens_generated} tokens in {elapsed:.2f}s "
                 f"({tokens_generated/elapsed:.1f} tokens/s)"
             )
-
+            
+            if on_tokens_generated:
+                on_tokens_generated(tokens_generated, elapsed)
+            
             self._clear_cache()
 
             return response
@@ -265,11 +270,12 @@ class GemmaWrapper:
             self._clear_cache()
             return "Lo siento, hubo un problema al generar la respuesta. Por favor, intenta de nuevo."
 
-    def generate_with_context(
+def generate_with_context(
         self,
         context: str,
-question: str,
+        question: str,
         max_new_tokens: int = 256,
+        on_tokens_generated: Optional[Callable[[int, float], None]] = None,
     ) -> str:
         """Generate a response given context and a question (RAG mode).
 
@@ -277,6 +283,7 @@ question: str,
             context: Retrieved context from the RAG system.
             question: User question.
             max_new_tokens: Maximum tokens to generate.
+            on_tokens_generated: Callback(token_count, elapsed_seconds).
 
         Returns:
             Generated response based on the context.
@@ -292,6 +299,7 @@ question: str,
             top_p=0.85,
             repetition_penalty=1.1,
             no_repeat_ngram_size=3,
+            on_tokens_generated=on_tokens_generated,
         )
 
     def _build_simple_prompt(self, context: str, question: str) -> str:

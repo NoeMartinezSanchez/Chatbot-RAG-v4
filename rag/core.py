@@ -15,6 +15,14 @@ from .generator import TinyLlamaGenerator
 from .gemma_generator import GemmaGenerator
 from .optimized_retriever import OptimizedRetriever
 
+try:
+    from evaluation.performance_logger import log_latency
+    _LOGGING_ENABLED = True
+except ImportError:
+    _LOGGING_ENABLED = False
+    def log_latency(*args, **kwargs):
+        pass
+
 logger = logging.getLogger(__name__)
 
 class RAGSystem:
@@ -141,6 +149,8 @@ class RAGSystem:
         """
         Procesar consulta usando RAG con OptimizedRetriever.
         """
+        import time
+        
         try:
             # 1. Generar embedding de la consulta
             query_embedding = self.embedder.embed_text(query)
@@ -164,8 +174,28 @@ class RAGSystem:
             if not context_str.strip():
                 return "No encontré información específica sobre eso en los materiales de Prepa en Línea SEP.", False, 0.0, []
             
-            # 5. Generar respuesta RAG con Gemma
-            response = self.generator.generate(query, context_str)
+            # Variables para métricas
+            generation_start = time.time()
+            tokens_generated = 0
+            
+            # 5. Generar respuesta RAG con Gemma (con callback para métricas)
+            def on_tokens(tokens: int, elapsed: float):
+                nonlocal tokens_generated
+                tokens_generated = tokens
+            
+            response = self.generator.generate(query, context_str, on_tokens_generated=on_tokens)
+            
+            generation_time = (time.time() - generation_start) * 1000
+            
+            # Log de latencia
+            if _LOGGING_ENABLED and tokens_generated > 0:
+                log_latency(
+                    retrieval_time_ms=0,
+                    generation_time_ms=generation_time,
+                    total_time_ms=generation_time,
+                    tokens_generated=tokens_generated,
+                    question=query
+                )
             
             # 6. Preparar fuentes para mostrar
             sources = []

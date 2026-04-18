@@ -8,7 +8,7 @@ import logging
 import random
 import re
 import time
-from typing import Optional
+from typing import Optional, Callable, Tuple
 
 from loguru import logger
 
@@ -45,6 +45,7 @@ class GemmaGenerator:
         query: str,
         context: str = "",
         max_length: int = 256,
+        on_tokens_generated: Optional[Callable[[int, float], None]] = None,
     ) -> str:
         """Generate a response for the given query.
 
@@ -52,6 +53,7 @@ class GemmaGenerator:
             query: User question/query.
             context: Retrieved context from RAG system (optional).
             max_length: Maximum tokens to generate.
+            on_tokens_generated: Callback(token_count, elapsed_seconds).
 
         Returns:
             Generated response string.
@@ -68,6 +70,7 @@ class GemmaGenerator:
                     max_new_tokens=max_length,
                     temperature=0.7,
                     top_p=0.9,
+                    on_tokens_generated=on_tokens_generated,
                 )
             else:
                 logger.info(f"Using RAG with context (length: {len(context)})")
@@ -75,6 +78,7 @@ class GemmaGenerator:
                     context=context,
                     question=query,
                     max_new_tokens=max_length,
+                    on_tokens_generated=on_tokens_generated,
                 )
 
             elapsed = time.time() - start_time
@@ -91,6 +95,7 @@ class GemmaGenerator:
         context: str,
         question: str,
         max_new_tokens: int = 256,
+        on_tokens_generated: Optional[Callable[[int, float], None]] = None,
     ) -> str:
         """Genera respuesta basada en contexto para Prepa en Línea SEP usando Gemma."""
         lines = context.split('\n')
@@ -124,6 +129,7 @@ class GemmaGenerator:
                 context=clean_context,
                 question=question,
                 max_new_tokens=max_new_tokens,
+                on_tokens_generated=on_tokens_generated,
             )
         except Exception as e:
             logger.error(f"Error in generate_with_context: {e}")
