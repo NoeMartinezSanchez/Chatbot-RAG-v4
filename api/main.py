@@ -29,6 +29,10 @@ from evaluation.automated_evaluator import run_automated_evaluation
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+print("=" * 50)
+print("🚀 CARGANDO API - Registro de endpoints:")
+print("=" * 50)
+
 # Inicializar aplicación
 app = FastAPI(
     title="Asistente Educativo RAG - Prepa en Línea SEP",
@@ -59,6 +63,11 @@ app.state.menu = {}
 
 # Montar archivos estáticos
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+print("✅ Endpoints registrados hasta ahora:")
+for route in app.routes:
+    if hasattr(route, 'path') and hasattr(route, 'methods'):
+        print(f"   {list(route.methods)[0] if route.methods else 'GET'} {route.path}")
 
 @app.on_event("startup")
 async def startup_event():
