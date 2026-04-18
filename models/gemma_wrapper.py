@@ -19,11 +19,11 @@ from urllib3.util.retry import Retry
 
 
 MODEL_VARIANTS = [
-    "microsoft/phi-2",
-    "google/gemma-1.1-2b-it"
+    "google/gemma-2-2b-it",
+    "google/gemma-1.1-2b-it",
 ]
 
-MIN_TRANSFORMERS_VERSION = "4.40.0"
+MIN_TRANSFORMERS_VERSION = "4.42.0"
 
 
 def _check_transformers_version():
