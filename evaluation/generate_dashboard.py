@@ -110,8 +110,16 @@ def get_category_stats(results: list) -> dict:
     }
 
 
-def generate_dashboard():
-    """Generate HTML dashboard from evaluation results."""
+def generate_dashboard(output_path: Path = None):
+    """Generate HTML dashboard from evaluation results.
+    
+    Args:
+        output_path: Custom path to save dashboard. If None, uses default.
+    """
+    # Usar ruta personalizada si se proporciona, si no usar la padrão
+    if output_path is None:
+        output_path = OUTPUT_PATH
+    
     results = load_results()
     metrics = calculate_metrics(results)
     diff_stats = get_difficulty_stats(results)
@@ -318,14 +326,14 @@ def generate_dashboard():
 </html>"""
     
     # Save HTML
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
         f.write(html)
     
-    absolute_path = OUTPUT_PATH.resolve()
+    absolute_path = output_path.resolve()
     print(f"✅ Dashboard guardado en: {absolute_path}")
-    print(f"✅ Existe archivo: {OUTPUT_PATH.exists()}")
-    return OUTPUT_PATH
+    print(f"✅ Existe archivo: {output_path.exists()}")
+    return output_path
 
 
 if __name__ == "__main__":

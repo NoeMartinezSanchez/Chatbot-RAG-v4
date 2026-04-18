@@ -4,6 +4,7 @@ Runs evaluation tests against the chatbot and logs results.
 """
 import json
 import os
+import tempfile
 import threading
 import time
 from datetime import datetime
@@ -13,11 +14,15 @@ from typing import Optional, Dict, Any, List
 from loguru import logger
 
 
-# Usar directorio raíz del proyecto
-PROJECT_ROOT = Path(__file__).parent.parent
-LOG_DIR = PROJECT_ROOT / "logs"
+# Usar /tmp para persistencia en HF Spaces
+TEMP_DIR = Path(tempfile.gettempdir())
+LOG_DIR = TEMP_DIR / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 EVALUATION_LOG = LOG_DIR / "evaluation_results.jsonl"
+
+# Dashboard y summary en /tmp
+DASHBOARD_PATH = TEMP_DIR / "dashboard.html"
+SUMMARY_PATH = TEMP_DIR / "evaluation_summary.json"
 
 TIMEOUT_SECONDS = 30
 
@@ -144,12 +149,13 @@ def _load_tests(test_set_path: str) -> List[Dict[str, Any]]:
         return []
 
 
-def _generate_dashboard():
+def _generate_dashboard(output_path: Path = None):
     """Generate dashboard after evaluation completes."""
     try:
         from evaluation.generate_dashboard import generate_dashboard
-        generate_dashboard()
-        logger.info("✅ Dashboard generado: evaluation/dashboard.html")
+        dashboard_file = generate_dashboard(output_path=output_path)
+        logger.info(f"✅ Dashboard generado: {dashboard_file}")
+        logger.info(f"✅ Existe: {dashboard_file.exists() if dashboard_file else False}")
     except Exception as e:
         logger.warning(f"⚠️ Error generando dashboard: {e}")
 
@@ -215,13 +221,12 @@ def run_automated_evaluation(
             "avg_generation_ms": round(sum(r["generation_time_ms"] for r in results) / total, 2) if total > 0 else 0,
         }
         
-        summary_path = LOG_DIR / "evaluation_summary.json"
-        with open(summary_path, "w", encoding="utf-8") as f:
+        with open(SUMMARY_PATH, "w", encoding="utf-8") as f:
             json.dump(summary, f, ensure_ascii=False, indent=2)
         
-        logger.info(f"Summary saved to {summary_path}")
+        logger.info(f"Summary saved to {SUMMARY_PATH}")
         
-        _generate_dashboard()
+        _generate_dashboard(output_path=DASHBOARD_PATH)
     
     if run_async:
         thread = threading.Thread(target=_run, daemon=True)
@@ -259,7 +264,7 @@ def run_evaluation_sync(
     total = len(results)
     correctas = sum(1 for r in results if r["correcto"])
     
-    _generate_dashboard()
+    _generate_dashboard(output_path=DASHBOARD_PATH)
     
     return {
         "total": total,

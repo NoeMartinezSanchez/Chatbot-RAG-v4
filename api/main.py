@@ -338,40 +338,41 @@ async def get_menu():
 async def get_dashboard():
     """Servir el dashboard HTML de evaluación"""
     import os
+    import tempfile
     from pathlib import Path
     
-    # Usar la misma ruta que generate_dashboard.py
-    script_dir = Path(__file__).parent.resolve()
-    dashboard_path = script_dir / "evaluation" / "dashboard.html"
+    # Leer desde /tmp (ubicación persistente en HF Spaces)
+    dashboard_path = Path(tempfile.gettempdir()) / "dashboard.html"
     
     logger.info(f"🔍 Buscando dashboard en: {dashboard_path}")
-    logger.info(f"🔍 Ruta absoluta: {dashboard_path.resolve()}")
     logger.info(f"🔍 Existe: {dashboard_path.exists()}")
     
     if dashboard_path.exists():
         return FileResponse(dashboard_path, media_type="text/html")
     else:
-        # Listar archivos en evaluation/
-        eval_dir = script_dir / "evaluation"
-        if eval_dir.exists():
-            files = list(eval_dir.glob("*"))
-            logger.info(f"📁 Archivos en evaluation/: {files}")
-        else:
-            logger.warning(f"⚠️ Directorio evaluation/ no existe")
+        # Listar archivos en /tmp para debugging
+        temp_dir = Path(tempfile.gettempdir())
+        temp_files = list(temp_dir.glob("*")) if temp_dir.exists() else []
+        logger.info(f"📁 Archivos en /tmp: {temp_files[:10]}")  # Primeros 10
         
         return {
             "status": "no_evaluation",
-            "message": "El dashboard se generará después de la evaluación",
+            "message": "La evaluación se está ejecutando o no ha terminado todavía",
             "dashboard_path": str(dashboard_path),
-            "dashboard_exists": dashboard_path.exists()
+            "dashboard_exists": dashboard_path.exists(),
+            "temp_files_count": len(temp_files)
         }
 
 @app.get("/evaluation-results")
 async def get_evaluation_results():
     """Obtener resultados de evaluación en JSON"""
     import json
+    import tempfile
     from pathlib import Path
-    results_path = Path("logs/evaluation_results.jsonl")
+    
+    # Leer desde /tmp
+    results_path = Path(tempfile.gettempdir()) / "logs" / "evaluation_results.jsonl"
+    
     if not results_path.exists():
         return {"results": [], "message": "No hay resultados de evaluación"}
     
