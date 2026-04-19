@@ -19,8 +19,8 @@ tenacity==8.2.3  # Para reintentos en descargas
 # PyTorch (necesario para modelos transformers)
 torch>=2.5.0
 
-# Hugging Face Transformers - 4.46.3 para Gemma 4
-transformers==4.46.3
+# Hugging Face Transformers - Desarrollo para Gemma 4
+transformers @ git+https://github.com/huggingface/transformers.git
 accelerate>=1.0.0  # Optimización de memoria
 huggingface-hub>=0.23.2,<1.0.0
 tokenizers>=0.19.1
