@@ -120,18 +120,32 @@ class GemmaWrapper:
                     logger.info(f"   ✅ pad_token ya configurado: {self.tokenizer.pad_token}")
 
                 logger.info(f"📥 [2/4] Descargando modelo: {model_variant}")
-                logger.info("   ℹ️ Tamaño: ~4-5 GB, puede tomar varios minutos...")
+                logger.info("   ℹ️ Tamaño: ~5-8 GB, puede tomar varios minutos...")
                 model_start = time.time()
                 
-                logger.info("   ℹ️ Configuración: device_map=cpu, torch_dtype=float32")
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    model_variant,
-                    device_map="cpu",
-                    torch_dtype=torch.float32,
-                    cache_dir=self.cache_dir,
-                    token=hf_token,
-                    trust_remote_code=True,
-                )
+                # Configuración especial para Gemma 4
+                if "gemma-4" in model_variant:
+                    logger.info("   ℹ️ Configuración Gemma 4: float16, low_cpu_mem_usage=True")
+                    self.model = AutoModelForCausalLM.from_pretrained(
+                        model_variant,
+                        trust_remote_code=True,
+                        torch_dtype=torch.float16,
+                        low_cpu_mem_usage=True,
+                        device_map="cpu",
+                        cache_dir=self.cache_dir,
+                        token=hf_token,
+                    )
+                else:
+                    # Configuración original para Gemma 2
+                    logger.info("   ℹ️ Configuración: device_map=cpu, torch_dtype=float32")
+                    self.model = AutoModelForCausalLM.from_pretrained(
+                        model_variant,
+                        device_map="cpu",
+                        torch_dtype=torch.float32,
+                        cache_dir=self.cache_dir,
+                        token=hf_token,
+                        trust_remote_code=True,
+                    )
                 
                 model_time = time.time() - model_start
                 logger.info(f"   ✅ Modelo descargado en {model_time:.1f}s")
