@@ -123,6 +123,25 @@ async def startup_event():
         logger.error(f"Error inicializando RAG: {e}")
         app.state.menu = {}
 
+@app.get("/dashboard")
+async def get_dashboard():
+    """Servir el dashboard desde almacenamiento persistente"""
+    dashboard_path = "/data/dashboard.html"
+    
+    if os.path.exists(dashboard_path):
+        return FileResponse(dashboard_path, media_type="text/html")
+    else:
+        return HTMLResponse(content="""
+        <html>
+        <head><title>Dashboard no disponible</title></head>
+        <body>
+        <h1>📊 Dashboard no disponible</h1>
+        <p>La evaluación automática aún no ha generado el dashboard.</p>
+        <p>Revisa los logs del Space para ver el progreso.</p>
+        </body>
+        </html>
+        """, status_code=202)
+
 @app.get("/")
 async def root():
     """Servir la interfaz web principal"""
