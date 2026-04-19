@@ -12,11 +12,12 @@ LABEL io.spaceflake.tags="education, chatbot, rag, llm, ollama"
 # Establecer directorio de trabajo
 WORKDIR /app
 
-# Instalar dependencias del sistema necesarias
+# Instalar dependencias del sistema necesarias incluyendo zstd
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     curl \
+    zstd \
     && rm -rf /var/lib/apt/lists/*
 
 # Instalar Ollama
