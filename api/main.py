@@ -123,24 +123,6 @@ async def startup_event():
         logger.error(f"Error inicializando RAG: {e}")
         app.state.menu = {}
 
-@app.get("/dashboard", response_class=HTMLResponse)
-async def serve_dashboard():
-    """Servir el dashboard HTML de evaluación"""
-    dashboard_path = "/tmp/dashboard.html"
-    logger.info(f"📊 Intentando servir dashboard desde: {dashboard_path}")
-    
-    if os.path.exists(dashboard_path):
-        with open(dashboard_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        logger.info(f"✅ Dashboard encontrado, tamaño: {len(content)} bytes")
-        return HTMLResponse(content=content)
-    
-    logger.warning(f"⚠️ Dashboard no encontrado en: {dashboard_path}")
-    return HTMLResponse(
-        content="<h1>Dashboard no encontrado</h1><p>La evaluación aún no ha terminado o el archivo no se generó.</p>",
-        status_code=404
-    )
-
 @app.get("/")
 async def root():
     """Servir la interfaz web principal"""
@@ -367,13 +349,13 @@ async def serve_dashboard():
     import subprocess
     import tempfile
     
-    # Intentar múltiples ubicaciones
+    # Intentar múltiples ubicaciones (prioridad: /data/)
     posibles_rutas = [
+        "/data/dashboard.html",
         "/tmp/dashboard.html",
         "/app/tmp/dashboard.html", 
         os.path.join(tempfile.gettempdir(), "dashboard.html"),
         "evaluation/dashboard.html",
-        "/app/evaluation/dashboard.html"
     ]
     
     for ruta in posibles_rutas:
@@ -389,7 +371,7 @@ async def serve_dashboard():
     # Si no existe, intentar generarlo de nuevo
     try:
         from evaluation.generate_dashboard import generate_dashboard
-        dashboard_path = generate_dashboard()
+        dashboard_path = generate_dashboard(output_path="/data/dashboard.html")
         if dashboard_path and os.path.exists(dashboard_path):
             with open(dashboard_path, "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
@@ -397,7 +379,7 @@ async def serve_dashboard():
         logger.error(f"Error generando dashboard: {e}")
     
     # Mostrar estado de la evaluación
-    summary_path = "/tmp/evaluation_summary.json"
+    summary_path = "/data/evaluation_summary.json"
     if os.path.exists(summary_path):
         with open(summary_path, "r") as f:
             summary = f.read()

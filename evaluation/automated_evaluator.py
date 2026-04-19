@@ -13,20 +13,18 @@ from typing import Optional, Dict, Any, List
 from loguru import logger
 
 
-# Usar /tmp para persistencia en HF Spaces (SDK Docker)
-TEMP_DIR = Path("/tmp")
-TEMP_DIR.mkdir(parents=True, exist_ok=True)
+# Usar /data para persistencia en HF Spaces (Storage Bucket)
+DATA_DIR = Path("/data")
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 PROJECT_ROOT = Path(__file__).parent.parent
 LOG_DIR = PROJECT_ROOT / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-# Logs en /tmp
-EVALUATION_LOG = TEMP_DIR / "evaluation_results.jsonl"
-
-# Dashboard y summary en /tmp
-DASHBOARD_PATH = TEMP_DIR / "dashboard.html"
-SUMMARY_PATH = TEMP_DIR / "evaluation_summary.json"
+# Rutas en /data/
+EVALUATION_LOG = DATA_DIR / "evaluation_results.jsonl"
+DASHBOARD_PATH = DATA_DIR / "dashboard.html"
+SUMMARY_PATH = DATA_DIR / "evaluation_summary.json"
 
 TIMEOUT_SECONDS = 30
 
@@ -228,7 +226,10 @@ def run_automated_evaluation(
         with open(SUMMARY_PATH, "w", encoding="utf-8") as f:
             json.dump(summary, f, ensure_ascii=False, indent=2)
         
-        logger.info(f"Summary saved to {SUMMARY_PATH}")
+        logger.info(f"✅ Resultados guardados en: {DATA_DIR}/")
+        logger.info(f"   - Resumen: {SUMMARY_PATH}")
+        logger.info(f"   - Dashboard: {DASHBOARD_PATH}")
+        logger.info(f"   - Resultados detallados: {EVALUATION_LOG}")
         
         _generate_dashboard(output_path=DASHBOARD_PATH)
     
