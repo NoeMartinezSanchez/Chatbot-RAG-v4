@@ -43,6 +43,35 @@ app = FastAPI(
     redoc_url="/api/redoc"
 )
 
+# ============================================================
+# ENDPOINT DEL DASHBOARD - Debe ser el primero después de crear la app
+# ============================================================
+@app.get("/dashboard", response_class=HTMLResponse)
+async def get_dashboard():
+    """Servir el dashboard desde el almacenamiento persistente"""
+    import os
+    from fastapi.responses import HTMLResponse
+    
+    dashboard_path = "/data/dashboard.html"
+    
+    if os.path.exists(dashboard_path):
+        with open(dashboard_path, "r", encoding="utf-8") as f:
+            html_content = f.read()
+        return HTMLResponse(content=html_content)
+    else:
+        return HTMLResponse(content=f"""
+        <html>
+        <head><title>Dashboard no disponible</title></head>
+        <body>
+        <h1>📊 Dashboard no disponible</h1>
+        <p>El archivo dashboard.html no existe en: {dashboard_path}</p>
+        <p>Ejecuta la evaluación automática primero.</p>
+        <hr>
+        <p><small>Endpoint probado correctamente.</small></p>
+        </body>
+        </html>
+        """, status_code=404)
+
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
@@ -111,7 +140,6 @@ async def startup_event():
         else:
             logger.warning(f"⚠️ test_set.json no encontrado en: {test_set_path}")
             logger.warning("   La evaluación automática no se ejecutará")
-            # Listar archivos en evaluation/
             eval_dir = "evaluation"
             if os.path.exists(eval_dir):
                 files = os.listdir(eval_dir)
@@ -123,24 +151,6 @@ async def startup_event():
         logger.error(f"Error inicializando RAG: {e}")
         app.state.menu = {}
 
-@app.get("/dashboard")
-async def get_dashboard():
-    """Servir el dashboard desde almacenamiento persistente"""
-    dashboard_path = "/data/dashboard.html"
-    
-    if os.path.exists(dashboard_path):
-        return FileResponse(dashboard_path, media_type="text/html")
-    else:
-        return HTMLResponse(content="""
-        <html>
-        <head><title>Dashboard no disponible</title></head>
-        <body>
-        <h1>📊 Dashboard no disponible</h1>
-        <p>La evaluación automática aún no ha generado el dashboard.</p>
-        <p>Revisa los logs del Space para ver el progreso.</p>
-        </body>
-        </html>
-        """, status_code=202)
 
 @app.get("/")
 async def root():
@@ -362,58 +372,6 @@ async def get_menu():
     if hasattr(app.state, 'menu') and app.state.menu:
         return {"menu": app.state.menu}
     return {"menu": {}}
-
-@app.get("/dashboard", response_class=HTMLResponse)
-async def serve_dashboard():
-    import subprocess
-    import tempfile
-    
-    # Intentar múltiples ubicaciones (prioridad: /data/)
-    posibles_rutas = [
-        "/data/dashboard.html",
-        "/tmp/dashboard.html",
-        "/app/tmp/dashboard.html", 
-        os.path.join(tempfile.gettempdir(), "dashboard.html"),
-        "evaluation/dashboard.html",
-    ]
-    
-    for ruta in posibles_rutas:
-        if os.path.exists(ruta):
-            try:
-                with open(ruta, "r", encoding="utf-8") as f:
-                    content = f.read()
-                logger.info(f"✅ Dashboard encontrado en: {ruta}")
-                return HTMLResponse(content=content)
-            except Exception as e:
-                logger.error(f"Error leyendo {ruta}: {e}")
-    
-    # Si no existe, intentar generarlo de nuevo
-    try:
-        from evaluation.generate_dashboard import generate_dashboard
-        dashboard_path = generate_dashboard(output_path="/data/dashboard.html")
-        if dashboard_path and os.path.exists(dashboard_path):
-            with open(dashboard_path, "r", encoding="utf-8") as f:
-                return HTMLResponse(content=f.read())
-    except Exception as e:
-        logger.error(f"Error generando dashboard: {e}")
-    
-    # Mostrar estado de la evaluación
-    summary_path = "/data/evaluation_summary.json"
-    if os.path.exists(summary_path):
-        with open(summary_path, "r") as f:
-            summary = f.read()
-        return HTMLResponse(content=f"""
-        <html>
-        <head><title>Dashboard - Prepa en Línea SEP</title></head>
-        <body>
-        <h1>📊 Resultados de Evaluación</h1>
-        <pre>{summary}</pre>
-        <p>El dashboard HTML no está disponible. Los resultados están arriba.</p>
-        </body>
-        </html>
-        """)
-    
-    return HTMLResponse(content="<h1>Dashboard no disponible</h1><p>La evaluación aún no ha generado resultados.</p>", status_code=202)
 
 
 @app.get("/evaluation-results")
