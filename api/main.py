@@ -44,13 +44,12 @@ app = FastAPI(
 )
 
 # ============================================================
-# ENDPOINT DEL DASHBOARD - Debe ser el primero después de crear la app
+# ENDPOINT DEL DASHBOARD
 # ============================================================
-@app.get("/dashboard", response_class=HTMLResponse)
+@app.get("/dashboard")
 async def get_dashboard():
     """Servir el dashboard desde el almacenamiento persistente"""
     import os
-    from fastapi.responses import HTMLResponse
     
     dashboard_path = "/data/dashboard.html"
     
@@ -64,13 +63,12 @@ async def get_dashboard():
         <head><title>Dashboard no disponible</title></head>
         <body>
         <h1>📊 Dashboard no disponible</h1>
-        <p>El archivo dashboard.html no existe en: {dashboard_path}</p>
-        <p>Ejecuta la evaluación automática primero.</p>
-        <hr>
-        <p><small>Endpoint probado correctamente.</small></p>
+        <p>El archivo no existe en: {dashboard_path}</p>
+        <p>Contenido de /data:</p>
+        <pre>{os.listdir('/data') if os.path.exists('/data') else 'No existe'}</pre>
         </body>
         </html>
-        """, status_code=404)
+        """)
 
 # Configurar CORS
 app.add_middleware(
