@@ -40,6 +40,9 @@ numpy==1.24.4
 # Tokenization - >= 0.1.99 necesario para Gemma
 sentencepiece>=0.1.99
 
+# Protocol Buffers - necesario para transformers y Gemma 4
+protobuf>=3.20.0,<5.0.0
+
 # Memory Management
 psutil==5.9.8
 
