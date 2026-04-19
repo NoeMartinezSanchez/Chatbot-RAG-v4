@@ -125,13 +125,13 @@ class GemmaWrapper:
                 
                 # Configuración especial para Gemma 4
                 if "gemma-4" in model_variant:
-                    logger.info("   ℹ️ Configuración Gemma 4: float16, low_cpu_mem_usage=True")
+                    logger.info("   ℹ️ Configuración Gemma 4: float16, device_map=cpu")
                     self.model = AutoModelForCausalLM.from_pretrained(
                         model_variant,
-                        trust_remote_code=True,
-                        torch_dtype=torch.float16,
-                        low_cpu_mem_usage=True,
                         device_map="cpu",
+                        torch_dtype=torch.float16,
+                        trust_remote_code=True,
+                        low_cpu_mem_usage=True,
                         cache_dir=self.cache_dir,
                         token=hf_token,
                     )
