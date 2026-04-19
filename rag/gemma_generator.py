@@ -1,7 +1,7 @@
-"""RAG Generator using Gemma-2-2b-it.
+"""RAG Generator using Gemma (via Ollama or transformers).
 
-This module provides a generator based on Gemma-2-2b-it model
-for improved response quality in the RAG architecture, optimized for CPU-only inference.
+This module provides a generator based on Gemma models
+for improved response quality in the RAG architecture.
 """
 
 import logging
@@ -12,32 +12,58 @@ from typing import Optional, Callable, Tuple
 
 from loguru import logger
 
-from models.gemma_wrapper import GemmaWrapper
+
+# Try to use Ollama, fall back to transformers
+try:
+    from models.ollama_wrapper import OllamaWrapper
+    OLLAMA_AVAILABLE = True
+except ImportError:
+    OLLAMA_AVAILABLE = False
+
+try:
+    from models.gemma_wrapper import GemmaWrapper
+    TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    TRANSFORMERS_AVAILABLE = False
 
 
 class GemmaGenerator:
-    """Generator using Gemma-2-2b-it for RAG-based responses.
+    """Generator using Gemma for RAG-based responses."""
 
-    This class wraps GemmaWrapper to provide a simple interface
-    for generating responses with or without context.
-    """
-
-    def __init__(self, cache_dir: str = "models/cache"):
+    def __init__(self, cache_dir: str = "models/cache", use_ollama: bool = False):
         """Initialize the Gemma generator.
 
         Args:
             cache_dir: Directory to cache model files.
+            use_ollama: If True, try to use Ollama first.
         """
         logger.info("Initializing GemmaGenerator...")
         start_time = time.time()
-
-        try:
-            self.wrapper = GemmaWrapper(cache_dir=cache_dir)
-            load_time = time.time() - start_time
-            logger.success(f"GemmaGenerator initialized in {load_time:.1f}s")
-
-        except Exception as e:
-            logger.error(f"Failed to initialize GemmaGenerator: {e}")
+        
+        self.wrapper = None
+        self.use_ollama = use_ollama
+        
+        # Try Ollama first if requested
+        if use_ollama and OLLAMA_AVAILABLE:
+            try:
+                self.wrapper = OllamaWrapper(model="gemma4:4b")
+                if self.wrapper.is_available():
+                    logger.success(f"✅ GemmaGenerator initialized with Ollama in {time.time() - start_time:.1f}s")
+                    return
+                else:
+                    logger.warning("⚠️ Ollama not available, trying transformers...")
+            except Exception as e:
+                logger.warning(f"⚠️ Ollama not available: {e}")
+        
+        # Fall back to transformers
+        if TRANSFORMERS_AVAILABLE:
+            try:
+                self.wrapper = GemmaWrapper(cache_dir=cache_dir)
+                logger.success(f"✅ GemmaGenerator initialized with Transformers in {time.time() - start_time:.1f}s")
+            except Exception as e:
+                logger.error(f"Failed to initialize: {e}")
+        else:
+            logger.error("❌ No generator available (Ollama and Transformers failed)")
             raise RuntimeError(f"Generator initialization failed: {e}") from e
 
     def generate(
