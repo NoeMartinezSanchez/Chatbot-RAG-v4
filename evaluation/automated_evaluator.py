@@ -231,6 +231,22 @@ def run_automated_evaluation(
         logger.info(f"   - Dashboard: {DASHBOARD_PATH}")
         logger.info(f"   - Resultados detallados: {EVALUATION_LOG}")
         
+        # Imprimir resultados detallados en los logs
+        logger.info("=" * 60)
+        logger.info("📋 RESULTADOS DETALLADOS DE EVALUACIÓN:")
+        logger.info("=" * 60)
+        for r in results:
+            estado = "✅ CORRECTO" if r.get("correcto") else "❌ INCORRECTO"
+            test_id = r.get("test_id", "N/A")
+            pregunta = r.get("pregunta", "")[:60]
+            respuesta = r.get("respuesta_chatbot", "")[:80]
+            logger.info(f"{estado} | {test_id} | {pregunta}...")
+            logger.info(f"   → Respuesta: {respuesta}")
+        
+        logger.info("=" * 60)
+        logger.info(f"📊 RESUMEN: {correctas}/{total} correctas ({tasa_exito:.1f}%)")
+        logger.info("=" * 60)
+        
         _generate_dashboard(output_path=DASHBOARD_PATH)
     
     if run_async:
