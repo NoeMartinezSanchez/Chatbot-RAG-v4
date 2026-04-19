@@ -50,7 +50,7 @@ class OllamaWrapper:
         except Exception:
             return False
     
-    def generate_with_context(
+def generate_with_context(
         self,
         context: str,
         question: str,
@@ -79,6 +79,26 @@ RESPUESTA:"""
         try:
             start_time = time.time()
             
+            # ============================================================
+            # LOGGING DETALLADO PARA DIAGNOSTICAR RESPUESTAS VACÍAS
+            # ============================================================
+            logger.info("=" * 60)
+            logger.info("🔍 DIAGNÓSTICO - generate_with_context")
+            logger.info("=" * 60)
+            logger.info(f"📝 Model: {self.model}")
+            logger.info(f"📝 Host: {self.host}")
+            logger.info(f"📝 Prompt length: {len(prompt)} chars")
+            logger.info(f"📝 Context length: {len(context)} chars")
+            logger.info(f"📝 Question: {question}")
+            logger.info(f"📝 Max new tokens: {max_new_tokens}")
+            logger.info(f"📝 Temperature: {temperature}")
+            logger.info(f"⏱️ Timeout: 60s")
+            logger.info("-" * 60)
+            logger.info("📋 Prompt completo (primeros 500 chars):")
+            logger.info(prompt[:500])
+            logger.info("-" * 60)
+            
+            # Llamada a Ollama
             response = requests.post(
                 f"{self.host}/api/generate",
                 json={
@@ -98,26 +118,85 @@ RESPUESTA:"""
             
             elapsed = time.time() - start_time
             
+            # ============================================================
+            # LOGGING DETALLADO DE LA RESPUESTA
+            # ============================================================
+            logger.info("=" * 60)
+            logger.info("📥 RESPUESTA RECIBIDA")
+            logger.info("=" * 60)
+            logger.info(f"📥 Status code: {response.status_code}")
+            logger.info(f"⏱️ Tiempo total: {elapsed:.2f}s")
+            
             if response.status_code != 200:
-                logger.error(f"❌ Ollama error: {response.status_code}")
+                logger.error(f"❌ Ollama error HTTP: {response.status_code}")
+                logger.error(f"❌ Response text: {response.text[:1000]}")
                 return "No se pudo generar una respuesta."
             
+            # Parsear respuesta completa
             result = response.json()
-            generated_text = result.get("response", "").strip()
+            logger.info(f"📥 JSON keys en respuesta: {list(result.keys())}")
             
+            # Obtener response
+            generated_text = result.get("response", "")
+            logger.info(f"📄 Response 'response' field length: {len(generated_text)} chars")
+            logger.info(f"📄 Response 'response' field (primeros 300 chars): '{generated_text[:300]}'")
+            
+            # Verificar otros campos de la respuesta
+            if "done" in result:
+                logger.info(f"📥 done field: {result.get('done')}")
+            if "context" in result:
+                logger.info(f"📥 context field presente: {len(result.get('context', []))} tokens")
+            if "total_duration" in result:
+                logger.info(f"📥 total_duration: {result.get('total_duration')} ns")
+            if "load_duration" in result:
+                logger.info(f"📥 load_duration: {result.get('load_duration')} ns")
+            if "prompt_eval_count" in result:
+                logger.info(f"📥 prompt_eval_count: {result.get('prompt_eval_count')}")
+            if "eval_count" in result:
+                logger.info(f"📥 eval_count: {result.get('eval_count')}")
+            if "eval_duration" in result:
+                logger.info(f"📥 eval_duration: {result.get('eval_duration')} ns")
+            
+            generated_text = generated_text.strip()
+            
+            # Callback si existe
             if on_tokens_generated:
-                tokens = len(generated_text.split())
+                tokens = len(generated_text.split()) if generated_text else 0
                 on_tokens_generated(tokens, elapsed)
             
-            logger.info(f"✅ Generated in {elapsed:.2f}s")
+            # Verificar respuesta vacía
+            if not generated_text:
+                logger.warning("=" * 60)
+                logger.warning("⚠️ RESPUESTA VACÍA DETECTADA")
+                logger.warning("=" * 60)
+                logger.warning(f"   Contexto длиной: {len(context)} chars")
+                logger.warning(f"   Pregunta: {question}")
+                logger.warning(f"   Tiempo de respuesta: {elapsed:.2f}s")
+                logger.warning(f"   eval_count: {result.get('eval_count')}")
+                logger.warning(f"   eval_duration: {result.get('eval_duration')}")
+                logger.warning("=" * 60)
+            
+            logger.info(f"✅ Generación completada en {elapsed:.2f}s")
+            logger.info("=" * 60)
             
             return generated_text if generated_text else "No se pudo generar una respuesta."
-            
+        
         except requests.exceptions.Timeout:
-            logger.error("❌ Timeout in Ollama API")
+            logger.error("=" * 60)
+            logger.error("❌ TIMEOUT en Ollama API")
+            logger.error("=" * 60)
             return "El modelo tardó demasiado en responder."
+        except requests.exceptions.ConnectionError as e:
+            logger.error("=" * 60)
+            logger.error("❌ ERROR DE CONEXIÓN a Ollama")
+            logger.error(f"   {e}")
+            logger.error("=" * 60)
+            return "No se pudo conectar con Ollama."
         except Exception as e:
-            logger.error(f"❌ Error in Ollama: {e}")
+            logger.error("=" * 60)
+            logger.error(f"❌ ERROR en generate_with_context: {type(e).__name__}")
+            logger.error(f"   {e}")
+            logger.error("=" * 60)
             return "No se pudo generar una respuesta."
     
     def generate(
