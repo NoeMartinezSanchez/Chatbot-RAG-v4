@@ -19,15 +19,16 @@ from urllib3.util.retry import Retry
 
 
 MODEL_VARIANTS = [
-    "google/gemma-2-2b-it",
-    "google/gemma-1.1-2b-it",
+    "google/gemma-4-e4b-it",      # 🚀 Principal: rápido y potente
+    "google/gemma-4-e2b-it",      # ⚡ Backup: más ligero
+    "google/gemma-2-2b-it",      # 🔄 Fallback final
 ]
 
-MIN_TRANSFORMERS_VERSION = "4.42.0"
+MIN_TRANSFORMERS_VERSION = "4.51.0"
 
 
 def _check_transformers_version():
-    """Verify transformers version meets minimum requirement for Gemma 2."""
+    """Verify transformers version meets minimum requirement for Gemma 4."""
     installed = transformers.__version__
     major, minor, _ = installed.split(".")[:3]
     required_major, required_minor = MIN_TRANSFORMERS_VERSION.split(".")[:2]
@@ -35,19 +36,19 @@ def _check_transformers_version():
     if (int(major) < int(required_major) or 
         (int(major) == int(required_major) and int(minor) < int(required_minor))):
         logger.warning(
-            f"⚠️ transformers {installed} incompatible con gemma-2. "
+            f"⚠️ transformers {installed} incompatible con gemma-4. "
             f"Requiere >= {MIN_TRANSFORMERS_VERSION}. "
-            f"Se usará fallback gemma-1.1-2b-it"
+            f"Se usará fallback gemma-2-2b-it"
         )
     else:
-        logger.info(f"✅ transformers version: {installed} (compatible con gemma-2)")
+        logger.info(f"✅ transformers version: {installed} (compatible con gemma-4)")
 
 
 class GemmaWrapper:
-    """Wrapper for Gemma-2-2b-it model with RAG integration support.
+    """Wrapper for Gemma-4 E4B model with RAG integration support.
 
-    This class provides an interface to the Gemma-2-2b-it model optimized for
-    CPU-only inference without quantization (float32).
+    This class provides an interface to the Gemma-4-e4b-it model optimized for
+    CPU-only inference.
     """
 
     def __init__(
@@ -292,8 +293,8 @@ class GemmaWrapper:
         logger.info(f"RAG generation - Context length: {len(context)}, Question: {question[:50]}...")
         return self.generate(
             prompt=prompt,
-            max_new_tokens=60,
-            min_new_tokens=10,
+            max_new_tokens=100,  # Respuestas más largas
+            min_new_tokens=15,
             temperature=0.2,
             top_p=0.85,
             repetition_penalty=1.1,
