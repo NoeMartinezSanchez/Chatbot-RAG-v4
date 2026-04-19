@@ -293,7 +293,7 @@ class GemmaWrapper:
         return self.generate(
             prompt=prompt,
             max_new_tokens=60,
-            min_new_tokens=15,
+            min_new_tokens=10,
             temperature=0.2,
             top_p=0.85,
             repetition_penalty=1.1,
@@ -304,19 +304,22 @@ class GemmaWrapper:
     def _build_simple_prompt(self, context: str, question: str) -> str:
         """Build a prompt for Gemma optimized for RAG with short responses."""
         
-        prompt = f"""Eres un asistente de Prepa en Línea SEP. Responde usando SOLO la información del contexto.
+        PROMPT_TEMPLATE = """Responde la pregunta usando SOLO el texto que está entre === CONTEXTO === y === FIN CONTEXTO ===.
 
-REGLAS:
-1. Responde con UNA frase corta y directa
-2. Empieza con "Sí" o "No" si la pregunta lo requiere
-3. Si no encuentras la respuesta, di "No encontré esa información"
-
-CONTEXTO:
+=== CONTEXTO ===
 {context}
+=== FIN CONTEXTO ===
 
 PREGUNTA: {question}
 
+REGLAS:
+1. Responde con UNA sola frase corta
+2. Empieza con "Sí" o "No" si es pregunta de sí/no
+3. Si la respuesta no está en el contexto, di: "No encontré esa información"
+
 RESPUESTA:"""
+        
+        prompt = PROMPT_TEMPLATE.format(context=context, question=question)
         
         return f"<start_of_turn>user\n{prompt}<end_of_turn>\n<start_of_turn>model\n"
 
