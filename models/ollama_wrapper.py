@@ -6,7 +6,7 @@ from typing import Optional, Dict, Any
 logger = logging.getLogger(__name__)
 
 class OllamaWrapper:
-    def __init__(self, model: str = "gemma4:e4b", host: str = "http://localhost:11434", timeout: int = 60):
+    def __init__(self, model: str = "gemma4:e4b", host: str = "http://localhost:11434", timeout: int = 120):
         self.model = model
         self.host = host
         self.timeout = timeout
@@ -28,13 +28,13 @@ class OllamaWrapper:
 
     def generate_with_context(self, context: str, question: str) -> str:
         """Generar respuesta usando contexto RAG"""
-        prompt = f"""Responde la pregunta usando SOLO el contexto. Responde con UNA frase corta.
+        prompt = f"""Responde con UNA frase corta y directa.
 
-CONTEXTO: {context}
+Pregunta: {question}
 
-PREGUNTA: {question}
+Contexto: {context}
 
-RESPUESTA:"""
+Respuesta:"""
         
         try:
             start_time = time.time()
@@ -45,9 +45,9 @@ RESPUESTA:"""
                     "prompt": prompt,
                     "stream": False,
                     "options": {
-                        "temperature": 0.2,
-                        "top_p": 0.85,
-                        "num_predict": 100
+                        "temperature": 0.1,
+                        "top_p": 0.9,
+                        "num_predict": 150
                     }
                 },
                 timeout=self.timeout
