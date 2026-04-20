@@ -99,8 +99,6 @@ def _run_single_test(
         response = generator.generate_with_context(
             context=context_str,
             question=pregunta,
-            max_new_tokens=200,
-            on_tokens_generated=None
         )
         generation_time = (time.time() - generation_start) * 1000
         

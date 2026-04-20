@@ -36,16 +36,12 @@ class GemmaGenerator:
         self,
         query: str,
         context: str = "",
-        max_length: int = 256,
-        on_tokens_generated: Optional[Callable[[int, float], None]] = None,
     ) -> str:
         """Generate a response for the given query.
 
         Args:
             query: User question/query.
             context: Retrieved context from RAG system (optional).
-            max_length: Maximum tokens to generate.
-            on_tokens_generated: Callback(token_count, elapsed_seconds).
 
         Returns:
             Generated response string.
@@ -54,40 +50,29 @@ class GemmaGenerator:
             return self.generate_with_context(
                 context=context,
                 question=query,
-                max_new_tokens=max_length,
-                on_tokens_generated=on_tokens_generated,
             )
         else:
-            return self.wrapper.generate(
-                prompt=query,
-                max_new_tokens=max_length,
-            )
+            return self.wrapper.generate(prompt=query)
 
     def generate_with_context(
         self,
         context: str,
         question: str,
-        max_new_tokens: int = 100,
-        on_tokens_generated: Optional[Callable[[int, float], None]] = None,
     ) -> str:
         """Generate a response given context and a question (RAG mode).
 
         Args:
             context: Retrieved context from the RAG system.
             question: User question.
-            max_new_tokens: Maximum tokens to generate.
-            on_tokens_generated: Callback(token_count, elapsed_seconds).
 
         Returns:
             Generated response based on the context.
         """
         try:
+            # OllamaWrapper solo acepta context y question
             return self.wrapper.generate_with_context(
                 context=context,
                 question=question,
-                max_new_tokens=max_new_tokens,
-                temperature=0.2,
-                on_tokens_generated=on_tokens_generated,
             )
         except Exception as e:
             logger.error(f"Error generating response: {e}")
