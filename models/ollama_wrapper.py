@@ -28,11 +28,9 @@ class OllamaWrapper:
 
     def generate_with_context(self, context: str, question: str) -> str:
         """Generar respuesta usando contexto RAG"""
-        prompt = f"""Responde con UNA frase corta y directa.
+        prompt = f"""Responde la pregunta con UNA SOLA PALABRA o UNA FRASE MUY CORTA.
 
 Pregunta: {question}
-
-Contexto: {context}
 
 Respuesta:"""
         
@@ -46,8 +44,8 @@ Respuesta:"""
                     "stream": False,
                     "options": {
                         "temperature": 0.1,
-                        "top_p": 0.9,
-                        "num_predict": 150
+                        "top_p": 0.85,
+                        "num_predict": 20
                     }
                 },
                 timeout=self.timeout
