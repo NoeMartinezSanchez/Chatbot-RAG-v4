@@ -123,6 +123,62 @@ async def startup_event():
         logger.info("Interfaz web disponible en: http://localhost:8000")
         logger.info("API Docs disponible en: http://localhost:8000/api/docs")
         
+        # ============================================================
+        # DIAGNÓSTICO DEL VECTOR STORE
+        # ============================================================
+        logger.info("=" * 60)
+        logger.info("🔍 DIAGNÓSTICO DEL VECTOR STORE")
+        logger.info("=" * 60)
+        
+        vector_store_path = "data/vector_store"
+        logger.info(f"📁 Revisando: {vector_store_path}")
+        logger.info(f"   ¿Existe? {os.path.exists(vector_store_path)}")
+        
+        if os.path.exists(vector_store_path):
+            files = os.listdir(vector_store_path)
+            logger.info(f"   Archivos encontrados: {files}")
+            for f in files:
+                fpath = os.path.join(vector_store_path, f)
+                size = os.path.getsize(fpath)
+                logger.info(f"      - {f} ({size} bytes)")
+        
+        # Verificar el índice FAISS
+        try:
+            from rag.retriever import VectorStoreFAISS
+            logger.info("🔄 Intentando cargar VectorStoreFAISS...")
+            vs = VectorStoreFAISS()
+            if vs.index:
+                logger.info(f"   ✅ Índice FAISS cargado correctamente")
+                logger.info(f"   📊 Número de vectores: {vs.index.ntotal}")
+                logger.info(f"   📐 Dimensión: {vs.embedding_dim}")
+            else:
+                logger.warning("   ❌ El índice FAISS es None")
+        except Exception as e:
+            logger.error(f"   ❌ Error cargando índice: {e}")
+        
+        # Probar una búsqueda de ejemplo
+        try:
+            from rag.embeddings import EmbeddingModel
+            embedder = EmbeddingModel()
+            test_query = "¿El módulo propedéutico es obligatorio?"
+            query_embedding = embedder.embed_query(test_query)
+            logger.info(f"🔍 Probando búsqueda con: '{test_query[:50]}...'")
+            
+            if vs and vs.index:
+                q_emb = query_embedding.reshape(1, -1).astype('float32')
+                results = vs.index.search(q_emb, 3)
+                logger.info(f"   Resultados (distancias): {results[0]}")
+                if results[0][0] < 1000:  # Distancia baja = similar
+                    logger.info(f"   ✅ Búsqueda exitosa! Distancia: {results[0][0]:.4f}")
+                else:
+                    logger.warning(f"   ❌ Sin resultados próximos. Distancias: {results[0]}")
+            else:
+                logger.warning("   ❌ No se pudo probar búsqueda - índice no disponible")
+        except Exception as e:
+            logger.error(f"   ❌ Error en búsqueda de prueba: {e}")
+        
+        logger.info("=" * 60)
+        
         # Ejecutar evaluación automática en segundo plano
         logger.info("🚀 Iniciando evaluación automática...")
         
