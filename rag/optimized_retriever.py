@@ -45,34 +45,52 @@ class OptimizedRetriever:
         
         # Configuración por defecto (optimizada para velocidad)
         self.config = config or {
-            "top_k_initial": 10,     # Recuperar más para filtrar
-            "top_k_final": 5,         # Más contexto para mejor calidad
-            "min_similarity": 0.6,   # Chunks más relevantes
+            "top_k_initial": 15,     # Recuperar más para filtrar
+            "top_k_final": 7,         # Más candidatos = mejores matches
+            "min_similarity": 0.5,   # Chunks más relevantes
             "use_metadata_filter": True,
             "use_reranking": True,
             "use_query_expansion": True,
-            "use_multi_query": False,  # Para preguntas complejas
-            "metadata_boost": {
-                "importance": 1.0,
-                "chunk_type": {
-                    "pregunta": 1.2,
-                    "paso": 1.1,
-                    "termino": 1.0,
-                    "conducta": 1.3,
-                    "regla": 1.1,
-                    "articulo": 1.05
-                },
-                "severity": {
-                    "muy_grave": 1.5,
-                    "grave": 1.2,
-                    "moderado": 1.0,
-                    "leve": 0.8
-                },
-                "action_type": {
-                    "obligacion": 1.2,
-                    "prohibicion": 1.3,
-                    "recomendacion": 1.0
-                }
+            "use_multi_query": True,   # Activar para preguntas complejas
+            "use_synonyms": True,    # Usar diccionario de sinónimos
+        }
+        
+        # Diccionario de sinónimos para mejor matching
+        self.synonyms = {
+            "decalogo": ["decálogo", "convivencia", "principios", "valores", "ética"],
+            "reglas": ["normas", "comunicación", "netiqueta", "virtual", "foro"],
+            "convocatoria": ["bases", "registro", "inscripción", "requisitos", "aspirante"],
+            "normativa": ["normas", "control escolar", "artículo", "reglamento", "oficial"],
+            "protocolo": ["convivencia", "armónica", "paz", "derechos humanos"],
+            "cero_tolerancia": ["tolerancia cero", "prohibido", "sanción", "falta"],
+            "calificacion": ["nota", "evaluación", "aprobatoria", "mínima"],
+            "documentos": ["constancia", "certificado", "comprobante", "fotografía"],
+            "plazo": ["fecha", "vigencia", "término", "días"],
+            "modulo": ["materia", "curso", "asignatura"],
+            "irregular": ["reprueb", "no acredita", "baja"],
+        }
+        
+        # Configuración de metadata boost
+        self.config["metadata_boost"] = {
+            "importance": 1.0,
+            "chunk_type": {
+                "pregunta": 1.2,
+                "paso": 1.1,
+                "termino": 1.0,
+                "conducta": 1.3,
+                "regla": 1.1,
+                "articulo": 1.05
+            },
+            "severity": {
+                "muy_grave": 1.5,
+                "grave": 1.2,
+                "moderado": 1.0,
+                "leve": 0.8
+            },
+            "action_type": {
+                "obligacion": 1.2,
+                "prohibicion": 1.3,
+                "recomendacion": 1.0
             }
         }
         
@@ -354,7 +372,25 @@ class OptimizedRetriever:
         
         return subqueries
     
-    # ==================== 6. MÉTODO PRINCIPAL DE BÚSQUEDA ====================
+    # ==================== 6. EXTRACT KEYWORDS ====================
+    
+    def _extract_keywords(self, query: str) -> List[str]:
+        """Extraer palabras clave de la query usando sinónimos."""
+        query_lower = query.lower()
+        found_keywords = []
+        
+        # Buscar sinónimos en la query
+        for key, syns in self.synonyms.items():
+            all_terms = [key] + syns
+            for term in all_terms:
+                if term in query_lower:
+                    found_keywords.append(key)
+                    break
+        
+        logger.debug(f"Keywords encontrados: {found_keywords}")
+        return found_keywords
+    
+    # ==================== 7. MÉTODO PRINCIPAL DE BÚSQUEDA ====================
     
     def retrieve(self, query: str, query_embedding: np.ndarray, top_k: int = None) -> List[Dict]:
         """
@@ -374,6 +410,14 @@ class OptimizedRetriever:
         # PASO 1: Clasificar intención
         intent = self.classify_intent(query)
         intent_name = intent.get("intent", "unknown") if isinstance(intent, dict) else "unknown"
+        
+        # Extraer palabras clave de la query usando sinónimos
+        query_keywords = self._extract_keywords(query)
+        logger.info(f"🔑 Keywords extraídos: {query_keywords}")
+        
+        # Aplicar boost a intent sihay palabras clave
+        if query_keywords and intent.get("boost", 1.0) == 1.0:
+            intent["boost"] = 1.15  # Boost por keywords encontradas
         
         # PASO 2: Expandir query (opcional)
         expanded_query = self.expand_query(query, intent)
