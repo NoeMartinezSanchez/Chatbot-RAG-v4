@@ -47,7 +47,8 @@ class ChunksRAGLoader:
     
     def _generate_embeddings_batch(self, texts: List[str]) -> np.ndarray:
         """Genera embeddings para una lista de textos"""
-        return self.embeddings.embed_batch(texts)
+        # Ya se aplicó prefijo "passage: " antes de llamar
+        return self.embeddings.embed_batch(texts, is_passage=True)
     
     def load_chunks_file(self, chunks_path: str) -> Dict:
         """Carga archivo JSONL de chunks al vector store"""
@@ -142,14 +143,17 @@ class ChunksRAGLoader:
             print(f"   🧠 Generando embeddings para {len(texts_for_embedding)} textos...")
             
             # Generar embeddings en batches para eficiencia
+            # IMPORTANTE: Usar prefijo "passage: " para indexar chunks (requerido por e5-small)
             batch_size = 32
             all_embeddings = []
             
             for i in range(0, len(texts_for_embedding), batch_size):
                 batch = texts_for_embedding[i:i+batch_size]
-                batch_embeddings = self._generate_embeddings_batch(batch)
+                # Aplicar prefijo de passage para mejor retrieval
+                batch_with_prefix = ["passage: " + text for text in batch]
+                batch_embeddings = self._generate_embeddings_batch(batch_with_prefix)
                 all_embeddings.append(batch_embeddings)
-                print(f"      Batch {i//batch_size + 1}: {len(batch)} embeddings generados")
+                print(f"      Batch {i//batch_size + 1}: {len(batch)} embeddings generados (con prefijo 'passage:')")
             
             embeddings = np.vstack(all_embeddings)
             print(f"   ✅ {len(embeddings)} embeddings generados (dimensión: {embeddings.shape[1]})")
