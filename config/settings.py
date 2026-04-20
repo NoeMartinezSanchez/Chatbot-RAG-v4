@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     MAX_CONTEXT_LENGTH: int = 4000  # Tokens máximos para contexto
     
     # ===== EMBEDDING MODEL CONFIGURATION =====
-    EMBEDDING_MODEL: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    EMBEDDING_MODEL: str = "intfloat/multilingual-e5-small"
     EMBEDDING_MODEL_DIMENSIONS: int = 384  # Dimensiones fijas para MiniLM-L12
     EMBEDDING_DEVICE: str = "cpu"  # "cpu" o "cuda"
     EMBEDDING_BATCH_SIZE: int = 32

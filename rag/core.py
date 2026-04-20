@@ -271,8 +271,8 @@ class RAGSystem:
             # Extraer textos
             texts = [doc['content'] for doc in documents]
             
-            # Generar embeddings en batch
-            embeddings = self.embedder.embed_batch(texts)
+            # Generar embeddings en batch (usar prefijo de passage para indexar)
+            embeddings = self.embedder.embed_batch(texts, is_passage=True)
             
             # Añadir al vector store
             self.vector_store.add_documents(documents, embeddings)

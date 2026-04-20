@@ -2,47 +2,59 @@ import numpy as np
 from typing import List
 from sentence_transformers import SentenceTransformer
 import logging
-from config.settings import settings  # <-- SE AÑADIO ESTA LINEA
 
 logger = logging.getLogger(__name__)
 
 class EmbeddingModel:
-    def __init__(self, model_name: str = None):
-        from config.settings import settings
-        self.model_name = model_name or settings.EMBEDDING_MODEL
+    def __init__(self, model_name: str = "intfloat/multilingual-e5-small"):
+        self.model_name = model_name
+        self.model = SentenceTransformer(model_name)
+        self.dimension = 384
         
-        # Modelos optimizados para español y CPU
-        if "MiniLM" in self.model_name:
-            # Muy ligero y bueno para español
-            self.model = SentenceTransformer(self.model_name)
-            self.dimension = 384
-        else:
-            self.model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
-            self.dimension = 384
-            
+        # Prefijos para e5 (mejora retrieval significativamente)
+        self.query_prefix = "query: "
+        self.passage_prefix = "passage: "
+        
         logger.info(f"Embedding model loaded: {self.model_name}")
+        logger.info(f"Using prefixes - query: '{self.query_prefix}', passage: '{self.passage_prefix}'")
     
-    # Cambia TU embeddings.py (línea 23):
     def embed_text(self, text: str) -> np.ndarray:
-        embedding = self.model.encode(text, show_progress_bar=False)
+        """Embed text with query prefix (for queries)."""
+        return self.embed_query(text)
     
-        # SE AÑADE ESTO (NORMALIZACIÓN): ⭐⭐
-        # Calcular norma
-        norm = np.linalg.norm(embedding)
-    
-        # Normalizar solo si la norma no es cero
-        if norm > 0:
-            embedding = embedding / norm
-
+    def embed_query(self, text: str) -> np.ndarray:
+        """Embed a query with query prefix."""
+        embedding = self.model.encode(
+            self.query_prefix + text, 
+            show_progress_bar=False,
+            normalize_embeddings=True
+        )
         return embedding
     
-    def embed_batch(self, texts: List[str]) -> np.ndarray:
-        embeddings = self.model.encode(texts, show_progress_bar=False, batch_size=32)
+    def embed_passage(self, text: str) -> np.ndarray:
+        """Embed a passage/chunk with passage prefix."""
+        embedding = self.model.encode(
+            self.passage_prefix + text, 
+            show_progress_bar=False,
+            normalize_embeddings=True
+        )
+        return embedding
     
-        # ⭐⭐ NORMALIZAR TODOS LOS EMBEDDINGS: ⭐⭐
-        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-        # Evitar división por cero
-        norms[norms == 0] = 1
-        embeddings = embeddings / norms
-    
+    def embed_batch(self, texts: List[str], is_passage: bool = False) -> np.ndarray:
+        """Embed a batch of texts.
+        
+        Args:
+            texts: List of texts to embed
+            is_passage: If True, use passage prefix. If False, use query prefix.
+        """
+        prefix = self.passage_prefix if is_passage else self.query_prefix
+        prefixed_texts = [prefix + text for text in texts]
+        
+        embeddings = self.model.encode(
+            prefixed_texts, 
+            show_progress_bar=False, 
+            batch_size=32,
+            normalize_embeddings=True
+        )
+        
         return embeddings
