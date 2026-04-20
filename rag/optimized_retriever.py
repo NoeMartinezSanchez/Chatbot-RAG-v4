@@ -47,7 +47,7 @@ class OptimizedRetriever:
         self.config = config or {
             "top_k_initial": 15,     # Recuperar más para filtrar
             "top_k_final": 7,         # Más candidatos = mejores matches
-            "min_similarity": 0.5,   # Chunks más relevantes
+            "min_similarity": 0.3,   # Reducido temporalmente para diagnóstico
             "use_metadata_filter": True,
             "use_reranking": True,
             "use_query_expansion": True,

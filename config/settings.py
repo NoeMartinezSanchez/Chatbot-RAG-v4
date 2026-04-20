@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     
     # Búsqueda y recuperación
     TOP_K_RESULTS: int = Field(default=2, ge=1, le=10)
-    SIMILARITY_THRESHOLD: float = Field(default=0.75, ge=0.1, le=1.0)
+    SIMILARITY_THRESHOLD: float = Field(default=0.3, ge=0.1, le=1.0)  # Reducido para diagnóstico
     MAX_CONTEXT_LENGTH: int = 4000  # Tokens máximos para contexto
     
     # ===== EMBEDDING MODEL CONFIGURATION =====
