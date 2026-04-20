@@ -93,6 +93,15 @@ def _run_single_test(
     contexts = [r.get("content", r.get("text", "")) for r in results]
     context_str = " ".join(contexts)
     
+    # Logging detallado de chunks recuperados
+    test_id = test.get("id", "unknown")
+    logger.info(f"🔍 Chunks recuperados para {test_id}:")
+    for i, chunk in enumerate(results):
+        chunk_id = chunk.get("chunk_id", chunk.get("doc_index", "N/A"))
+        score = chunk.get("similarity", chunk.get("score", chunk.get("reranked_score", 0)))
+        fuente = chunk.get("source_file", chunk.get("metadata", {}).get("source_file", "N/A"))
+        logger.info(f"   {i+1}. ID:{str(chunk_id)[:12]} - score:{score:.4f} - fuente:{fuente}")
+    
     generation_start = time.time()
     
     try:
