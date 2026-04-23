@@ -10,23 +10,15 @@ from typing import Optional, Callable
 
 from loguru import logger
 
-from models.ollama_wrapper import OllamaWrapper
+from models.gemini_wrapper import GeminiWrapper
 
 
 class GemmaGenerator:
-    """Generator using Gemma 4 via Ollama for RAG-based responses."""
-
-    def __init__(self, cache_dir: str = "models/cache", model: str = "gemma4:e4b"):
-        """Initialize the Gemma generator with Ollama.
-
-        Args:
-            cache_dir: Directory to cache model files (not used with Ollama).
-            model: Ollama model name to use.
-        """
-        logger.info("Initializing GemmaGenerator with Ollama...")
+    def __init__(self, cache_dir: str = "models/cache", model: str = "gemini-2.0-flash-exp"):
+        logger.info("Initializing GemmaGenerator with Gemini API...")
         start_time = time.time()
         
-        self.wrapper = OllamaWrapper(model=model)
+        self.wrapper = GeminiWrapper()
         self.model = model
         
         load_time = time.time() - start_time
@@ -69,7 +61,6 @@ class GemmaGenerator:
             Generated response based on the context.
         """
         try:
-            # OllamaWrapper solo acepta context y question
             return self.wrapper.generate_with_context(
                 context=context,
                 question=question,
