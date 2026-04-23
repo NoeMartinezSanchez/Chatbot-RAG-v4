@@ -318,7 +318,7 @@ class VectorStoreFAISS:
             'distances': [distances],
             'metadatas': [results]
         }
-    def search_documents(self, query_embedding: np.ndarray, top_k: int = 5, min_similarity: float = 0.3) -> Dict:
+    def search_documents(self, query_embedding: np.ndarray, top_k: int = 10, min_similarity: float = 0.2) -> Dict:
         """
         Buscar documentos similares al embedding de consulta.
         
