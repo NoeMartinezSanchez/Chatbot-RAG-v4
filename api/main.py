@@ -347,8 +347,8 @@ async def chat(request: ChatRequest):
         )
         
     except Exception as e:
-        logger.error(f"❌ Error en chat endpoint: {e}")
-        raise HTTPException(status_code=500, detail="Error procesando la consulta")
+        logger.error(f"❌ Error en chat endpoint: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/feedback")
 async def submit_feedback(request: FeedbackRequest):

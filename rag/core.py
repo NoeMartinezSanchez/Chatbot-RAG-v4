@@ -183,7 +183,13 @@ class RAGSystem:
                 nonlocal tokens_generated
                 tokens_generated = tokens
             
-            response = self.generator.generate(query, context_str, on_tokens_generated=on_tokens)
+            logger.info(f"🔄 Calling generator.generate() with query length: {len(query)}, context length: {len(context_str)}")
+            try:
+                response = self.generator.generate(query, context_str, on_tokens_generated=on_tokens)
+                logger.info(f"✅ Response received: {response[:100]}...")
+            except Exception as e:
+                logger.error(f"❌ Error in generator.generate(): {e}", exc_info=True)
+                raise
             
             generation_time = (time.time() - generation_start) * 1000
             
