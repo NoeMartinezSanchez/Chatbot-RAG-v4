@@ -1,3 +1,12 @@
+---
+title: Chatbot RAG PLS
+emoji: 🤖
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
+
 # 🤖 Prepa en Línea SEP - Asistente Educativo RAG
 
 Asistente virtual con tecnología RAG (Retrieval-Augmented Generation) para estudiantes de Prepa en Línea SEP. Chatbot educativo que responde dudas sobre Convocatoria, Normativa, Protocolos y Guías del programa.
@@ -155,7 +164,3 @@ git push origin main
 ## 📝 Licencia
 
 MIT License - feel free to use for learning and personal projects.
-
----
-
-¿Dudas? Escríbeme: @tu-usuario

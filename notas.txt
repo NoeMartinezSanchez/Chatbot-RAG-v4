@@ -166,3 +166,10 @@ ssh -i C:\Users\mecat\.ssh\oci_key ubuntu@140.84.189.188
 Verificar que el servicio este corriendo
 
 sudo systemctl status chatbot
+
+
+------------dashBoard de resultados de la evaluacion automatizada-----------
+
+https://tu-space.hf.space/dashboard
+
+https://huggingface.co/spaces/ecotecds/Chatbot-RAG-v4/dashboard
