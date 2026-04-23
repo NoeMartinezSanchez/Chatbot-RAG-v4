@@ -14,7 +14,7 @@ class GeminiWrapper:
         self.model = genai.GenerativeModel('gemini-2.5-flash')
         logger.info("✅ Gemini API inicializada correctamente")
     
-    def generate_with_context(self, context, question):
+    def generate_with_context(self, context, question, **kwargs):
         prompt = f"""Responde la pregunta usando SOLO el contexto. Responde con UNA frase corta.
 
 CONTEXTO: {context}
@@ -30,5 +30,8 @@ RESPUESTA:"""
             logger.error(f"Error en Gemini API: {e}")
             return "No se pudo generar una respuesta."
     
-    def generate(self, prompt):
+    def generate(self, prompt, **kwargs):
+        """Método para compatibilidad con la interfaz existente.
+        Acepta kwargs adicionales (como on_tokens_generated) para no romper la compatibilidad.
+        """
         return self.generate_with_context("", prompt)
