@@ -1,6 +1,6 @@
 """Dashboard Generator for Evaluation Results.
 
-Reads evaluation results and generates an HTML dashboard.
+Reads evaluation results from /data and generates an HTML dashboard.
 """
 import json
 import os
@@ -9,72 +9,19 @@ from pathlib import Path
 from collections import defaultdict
 
 
-# Usar /tmp para persistencia en HF Spaces (requiere SDK Docker)
-TEMP_DIR = Path("/tmp")
-TEMP_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR = Path("/data")
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-LOG_DIR = Path("logs")
-
-# Intentar primero en /tmp, luego en proyecto local
-EVALUATION_LOG_TMP = TEMP_DIR / "evaluation_results.jsonl"
-EVALUATION_LOG_LOCAL = LOG_DIR / "evaluation_results.jsonl"
-
-# Dashboard siempre en /tmp
-OUTPUT_PATH = TEMP_DIR / "dashboard.html"
+EVALUATION_LOG = DATA_DIR / "evaluation_results.jsonl"
 
 
 def load_results() -> list:
-    """Load evaluation results from JSONL file."""
+    """Load evaluation results from /data/evaluation_results.jsonl."""
     results = []
     
-    # Primero intentar /tmp, luego proyecto local
-    eval_log = EVALUATION_LOG_TMP if EVALUATION_LOG_TMP.exists() else EVALUATION_LOG_LOCAL
-    
-    if not eval_log.exists():
-        print(f"⚠️ No se encontró archivo de resultados: {eval_log}")
+    if not EVALUATION_LOG.exists():
+        print(f"⚠️ No se encontró archivo de resultados: {EVALUATION_LOG}")
         return results
-    
-    with open(eval_log, "r", encoding="utf-8") as f:
-        for line in f:
-            try:
-                results.append(json.loads(line.strip()))
-            except json.JSONDecodeError:
-                continue
-    return results
-
-
-def calculate_metrics(results: list) -> dict:
-    """Calculate summary metrics from results."""
-    if not results:
-        return {
-            "total": 0,
-            "correctas": 0,
-            "incorrectas": 0,
-            "tasa_exito": 0,
-            "avg_latency": 0,
-            "avg_retrieval": 0,
-            "avg_generation": 0
-        }
-    
-    total = len(results)
-    correctas = sum(1 for r in results if r.get("correcto", False))
-    incorrectas = total - correctas
-    tasa_exito = round(correctas / total * 100, 1) if total > 0 else 0
-    
-    avg_latency = round(sum(r.get("latency_ms", 0) for r in results) / total, 1) if total > 0 else 0
-    avg_retrieval = round(sum(r.get("retrieval_time_ms", 0) for r in results) / total, 1) if total > 0 else 0
-    avg_generation = round(sum(r.get("generation_time_ms", 0) for r in results) / total, 1) if total > 0 else 0
-    
-    return {
-        "total": total,
-        "correctas": correctas,
-        "incorrectas": incorrectas,
-        "tasa_exito": tasa_exito,
-        "avg_latency": avg_latency,
-        "avg_retrieval": avg_retrieval,
-        "avg_generation": avg_generation,
-        "last_evaluation": results[-1].get("timestamp", "N/A") if results else "N/A"
-    }
     
     with open(EVALUATION_LOG, "r", encoding="utf-8") as f:
         for line in f:
