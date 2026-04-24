@@ -48,27 +48,40 @@ app = FastAPI(
 # ============================================================
 @app.get("/dashboard")
 async def get_dashboard():
-    """Servir el dashboard desde el almacenamiento persistente"""
+    """Servir el dashboard desde múltiples ubicaciones posibles"""
     import os
     
-    dashboard_path = "/data/dashboard.html"
+    posibles_ubicaciones = [
+        "/data/dashboard.html",
+        "static/dashboard.html",
+        "/app/static/dashboard.html",
+        "evaluation/dashboard.html"
+    ]
     
-    if os.path.exists(dashboard_path):
-        with open(dashboard_path, "r", encoding="utf-8") as f:
-            html_content = f.read()
-        return HTMLResponse(content=html_content)
-    else:
-        return HTMLResponse(content=f"""
-        <html>
-        <head><title>Dashboard no disponible</title></head>
-        <body>
-        <h1>📊 Dashboard no disponible</h1>
-        <p>El archivo no existe en: {dashboard_path}</p>
-        <p>Contenido de /data:</p>
-        <pre>{os.listdir('/data') if os.path.exists('/data') else 'No existe'}</pre>
-        </body>
-        </html>
-        """)
+    for path in posibles_ubicaciones:
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                html_content = f.read()
+            logger.info(f"✅ Dashboard encontrado en: {path}")
+            return HTMLResponse(content=html_content)
+    
+    # Si no existe, mostrar diagnóstico
+    data_dir = "/data"
+    static_dir = "static"
+    
+    return HTMLResponse(content=f"""
+    <html>
+    <head><title>Dashboard no disponible</title></head>
+    <body>
+    <h1>📊 Dashboard no disponible</h1>
+    <p>El dashboard no se ha generado aún.</p>
+    <h2>Contenido de /data:</h2>
+    <pre>{os.listdir(data_dir) if os.path.exists(data_dir) else 'No existe'}</pre>
+    <h2>Contenido de static/:</h2>
+    <pre>{os.listdir(static_dir) if os.path.exists(static_dir) else 'No existe'}</pre>
+    </body>
+    </html>
+    """)
 
 # Configurar CORS
 app.add_middleware(

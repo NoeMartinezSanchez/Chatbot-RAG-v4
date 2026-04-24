@@ -255,6 +255,21 @@ def run_automated_evaluation(
         logger.info("=" * 60)
         
         _generate_dashboard(output_path=DASHBOARD_PATH)
+        
+        # Copiar dashboard a static/ para acceso directo via FastAPI
+        import shutil
+        static_dir = Path("static")
+        static_dir.mkdir(parents=True, exist_ok=True)
+        
+        static_dashboard = static_dir / "dashboard.html"
+        if DASHBOARD_PATH.exists():
+            shutil.copy(DASHBOARD_PATH, static_dashboard)
+            logger.info(f"✅ Dashboard copiado a: {static_dashboard}")
+        
+        static_summary = static_dir / "evaluation_summary.json"
+        if SUMMARY_PATH.exists():
+            shutil.copy(SUMMARY_PATH, static_summary)
+            logger.info(f"✅ Resumen copiado a: {static_summary}")
     
     if run_async:
         thread = threading.Thread(target=_run, daemon=True)
