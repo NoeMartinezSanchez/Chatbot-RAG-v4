@@ -1,8 +1,10 @@
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import logging
+import json
 import uuid
 from datetime import datetime
 import os
@@ -33,6 +35,9 @@ logger = logging.getLogger(__name__)
 print("=" * 50)
 print("🚀 CARGANDO API - Registro de endpoints:")
 print("=" * 50)
+
+USER_INTERACTIONS_LOG = Path("/data/user_interactions.jsonl")
+USER_INTERACTIONS_LOG.parent.mkdir(parents=True, exist_ok=True)
 
 # Inicializar aplicación
 app = FastAPI(
@@ -214,6 +219,14 @@ async def startup_event():
             else:
                 logger.warning(f"   Directorio evaluation/ no existe")
         
+        # Generar dashboard de usuarios automáticamente
+        try:
+            from evaluation.generate_user_dashboard import generate_user_dashboard
+            generate_user_dashboard()
+            logger.info("✅ Dashboard de usuarios generado automáticamente")
+        except Exception as e:
+            logger.error(f"❌ Error generando dashboard de usuarios: {e}")
+        
     except Exception as e:
         logger.error(f"Error inicializando RAG: {e}")
         app.state.menu = {}
@@ -354,6 +367,21 @@ async def chat(request: ChatRequest):
             question=request.message
         )
         
+        # Guardar interacción de usuario para dashboard dinámico
+        interaction = {
+            "timestamp": datetime.now().isoformat(),
+            "pregunta": request.message,
+            "respuesta": response_text[:500] if response_text else "",
+            "tiempo_total_ms": round(total_time, 2),
+            "tiempo_retrieval_ms": round(retrieval_time, 2),
+            "tiempo_generacion_ms": round(generation_time, 2),
+            "confianza": round(conf_value, 4),
+            "fuentes_usadas": [s.get("source_file", s.get("chunk_id", "unknown")) for s in sources] if sources else [],
+            "es_rag": is_rag
+        }
+        with open(USER_INTERACTIONS_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps(interaction, ensure_ascii=False) + "\n")
+        
         return JSONResponse(
             content=response.dict(),
             headers=headers
@@ -490,6 +518,33 @@ async def get_evaluation_summary():
                 continue
     
     return {"results": results, "total": len(results)}
+
+
+@app.get("/user-dashboard", response_class=HTMLResponse)
+async def get_user_dashboard():
+    """Servir el dashboard de interacciones de usuarios"""
+    dashboard_path = "/data/user_dashboard.html"
+    
+    if os.path.exists(dashboard_path):
+        with open(dashboard_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    
+    return HTMLResponse(content="<h1>Dashboard no disponible</h1><p>Aún no hay interacciones de usuarios.</p>", status_code=202)
+
+
+@app.get("/user-dashboard/refresh")
+async def refresh_user_dashboard():
+    """Regenerar el dashboard de interacciones de usuarios"""
+    try:
+        from evaluation.generate_user_dashboard import generate_user_dashboard
+        
+        dashboard_path = "/data/user_dashboard.html"
+        generate_user_dashboard(output_path=dashboard_path)
+        
+        return {"status": "success", "message": "Dashboard de usuarios regenerado"}
+    except Exception as e:
+        logger.error(f"❌ Error regenerando dashboard: {e}")
+        return HTMLResponse(content=f"<h1>Error: {e}</h1>", status_code=500)
 
 
 if __name__ == "__main__":
