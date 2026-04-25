@@ -397,40 +397,12 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
             location.reload();
         }}
         
-        function formatFecha(isoString) {{
-            if (!isoString) return '-';
-            const date = new Date(isoString);
-            const dia = String(date.getDate()).padStart(2, '0');
-            const mes = String(date.getMonth() + 1).padStart(2, '0');
-            const anio = date.getFullYear();
-            const hora = String(date.getHours()).padStart(2, '0');
-            const min = String(date.getMinutes()).padStart(2, '0');
-            return dia + '/' + mes + '/' + anio + ' ' + hora + ':' + min;
+        async function refresh() {{
+            const btn = document.querySelector('.btn');
+            btn.textContent = 'Actualizando...';
+            await fetch('/user-dashboard/refresh');
+            location.reload();
         }}
-        
-        async function loadRecientes() {{
-            try {{
-                const res = await fetch('/data/user_interactions.jsonl');
-                const text = await res.text();
-                const lines = text.trim().split('\\n').filter(l => l).slice(-10);
-                const tbody = document.querySelector('#tablaHistorial tbody');
-                tbody.innerHTML = lines.reverse().map(line => {{
-                    const d = JSON.parse(line);
-                    const fecha = formatFecha(d.timestamp);
-                    const tiempo = d.tiempo_total_ms ? d.tiempo_total_ms.toFixed(0) + 'ms' : '-';
-                    const rag = d.es_rag ? '✓' : '-';
-                    return `<tr>
-                        <td>${{fecha}}</td>
-                        <td>${{d.pregunta ? d.pregunta.substring(0, 50) + '...' : '-'}}</td>
-                        <td>${{d.respuesta ? d.respuesta.substring(0, 40) + '...' : '-'}}</td>
-                        <td>${{tiempo}}</td>
-                        <td>${{rag}}</td>
-                    </tr>`;
-                }}).join('');
-            }} catch(e) {{ console.error(e); }}
-        }}
-        
-        loadRecientes();
     </script>
 </body>
 </html>'''
@@ -449,8 +421,8 @@ def generate_user_dashboard(
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html)
     
-    print(f"✅ Dashboard generado: {output_path}")
-    print(f"   Interacciones procesadas: {metrics['total_interacciones']}")
+    print(f"[OK] Dashboard generado: {output_path}")
+    print(f"     Interacciones procesadas: {metrics['total_interacciones']}")
     return output_path
 
 
