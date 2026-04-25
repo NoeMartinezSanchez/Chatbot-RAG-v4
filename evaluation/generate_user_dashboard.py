@@ -44,16 +44,28 @@ def extract_keywords(questions: List[str], top_n: int = 5) -> List[Dict[str, int
         "está", "son", "tiene", "tienen", "hacer", "puedo", "puede", "sí",
         "no", "pero", "del", "al", "le", "les", "esto", "esta", "este",
         "todo", "toda", "todos", "todas", "muy", "más", "menos", "tan",
-        "bien", "mal", "solo", "sólo", "ya", "aún", "todavía"
+        "bien", "mal", "solo", "sólo", "ya", "aún", "todavía",
+        "cual", "forma", "manera", "razon", "saber", "haber", "estar", "ser",
+        "hacer", "tener", "decir", "ir", "ver", "dar", "algo", "alguien",
+        "nada", "nadie", "cada", "poco", "mucho", "otro", "mismo"
     }
     
-    all_words = []
-    for q in questions:
-        words = re.findall(r'\b\w+\b', q.lower())
-        words = [w for w in words if w not in stopwords and len(w) > 2]
-        all_words.extend(words)
+    todas_palabras = []
     
-    counter = Counter(all_words)
+    for pregunta in questions:
+        if not pregunta:
+            continue
+        # Limpiar: minúsculas, eliminar signos de puntuación ynormalizar tildes
+        texto_limpio = pregunta.lower()
+        texto_limpio = re.sub(r'[^\w\sáéíóúüñ]', ' ', texto_limpio)
+        # Normalizar tildes
+        texto_limpio = texto_limpio.replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u')
+        palabras = texto_limpio.split()
+        # Filtrar stop words y palabras muy cortas
+        palabras_filtradas = [p for p in palabras if p not in stopwords and len(p) > 3]
+        todas_palabras.extend(palabras_filtradas)
+    
+    counter = Counter(todas_palabras)
     return [{"palabra": w, "conteo": c} for w, c in counter.most_common(top_n)]
 
 
@@ -103,7 +115,7 @@ def calculate_metrics(interactions: List[Dict[str, Any]]) -> Dict[str, Any]:
     usuarios_unicos = len(session_ids)
     
     # Palabras clave
-    preguntas = [i.get("preunta", "") for i in interactions if i.get("preunta")]
+    preguntas = [i.get("pregunta", "") for i in interactions if i.get("pregunta")]
     palabras_clave = extract_keywords(preguntas, 5)
     
     # Fuentes más usadas
