@@ -8,7 +8,7 @@ from collections import Counter, defaultdict
 from typing import Dict, List, Any
 
 
-def read_interactions(log_path: str = "data/user_interactions.jsonl") -> List[Dict[str, Any]]:
+def read_interactions(log_path: str = "/data/user_interactions.jsonl") -> List[Dict[str, Any]]:
     """Lee las interacciones desde el archivo JSONL."""
     path = Path(log_path)
     if not path.exists():
@@ -297,7 +297,7 @@ def generate_dashboard_html(metrics: Dict[str, Any]) -> str:
 
 
 def generate_user_dashboard(
-    log_path: str = "data/user_interactions.jsonl",
+    log_path: str = "/data/user_interactions.jsonl",
     output_path: str = "/data/user_dashboard.html"
 ) -> str:
     """Genera el dashboard de interacciones de usuarios."""

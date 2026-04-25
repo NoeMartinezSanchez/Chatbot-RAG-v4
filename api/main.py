@@ -551,6 +551,24 @@ async def refresh_user_dashboard():
         return HTMLResponse(content=f"<h1>Error: {e}</h1>", status_code=500)
 
 
+@app.get("/debug-user-logs")
+async def debug_user_logs():
+    """Diagnosticar acceso al archivo de logs de usuarios"""
+    import os
+    log_file = "/data/user_interactions.jsonl"
+    result = {
+        "file_exists": os.path.exists(log_file),
+        "file_size": os.path.getsize(log_file) if os.path.exists(log_file) else 0,
+        "data_dir_contents": os.listdir("/data") if os.path.exists("/data") else []
+    }
+    
+    if os.path.exists(log_file):
+        with open(log_file, "r", encoding="utf-8") as f:
+            result["first_line"] = f.readline()
+    
+    return result
+
+
 if __name__ == "__main__":
     import uvicorn
     logger.info(f"🚀 Iniciando servidor en {settings.API_HOST}:{settings.API_PORT}")
