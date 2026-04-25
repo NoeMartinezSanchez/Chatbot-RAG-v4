@@ -151,9 +151,40 @@ def calculate_metrics(interactions: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
-def generate_dashboard_html(metrics: Dict[str, Any]) -> str:
+def formatear_fecha(timestamp_str):
+    """Formatea timestamp ISO a DD/MM/YYYY HH:MM."""
+    if not timestamp_str:
+        return "-"
+    try:
+        fecha_obj = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        return fecha_obj.strftime("%d/%m/%Y %H:%M")
+    except:
+        return timestamp_str[:16] if len(timestamp_str) > 16 else "-"
+
+
+def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str, Any]] = []) -> str:
     """Genera el HTML del dashboard interactivo."""
     import html
+    
+    if interactions is None:
+        interactions = []
+    
+    # Generar tabla de historial reciente (últimas 10)
+    historial_html = ""
+    for i in interactions[-10:]:
+        ts = formatear_fecha(i.get("timestamp", ""))
+        pregunta = html.escape(i.get("pregunta", "-")[:50])
+        if len(i.get("pregunta", "")) > 50:
+            pregunta += "..."
+        respuesta = html.escape(i.get("respuesta", "-")[:60])
+        if len(i.get("respuesta", "")) > 60:
+            respuesta += "..."
+        tiempo = f"{i.get('tiempo_total_ms', 0):.0f}ms" if i.get("tiempo_total_ms") else "-"
+        rag = "Sí" if i.get("es_rag", False) else "No"
+        historial_html += f"<tr><td>{ts}</td><td>{pregunta}</td><td>{respuesta}</td><td>{tiempo}</td><td>{rag}</td></tr>"
+    
+    if not historial_html:
+        historial_html = '<tr><td colspan="5" class="no-data">No hay interacciones registradas</td></tr>'
     
     # Preparar datos para gráficos
     horas_labels = list(range(24))
@@ -303,7 +334,9 @@ def generate_dashboard_html(metrics: Dict[str, Any]) -> str:
                 <thead>
                     <tr><th>Fecha</th><th>Pregunta</th><th>Respuesta</th><th>Tiempo</th><th>RAG</th></tr>
                 </thead>
-                <tbody></tbody>
+                <tbody>
+                    {historial_html}
+                </tbody>
             </table>
         </div>
     </div>
@@ -410,7 +443,7 @@ def generate_user_dashboard(
     """Genera el dashboard de interacciones de usuarios."""
     interactions = read_interactions(log_path)
     metrics = calculate_metrics(interactions)
-    html = generate_dashboard_html(metrics)
+    html = generate_dashboard_html(metrics, interactions)
     
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
