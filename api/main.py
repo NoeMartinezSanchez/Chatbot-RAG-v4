@@ -376,7 +376,8 @@ async def chat(request: ChatRequest):
                 "confianza": round(conf_value, 4),
                 "fuentes_usadas": [s.get("source_file", "unknown") for s in sources] if sources else [],
                 "es_rag": is_rag,
-                "tokens_generados": tokens_generated
+                "tokens_generados": tokens_generated,
+                "session_id": conversation_id
             }
             
             log_file = "/data/user_interactions.jsonl"
