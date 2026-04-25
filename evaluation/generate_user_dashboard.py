@@ -170,6 +170,14 @@ def generate_dashboard_html(metrics: Dict[str, Any]) -> str:
     if not palabras_html:
         palabras_html = '<div class="no-data">No hay palabras clave</div>'
     
+    # Fuentes más usadas
+    fuentes_html = ""
+    for f in metrics.get("fuentes_top", []):
+        fuentes_html += f'<div class="fuente-item"><span>{html.escape(f["fuente"])}</span><span class="count">{f["conteo"]}</span></div>'
+    
+    if not fuentes_html:
+        fuentes_html = '<div class="no-data">No hay fuentes registradas</div>'
+    
     return f'''<!DOCTYPE html>
 <html lang="es">
 <head>
