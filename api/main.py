@@ -36,9 +36,6 @@ print("=" * 50)
 print("🚀 CARGANDO API - Registro de endpoints:")
 print("=" * 50)
 
-USER_INTERACTIONS_LOG = Path("/data/user_interactions.jsonl")
-USER_INTERACTIONS_LOG.parent.mkdir(parents=True, exist_ok=True)
-
 # Inicializar aplicación
 app = FastAPI(
     title="Asistente Educativo RAG - Prepa en Línea SEP",
@@ -368,19 +365,26 @@ async def chat(request: ChatRequest):
         )
         
         # Guardar interacción de usuario para dashboard dinámico
-        interaction = {
-            "timestamp": datetime.now().isoformat(),
-            "pregunta": request.message,
-            "respuesta": response_text[:500] if response_text else "",
-            "tiempo_total_ms": round(total_time, 2),
-            "tiempo_retrieval_ms": round(retrieval_time, 2),
-            "tiempo_generacion_ms": round(generation_time, 2),
-            "confianza": round(conf_value, 4),
-            "fuentes_usadas": [s.get("source_file", s.get("chunk_id", "unknown")) for s in sources] if sources else [],
-            "es_rag": is_rag
-        }
-        with open(USER_INTERACTIONS_LOG, "a", encoding="utf-8") as f:
-            f.write(json.dumps(interaction, ensure_ascii=False) + "\n")
+        try:
+            interaction = {
+                "timestamp": datetime.now().isoformat(),
+                "pregunta": request.message,
+                "respuesta": response_text,
+                "tiempo_total_ms": round(total_time, 2),
+                "tiempo_retrieval_ms": round(retrieval_time, 2),
+                "tiempo_generacion_ms": round(generation_time, 2),
+                "confianza": round(conf_value, 4),
+                "fuentes_usadas": [s.get("source_file", "unknown") for s in sources] if sources else [],
+                "es_rag": is_rag,
+                "tokens_generados": tokens_generated
+            }
+            
+            log_file = "/data/user_interactions.jsonl"
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(interaction, ensure_ascii=False) + "\n")
+            logger.info(f"✅ Interacción guardada en {log_file}")
+        except Exception as e:
+            logger.error(f"❌ Error guardando interacción: {e}")
         
         return JSONResponse(
             content=response.dict(),
