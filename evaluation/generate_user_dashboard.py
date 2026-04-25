@@ -208,7 +208,7 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
     # Palabras clave
     palabras_html = ""
     for p in metrics.get("palabras_clave", []):
-        palabras_html += f'<div class="fuente-item"><span>{html.escape(p["palabra"])}</span><span class="count">{p["conteo"]}</span></div>'
+        palabras_html += f'<span class="badge">{html.escape(p["palabra"])} ({p["conteo"]})</span>'
     
     if not palabras_html:
         palabras_html = '<div class="no-data">No hay palabras clave</div>'
@@ -216,7 +216,7 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
     # Fuentes más usadas
     fuentes_html = ""
     for f in metrics.get("fuentes_top", []):
-        fuentes_html += f'<div class="fuente-item"><span>{html.escape(f["fuente"])}</span><span class="count">{f["conteo"]}</span></div>'
+        fuentes_html += f'<span class="badge">{html.escape(f["fuente"])} ({f["conteo"]})</span>'
     
     if not fuentes_html:
         fuentes_html = '<div class="no-data">No hay fuentes registradas</div>'
@@ -229,37 +229,66 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
     <title>Dashboard de Usuarios - Prepa en Línea SEP</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        /* Paleta de colores del chatbot */
+        :root {{
+            --azul-principal: #2c3e50;
+            --azul-secundario: #3498db;
+            --verdeclaro: #2ecc71;
+            --rojosoft: #e74c3c;
+            --grisclaro: #ecf0f1;
+            --gristexto: #7f8c8d;
+            --blanco: #ffffff;
+            --sombra: rgba(0,0,0,0.1);
+        }}
+        
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; padding: 20px; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--grisclaro); padding: 20px; }}
         .container {{ max-width: 1200px; margin: 0 auto; }}
-        h1 {{ color: #1a1a2e; margin-bottom: 5px; font-size: 1.8rem; }}
-        .subtitle {{ color: #666; margin-bottom: 20px; }}
-        .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
-        .btn {{ background: #4f46e5; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }}
-        .btn:hover {{ background: #4338ca; }}
+        h1 {{ color: var(--azul-principal); margin-bottom: 8px; font-size: 1.8rem; font-weight: 700; }}
+        .subtitle {{ color: var(--gristexto); margin-bottom: 20px; font-size: 14px; }}
+        .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }}
+        .btn {{ background: var(--azul-secundario); color: var(--blanco); padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: background 0.2s; }}
+        .btn:hover {{ background: var(--azul-principal); }}
         
         .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }}
-        .card {{ background: white; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }}
-        .card-label {{ font-size: 12px; color: #6b7280; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }}
-        .card-value {{ font-size: 28px; font-weight: 700; color: #1a1a2e; }}
-        .card-sub {{ font-size: 12px; color: #6b7280; margin-top: 4px; }}
+        .card {{ background: var(--blanco); border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px var(--sombra); }}
+        .card-label {{ font-size: 11px; color: var(--gristexto); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }}
+        .card-value {{ font-size: 28px; font-weight: 700; color: var(--azul-principal); }}
+        .card-value.positivo {{ color: var(--verdeclaro); }}
+        .card-value.negativo {{ color: var(--rojosoft); }}
+        .card-sub {{ font-size: 12px; color: var(--gristexto); margin-top: 4px; }}
         
-        .chart-container {{ background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; }}
-        .chart-title {{ font-size: 16px; font-weight: 600; color: #1a1a2e; margin-bottom: 16px; }}
+        .chart-container {{ background: var(--blanco); border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px var(--sombra); margin-bottom: 24px; }}
+        .chart-title {{ font-size: 16px; font-weight: 600; color: var(--azul-principal); margin-bottom: 16px; }}
         
-        .fuentes-list {{ display: flex; flex-direction: column; gap: 8px; }}
-        .fuente-item {{ display: flex; justify-content: space-between; padding: 10px 12px; background: #f9fafb; border-radius: 6px; font-size: 14px; }}
-        .fuente-item .count {{ font-weight: 600; color: #4f46e5; }}
-        .no-data {{ color: #9ca3af; font-style: italic; }}
+        .badges {{ display: flex; flex-wrap: wrap; gap: 8px; }}
+        .badge {{ background: var(--azul-secundario); color: var(--blanco); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; }}
         
-        .tables {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }}
-        @media (max-width: 768px) {{ .tables {{ grid-template-columns: 1fr; }} }}
+        .sources-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }}
         
-        table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
-        th, td {{ padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb; }}
-        th {{ background: #f9fafb; font-weight: 600; color: #374151; }}
-        td {{ color: #4b5563; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 13px; background: var(--blanco); border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px var(--sombra); }}
+        th, td {{ padding: 12px 10px; text-align: left; border-bottom: 1px solid var(--grisclaro); }}
+        th {{ background: var(--azul-principal); color: var(--blanco); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }}
+        td {{ color: var(--azul-principal); }}
+        tr:nth-child(even) {{ background: var(--grisclaro); }}
         tr:last-child td {{ border-bottom: none; }}
+        
+        .no-data {{ color: var(--gristexto); font-style: italic; text-align: center; padding: 20px; }}
+        
+        /* Responsive */
+        @media (max-width: 768px) {{
+            body {{ padding: 12px; }}
+            h1 {{ font-size: 1.5rem; }}
+            .header {{ flex-direction: column; align-items: flex-start; }}
+            .btn {{ width: 100%; text-align: center; }}
+            .grid {{ grid-template-columns: 1fr 1fr; }}
+            table {{ font-size: 12px; }}
+            th, td {{ padding: 8px 6px; }}
+        }}
+        @media (max-width: 480px) {{
+            .grid {{ grid-template-columns: 1fr; }}
+            .sources-grid {{ grid-template-columns: 1fr; }}
+        }}
     </style>
 </head>
 <body>
@@ -276,7 +305,7 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
             <div class="card">
                 <div class="card-label">Total Interacciones</div>
                 <div class="card-value">{metrics.get("total_interacciones", 0):,}</div>
-                <div class="card-sub">Conversaciones registradas</div>
+                <div class="card-sub">Conversaciones</div>
             </div>
             <div class="card">
                 <div class="card-label">Tiempo Promedio</div>
@@ -286,7 +315,7 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
             <div class="card">
                 <div class="card-label">Tiempo P50</div>
                 <div class="card-value">{metrics.get("tiempo_p50_ms", 0):.0f}ms</div>
-                <div class="card-sub">Mediana de respuesta</div>
+                <div class="card-sub">Mediana</div>
             </div>
             <div class="card">
                 <div class="card-label">Tiempo P95</div>
@@ -295,36 +324,36 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
             </div>
             <div class="card">
                 <div class="card-label">Tasa RAG</div>
-                <div class="card-value">{metrics.get("tasa_rag", 0):.1f}%</div>
-                <div class="card-sub">Consultas con RAG</div>
+                <div class="card-value positivo">{metrics.get("tasa_rag", 0):.1f}%</div>
+                <div class="card-sub">Con RAG</div>
             </div>
             <div class="card">
-                <div class="card-label">No Encontrado</div>
+                <div class="card-label">Sin Info</div>
                 <div class="card-value">{metrics.get("tasa_no_encontrado", 0):.1f}%</div>
-                <div class="card-sub">Sin información disponible</div>
+                <div class="card-sub">No disponible</div>
             </div>
             <div class="card">
-                <div class="card-label">Confianza Promedio</div>
+                <div class="card-label">Confianza</div>
                 <div class="card-value">{metrics.get("confianza_promedio", 0)*100:.1f}%</div>
-                <div class="card-sub">Confianza media del sistema</div>
+                <div class="card-sub">Media del sistema</div>
             </div>
             <div class="card">
-                <div class="card-label">Usuarios Únicos</div>
+                <div class="card-label">Usuarios</div>
                 <div class="card-value">{metrics.get("usuarios_unicos", 0):,}</div>
-                <div class="card-sub">Sesiones diferentes</div>
+                <div class="card-sub">Sesiones únicas</div>
             </div>
         </div>
         
-        <div class="tables">
+        <div class="sources-grid">
             <div class="chart-container">
                 <div class="chart-title">Fuentes Más Usadas</div>
-                <div class="fuentes-list">
+                <div class="badges">
                     {fuentes_html}
                 </div>
             </div>
             <div class="chart-container">
                 <div class="chart-title">Palabras Clave (Top 5)</div>
-                <div class="fuentes-list">
+                <div class="badges">
                     {palabras_html}
                 </div>
             </div>
