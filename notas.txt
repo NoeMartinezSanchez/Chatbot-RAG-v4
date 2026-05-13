@@ -173,3 +173,13 @@ sudo systemctl status chatbot
 https://tu-space.hf.space/dashboard
 
 https://huggingface.co/spaces/ecotecds/Chatbot-RAG-v4/dashboard
+
+
+---En esta direccion se puede ver el dashboard del chatbot con la evaluacion automatizada-----------------
+
+https://ecotecds-chatbot-rag-v4.hf.space/dashboard
+
+---Dashboard de interacciones reales-------------
+
+https://ecotecds-chatbot-rag-v4.hf.space/user-dashboard
+

@@ -3,14 +3,461 @@
     {
       "tag": "saludo",
       "patterns": [
-        "hola",
+        "hola buenas, tengo una duda",
+        "buen día, necesito ayuda con el módulo",
+        "hola, soy nuevo en el propedéutico",
+        "buenas, empiezo el módulo y tengo preguntas",
+        "hola asistente académico",
+        "holaaa",
+        "buen día a todos",
+        "hola buen día",
+        "hey qué tal todo",
+        "saludos buen día a todos",
+        "hola, buen día ¿cómo están?",
+        "hola, tengo una pregunta",
+        "buen día, me pueden ayudar",
+        "hola, necesito información",
         "buenos días",
-        "buenas tardes"
+        "buenas tardes",
+        "buenas noches",
+        "qué tal",
+        "cómo estás",
+        "saludos",
+        "hola qué tal",
+        "hola asistente",
+        "hey necesito ayuda"
       ],
       "responses": [
-        "¡Hola! ¿En qué puedo ayudarte?"
+        "¡Hola! 👋 Soy tu asistente especializado en el Módulo Propedéutico. ¿En qué puedo ayudarte hoy?",
+        "¡Buen día! 🎓 Estoy aquí para orientarte con el módulo propedéutico. ¿Qué te gustaría saber?",
+        "¡Hola! 🤗 Bienvenido al asistente inteligente del módulo propedéutico. ¿En qué puedo apoyarte?"
       ],
       "context": "welcome"
+    },
+    {
+      "tag": "despedida",
+      "patterns": [
+        "adiós",
+        "hasta luego",
+        "nos vemos",
+        "chao",
+        "bye",
+        "hasta pronto",
+        "hasta la próxima",
+        "hasta mañana",
+        "hasta después",
+        "nos vemos después",
+        "gracias por la ayuda, hasta luego",
+        "muchas gracias, adiós",
+        "gracias, nos vemos",
+        "te agradezco, hasta pronto",
+        "ya me voy",
+        "me retiro",
+        "me despido",
+        "hasta la vista",
+        "bye bye",
+        "chao chao",
+        "nos vemos al rato",
+        "hasta luego compa",
+        "nada más",
+        "eso sería todo"
+      ],
+      "responses": [
+        "¡Hasta luego! 🚀 Recuerda que estoy aquí para ayudarte cuando lo necesites.",
+        "¡Nos vemos! 💫 Éxito en tu módulo propedéutico.",
+        "¡Chao! 📚 No dudes en volver si tienes más preguntas."
+      ],
+      "context": "goodbye"
+    },
+    {
+      "tag": "aceptacion_calificacion",
+      "patterns": [
+        "¿Qué calificación necesito para entrar al Módulo 1?",
+        "¿Con qué porcentaje apruebo el propedéutico?",
+        "¿Cuál es el promedio mínimo para ser seleccionado?",
+        "¿Si apruebo con 60% ya quedé como estudiante?",
+        "¿Con cuánto se aprueba el curso propedéutico?",
+        "¿Cuál es el puntaje de corte para el propedéutico?",
+        "¿Cuántos puntos necesito para quedar en Prepa en Línea?",
+        "¿Es suficiente tener 80% para ser aceptado?",
+        "¿Qué tan alta debe ser mi calificación para entrar?",
+        "¿A qué se refieren con que solo entran los de mejores promedios?",
+        "Cuanto necesito?",
+        "Con cuanto paso",
+        "Con cuanto apruebo?",
+        "Con cuanta calificacion apruebo?",
+        "Cuanto necesito para pasar?"
+      ],
+      "responses": [
+        "La calificación necesaria para **aprobar** el Módulo Propedéutico es de **60 puntos** (sobre 100) [1-7]. **Importante:** Una cosa es aprobar y otra ser seleccionado. Debido a la alta demanda, solo entran los **mejores promedios**. Se recomienda obtener **más de 90 puntos** para asegurar lugar. **Dato clave:** El módulo propedéutico dura **10 días naturales**, no 4 semanas como un módulo normal.",
+        "La calificación mínima aprobatoria es 60 puntos, pero funciona como examen de admisión. Solo los aspirantes con las calificaciones más altas (generalmente arriba de 90) son seleccionados para el Módulo 1 debido al cupo limitado.",
+        "Aunque apruebes con 60 puntos, no garantiza tu lugar. Históricamente, aspirantes con 80 puntos o menos han reportado no ser aceptados. Apunta a **90 puntos o más** para tener altas probabilidades."
+      ],
+      "context": "calificacion"
+    },
+    {
+      "tag": "consulta_calificacion_final",
+      "patterns": [
+        "dónde checo mi calificacion final",
+        "cómo sé si pasé el propedéutico",
+        "dónde veo mi porcentaje total",
+        "cuando sale la calificación final del propedéutico",
+        "donde se ve la calificacion",
+        "portafolio de evidencias donde esta",
+        "ya terminé el módulo cómo veo mi resultado",
+        "en qué parte sale el puntaje final",
+        "calificacion total del módulo",
+        "cómo descargo mi portafolio de evidencias",
+        "calificación total donde la encuentro",
+        "cuando te dan la calificacion final",
+        "dónde reviso si ya me calificaron todo",
+        "la calificación está hasta abajo del portafolio, verdad?",
+        "aún no me califican el foro y el proyecto",
+        "me falta que me califiquen actividades integradoras",
+        "no encuentro mi calificación final, ayudaaa"
+      ],
+      "responses": [
+        "Para la **Generación 85**, los resultados (si fuiste promovido o no) se consultan en el portal institucional del **20 al 25 de febrero**. En generaciones posteriores, generalmente tu calificación final aparece en el **Portafolio de Evidencias**, en la parte inferior donde dice **'Total del módulo'**. Es recomendable descargar o guardar tu Portafolio cuando esté completo.",
+        "Tu calificación final se consulta en el **Portafolio de Evidencias**, al final de todo. Los asesores tienen hasta 72 horas para calificar el Proyecto Integrador y el Foro de Integración.",
+        "¡Importante! Guarda o descarga tu Portafolio de Evidencias completo. Ten en cuenta que el 'Avance' de la plataforma (barra de porcentaje) NO es lo mismo que tu calificación final."
+      ],
+      "context": "calificacion_final"
+    },
+    {
+      "tag": "registro_inscripcion",
+      "patterns": [
+        "cómo me inscribo a la prepa",
+        "alguien que me pueda orientar porfa para inscribirme",
+        "cómo me registro para la prepa en línea",
+        "dónde me explican cómo me inscribo",
+        "cuándo abren la convocatoria para la prepa",
+        "cómo puedo terminar mi prepa en línea",
+        "Me urje. Aprender la prepa",
+        "mandenme un número de teléfono por favor si me interesa la prepa",
+        "información sobre la inscripción para la prepa",
+        "como le puedo hacer para estudiar la prepa",
+        "cómo puedo ingresar para inscribirme",
+        "cuál es el link para empezar el propedéutico?",
+        "qué debo hacer para ser aspirante",
+        "ya pasó la convocatoria ahora hasta la G-57",
+        "que procede después de la convocatoria"
+      ],
+      "responses": [
+        "El primer paso es registrarse como **aspirante** durante el periodo de una convocatoria oficial. Debes estar pendiente de las próximas fechas en el portal oficial de Prepa en Línea SEP.",
+        "La inscripción formal (para ser alumno del Módulo 1) solo ocurre **después de aprobar el Módulo Propedéutico**. El propedéutico funciona como un examen de ingreso o de admisión.",
+        "Para registrarte, debes ir al portal oficial de Prepa en Línea SEP. Es crucial asegurarse de poner bien tus datos. Si ya pasó la convocatoria, debes esperar la siguiente."
+      ],
+      "context": "registro_proceso"
+    },
+    {
+      "tag": "calificacion_minima_aprobar",
+      "patterns": [
+        "¿Con cuánto de calificación se pasa el propedéutico?",
+        "cuál es el mínimo para aprobar",
+        "calificación mínima para pasar el módulo",
+        "¿Es suficiente con 60 para pasar el propedéutico?",
+        "¿Si saco 60% ya entro a la prepa?",
+        "con 60 ya la armo?",
+        "con cuanto es el pase",
+        "cuánto es lo menos que puedo sacar",
+        "el 60 es para aprobar o para ser aceptado",
+        "si paso con 70% me aceptan?",
+        "el propedéutico se pasa con 60?",
+        "que pasa si no saco 90",
+        "mínimo para quedar",
+        "es verdad que con menos de 80 no quedas",
+        "necesito 100 para aprobar"
+      ],
+      "responses": [
+        "La calificación mínima para **aprobar** el Módulo Propedéutico es de **60 puntos** (en una escala de 0 a 100). Sin embargo, este módulo funciona como examen de admisión y solo seleccionan a los aspirantes con las **calificaciones más altas**. Aprobar con 60 no garantiza un lugar. Se recomienda obtener **arriba de 90 puntos** para tener altas probabilidades de ser aceptado en el Módulo 1.",
+        "Aprobar con 60 puntos no garantiza que seas seleccionado. Se recomienda obtener un promedio **arriba de 90%** para tener altas probabilidades de asegurar un lugar.",
+        "Si tu calificación es baja (menos de 80 puntos), es probable que debas esperar la siguiente convocatoria para volver a intentarlo y mejorar tu puntaje, ya que solo se quedan los 'mejores promedios'."
+      ],
+      "context": "calificacion"
+    },
+    {
+      "tag": "consejos_exito_propedéutico",
+      "patterns": [
+        "qué tengo que hacer para sacar buena calificación",
+        "tips para pasar el propedeutico",
+        "consejos para que me vaya bien en el módulo inicial",
+        "lo más importante para el propedéutico",
+        "que recomiendan para no reprobar",
+        "ayuda con tips",
+        "cómo me aseguro un 100",
+        "que me aconsejan para el módulo 0",
+        "cual es la clave para pasar el propedéutico",
+        "que debo estudiar para el propedéutico",
+        "que me recomiendan hacer primero en la semana 1",
+        "guía para tener éxito en el curso",
+        "lo mas dificil es el propedeutico?",
+        "cómo evitar el plagio",
+        "hay algún secreto para sacar 100",
+        "necesito motivación para estudiar",
+        "qué hace a un buen estudiante en prepa en línea"
+      ],
+      "responses": [
+        "La clave del éxito en el propedéutico (y en módulos futuros) es la **lectura y la organización**.",
+        "Debes **leer absolutamente todos los recursos** de la plataforma y las instrucciones de cada actividad, incluso varias veces para asegurar una buena **comprensión lectora**.",
+        "El consejo más importante es **seguir la Rúbrica al pie de la letra**; concéntrate en cumplir todos los aspectos de la columna de **Experto** para maximizar tu puntaje.",
+        "Es vital que te **conectes o veas las grabaciones de las sesiones síncronas** (Espacios Abiertos para el Aprendizaje) con tu Asesor Virtual, ya que explican las actividades y puedes obtener **puntos extra** por participar.",
+        "**Practica la citación y referenciación (formato APA)** desde ahora, pues las faltas de ortografía y el no citar correctamente son motivos de baja calificación y plagio.",
+        "Organiza tu tiempo para entregar tus actividades **antes del domingo** para evitar saturación de la plataforma."
+      ],
+      "context": "exito_academico"
+    },
+    {
+      "tag": "dificultad_propedéutico",
+      "patterns": [
+        "¿Es difícil el propedéutico o la prepa en línea?",
+        "¿Qué tan difícil es Prepa en Línea?",
+        "¿Es muy complicado el módulo inicial?",
+        "¿Me costará trabajo el propedéutico si tengo años sin estudiar?",
+        "La prepa en línea es fácil o no?",
+        "Se me hace difícil el propedéutico que hago?",
+        "¿Es muy laborioso?",
+        "¿El módulo 0 es complicado?",
+        "El propedéutico es regalado?",
+        "Tengo miedo de que sea muy difícil",
+        "¿Me voy a estresar mucho?",
+        "Se necesita mucha dedicación o es fácil",
+        "¿Es el módulo más fácil de todos?",
+        "¿Qué tan difícil se pone la prepa?"
+      ],
+      "responses": [
+        "El Módulo Propedéutico es considerado por muchos egresados como **'lo más fácil'** de toda la Prepa en Línea SEP, porque su objetivo principal es que te familiarices con el modelo educativo y el manejo de la plataforma.",
+        "Generalmente, el propedéutico se centra en **aprender a usar la plataforma** y el manejo básico de herramientas ofimáticas (Word, Excel, PowerPoint).",
+        "La dificultad no suele ser académica, sino que puede ser **laborioso** o complicado si no estás familiarizado con la tecnología o llevas mucho tiempo sin estudiar.",
+        "El consejo principal es **leer bien las instrucciones** y **apegarse a la Rúbrica** de evaluación, ya que al principio muchos se confunden por no leer o no comprender.",
+        "Los estudiantes experimentados advierten que si el propedéutico te resulta muy complicado, los módulos subsecuentes (especialmente a partir del Módulo 11) aumentarán el nivel de complejidad."
+      ],
+      "context": "dificultad"
+    },
+    {
+      "tag": "inicio_convocatoria_modulo",
+      "patterns": [
+        "¿Cuándo empieza la siguiente convocatoria?",
+        "¿Ya salieron las fechas para el propedéutico?",
+        "¿Cuándo me toca empezar el módulo 1?",
+        "¿Saben cuándo inicia la próxima generación?",
+        "¿Cuánto falta para que inicie mi módulo 1?",
+        "¿Cuándo puedo volver a inscribirme?",
+        "¿La convocatoria está abierta?",
+        "¿Qué día empezamos el propedéutico?",
+        "¿Cómo me entero de las fechas de la siguiente convocatoria?",
+        "Ya pasó la convocatoria?",
+        "Quiero inscribirme ya, qué hago?",
+        "¿Cuando se abre la nueva plataforma?",
+        "¿El módulo 1 empieza luego luego?",
+        "Necesito saber las fechas de inscripción.",
+        "¿Cuándo inicia el propedéutico para los nuevos?"
+      ],
+      "responses": [
+        "Si eres aspirante y aún no has iniciado, debes estar pendiente de las próximas **convocatorias** en el portal oficial de Prepa en Línea SEP. Ahí se anuncian las fechas de registro e inicio del propedéutico.",
+        "Si ya aprobaste el propedéutico y esperas el Módulo 1, generalmente hay **una semana de descanso** después de que finaliza el módulo inicial.",
+        "Los módulos y las semanas de estudio comienzan siempre los **días lunes**.",
+        "Es crucial que revises la **guía de registro de tu generación** para conocer las fechas específicas de cuándo empieza tu Módulo 1, pues a veces la información llega al correo o está publicada directamente en la plataforma."
+      ],
+      "context": "fechas_inicio"
+    },
+    {
+      "tag": "reprobacion_baja_calificacion",
+      "patterns": [
+        "¿Qué pasa si no apruebo el propedéutico?",
+        "¿Si mi calificación es baja puedo entrar al Módulo 1?",
+        "¿Con 70 o 80 me quedo?",
+        "si no fui seleccionado, ¿qué sigue?",
+        "saqué 79 y no quedé, ¿por qué?",
+        "tengo que volver a hacer el propedéutico si no quedé?",
+        "¿Cuántas veces puedo intentar pasar el propedéutico?",
+        "si mi calificación es menor a 90, ¿pierdo mi lugar?",
+        "¿Me van a funar por no pasar el propedéutico?",
+        "tengo otra oportunidad si repruebo el módulo 0"
+      ],
+      "responses": [
+        "Si tu calificación es baja (generalmente debajo de 90 puntos), es probable que **no seas seleccionado** para el Módulo 1, aunque hayas aprobado el módulo con el mínimo de 60 puntos.",
+        "Esto sucede porque el propedéutico funciona como un examen de admisión, y solo los aspirantes con las **mejores calificaciones** (promedios de 90 puntos o más) son aceptados debido al cupo limitado de lugares.",
+        "Si no eres seleccionado en esta ocasión, debes esperar la **siguiente convocatoria** para volver a intentarlo y así mejorar tu puntaje, ya que tendrás la experiencia del primer intento.",
+        "Los aspirantes con calificaciones de 80 puntos o menos en el propedéutico han reportado no haber sido aceptados, aunque el puntaje aprobatorio es 60.",
+        "Aprovecha esta experiencia para **estar más preparado** en el próximo intento, sabiendo de qué trata el módulo."
+      ],
+      "context": "calificacion"
+    },
+    {
+      "tag": "sesiones_sincronas_puntos",
+      "patterns": [
+        "¿Dónde encuentro las sesiones síncronas con el asesor?",
+        "¿Las clases en vivo son obligatorias?",
+        "¿Cuándo son las sesiones de mi asesor virtual?",
+        "¿Las sesiones dan puntos extra?",
+        "¿Cómo veo las sesiones grabadas si no pude asistir?",
+        "¿Dónde reviso los horarios de las videollamadas?",
+        "¿Cuánto vale la asistencia a las sesiones?",
+        "¿Dá puntos extra mi asesor por entrar al Zoom?",
+        "¿Hay que participar en la sesión para que cuenten los puntos?",
+        "¿Cómo se que mi asesor ya me puso los puntos extras?",
+        "¿Dónde está la Pizarra de Sesiones?",
+        "¿Las sesiones de mi asesor son todos los días?",
+        "¿Con qué frecuencia hay sesiones síncronas?",
+        "¿Dónde se publican las ligas de las sesiones?",
+        "¿Dan puntos por cada sesión que asisto?",
+        "¿Cada sesión vale 1.25 puntos?",
+        "¿Si no entro, me bajan calificación?",
+        "¿Puedo ver las sesiones en YouTube?"
+      ],
+      "responses": [
+        "Las sesiones virtuales (llamadas Espacios Abiertos para el Aprendizaje) no son obligatorias, pero son muy recomendables y te otorgan **puntos extra** por participar.",
+        "Generalmente, se realizan **dos sesiones por semana** con tu Asesor Virtual. La participación activa en estas sesiones puede sumar hasta **10 puntos extra** a tu calificación total del módulo (1.25 puntos por sesión).",
+        "Para encontrar los horarios y las ligas de acceso, debes revisar la sección **Pizarra de Sesiones** (o 'Avisos') en la plataforma. El asesor elige el horario, a menudo basándose en una encuesta.",
+        "Si no puedes asistir en el horario establecido, no te preocupes. **Las sesiones quedan grabadas** y se suben a la plataforma o a YouTube para que las consultes más tarde, pero solo la asistencia y participación en vivo otorgan los puntos extras."
+      ],
+      "context": "sesiones_ayuda"
+    },
+    {
+      "tag": "problemas_ingreso_plataforma",
+      "patterns": [
+        "no puedo ingresar al propedéutico",
+        "mi usuario y contraseña son incorrectos",
+        "me sale sin asignacion de módulo",
+        "no puedo acceder a mi aula",
+        "el link no me deja entrar",
+        "dónde está mi usuario y contraseña",
+        "me dice que la curp no es válida",
+        "la página se encuentra en mantenimiento",
+        "no me ha llegado el correo de confirmacion",
+        "no puedo entrar al campus",
+        "me marca error al querer entrar",
+        "donde me envían el ID y la contraseña",
+        "no me acepta mi clave",
+        "a mi me sale que no tengo modulo asignado",
+        "pensé que solo era yo la de ese problema",
+        "puro error me sale la página hoy"
+      ],
+      "responses": [
+        "Si tienes problemas para ingresar, primero asegúrate de que estás ingresando al **apartado correcto**; para el curso propedéutico, debes entrar donde dice 'Propedéutico', no donde dice 'alumnos y maestros', ya que aún eres aspirante y no alumno.",
+        "Un error común es **escribir manualmente** el usuario y la contraseña. Te recomendamos enfáticamente **copiar y pegar** tu usuario y contraseña directamente desde el correo electrónico que te enviaron.",
+        "Si el correo con tu usuario y contraseña no te ha llegado, revisa tu **bandeja de correo no deseado (spam)**.",
+        "Ten en cuenta que la plataforma entra en **mantenimiento, generalmente los días miércoles**. A veces esto dura solo unas horas, por lo que debes tomar precauciones y planificar tus actividades.",
+        "Si te aparece la leyenda 'sin asignación de módulo' después de aprobar el propedéutico, puede significar que **no fuiste seleccionado** en ese momento, ya que solo ingresan los promedios más altos."
+      ],
+      "context": "acceso_plataforma"
+    },
+    {
+      "tag": "modulo_info",
+      "patterns": [
+        "qué es el módulo propedéutico",
+        "información del módulo",
+        "hablame del propedéutico",
+        "qué es propedéutico",
+        "para qué sirve el módulo",
+        "objetivos del módulo",
+        "qué aprenderé en el propedéutico",
+        "en qué consiste el módulo",
+        "cuál es el propósito del módulo propedéutico",
+        "qué me ofrece el propedéutico",
+        "dime del módulo",
+        "habla del propedéutico"
+      ],
+      "responses": [
+        "📖 **Módulo Propedéutico**: Es tu preparación inicial de **10 días naturales** (no 4 semanas) diseñada para:\n\n• 🎯 Desarrollar habilidades de estudio efectivas\n• 💻 Familiarizarte con la plataforma educativa\n• ⏰ Mejorar tu organización del tiempo\n• 💬 Practicar comunicación académica en línea\n\nEs tu puerta de entrada al éxito en Prepa en Línea SEP y funciona como examen de admisión.",
+        "🎓 **El módulo propedéutico** es un programa de 10 días que te prepara para:\n\n• Fortalecer técnicas de aprendizaje\n• Dominar el uso de la plataforma virtual\n• Gestionar eficientemente tu tiempo\n• Desarrollar competencias digitales\n\n¡Es tu base para un excelente desempeño académico! Una vez aprobado (mínimo 60 puntos), compites por un lugar según tu calificación."
+      ],
+      "context": "academic"
+    },
+    {
+      "tag": "requisitos_tecnologicos",
+      "patterns": [
+        "qué computadora necesito para la prepa en línea",
+        "requisitos de internet y equipo",
+        "mi celular funciona con la plataforma",
+        "qué sistema operativo necesito",
+        "puedo hacer todo desde mi celular",
+        "necesito una laptop gamer",
+        "requisitos técnicos mínimos",
+        "qué navegador debo usar",
+        "mi computadora es muy vieja, sirve?"
+      ],
+      "responses": [
+        "Basado en la convocatoria oficial, los requisitos técnicos mínimos son:\n\n💻 **Computadora:** Windows 10, macOS Catalina o superiores.\n📱 **Dispositivos móviles:** Android 5.0 o iOS 11+ (útil para consultar, pero se recomienda computadora para entregar actividades).\n🌐 **Navegador:** Versión actualizada de tu preferencia (Chrome, Firefox, Edge, etc.).\n🔌 **Conexión:** Internet estable para cargar documentos y participar en sesiones.\n📦 **Software:** Algunas actividades requieren programas específicos como Word, Excel o PowerPoint.",
+        "No necesitas una computadora moderna o gamer. Con un equipo que corra Windows 10 o macOS Catalina y tenga buena conexión a internet es suficiente. Tu celular te sirve para revisar, pero para hacer tareas es mejor una computadora."
+      ],
+      "context": "requisitos_tecnicos"
+    },
+    {
+      "tag": "periodos_fechas_especificas",
+      "patterns": [
+        "cuándo son las fechas exactas para la G85",
+        "hasta cuándo puedo registrarme",
+        "qué día empieza el propedéutico de la generación 85",
+        "cuándo salen los resultados de la G85",
+        "fechas de inscripción para la generación 85",
+        "del 9 al 18 de febrero qué pasa",
+        "fechas convocatoria G85",
+        "calendario generación 85",
+        "para la generación 86 cuándo es"
+      ],
+      "responses": [
+        "Para la **Generación 85 (G85)** , las fechas clave son:\n\n📝 **Registro:** 26 de enero al 4 de febrero.\n🔑 **Obtención de claves (ID y contraseña):** 6 al 8 de febrero.\n📚 **Módulo Propedéutico:** 9 al 18 de febrero (10 días naturales).\n✅ **Resultados e Inscripción:** 20 al 25 de febrero.\n🚀 **Inicio del Módulo 1:** 2 de marzo.\n\n*Estas fechas son específicas para la G85. Para generaciones posteriores (G86, G87, etc.), verifica siempre la convocatoria oficial en el portal de Prepa en Línea SEP, ya que las fechas cambian.*",
+        "Si eres de una generación más reciente (G86 en adelante), las fechas son diferentes. Consulta el portal oficial o tu correo. Como referencia, el registro suele durar 10 días, el propedéutico otros 10 días, y los resultados se publican una semana después."
+      ],
+      "context": "fechas_especificas"
+    },
+    {
+      "tag": "documentacion_requerida_formatos",
+      "patterns": [
+        "qué documentos necesito para inscribirme",
+        "en qué formato subir mi acta de nacimiento",
+        "mi certificado de secundaria debe ser foto o escaneado",
+        "qué peso máximo tienen los archivos",
+        "como debe ser mi foto para la credencial",
+        "puedo subir una captura de pantalla de mi comprobante",
+        "formatos de documentos",
+        "mi certificado es muy pesado, qué hago",
+        "dónde escaneo mis documentos"
+      ],
+      "responses": [
+        "Los documentos deben ser **escaneados completamente** (visibles los 4 bordes del documento original). **NO se aceptan fotos tomadas con celular ni capturas de pantalla**. El peso máximo por archivo es de **1 MB**.\n\n📄 **CURP y Acta de nacimiento:** Formato **PDF**.\n📸 **Fotografía:** Tipo credencial, reciente, de frente, rostro descubierto, fondo blanco, formato **JPG**.\n🏠 **Comprobante de domicilio:** Recibo de agua, luz o predial (máx. 3 meses de antigüedad). **NO se admite la credencial del INE como comprobante**.\n🎓 **Certificado de secundaria:** Anverso y reverso escaneados (si el reverso no tiene info, sube el anverso nuevamente).\n\nRecomendación: Usa aplicaciones como Adobe Scan o CamScanner para escanear correctamente y reducir el peso del archivo."
+      ],
+      "context": "documentacion"
+    },
+    {
+      "tag": "netiqueta_reglas_comunicacion",
+      "patterns": [
+        "cómo debo escribir en los foros",
+        "reglas de comunicación virtual",
+        "qué es la netiqueta en prepa en línea",
+        "puedo escribir en mayúsculas",
+        "está bien poner imágenes en mi participación",
+        "cómo dirigirme a mi asesor o compañeros",
+        "reglas de los foros",
+        "netiqueta",
+        "está mal usar abreviaturas como xq"
+      ],
+      "responses": [
+        "¡La **netiqueta** es fundamental en Prepa en Línea! Estas son las reglas principales de comunicación virtual:\n\n1.  **Saludo y presentación:** Saluda y preséntate antes de participar.\n2.  **Respeto:** Respeta todas las opiniones, aunque no coincidas con ellas.\n3.  **Pertinencia:** Habla solo de **asuntos académicos**.\n4.  **Personalización:** Refiere el nombre de la persona a quien te diriges.\n5.  **Ortografía y redacción:** Cuida tu escritura, usa signos de puntuación.\n6.  **NO uses MAYÚSCULAS sostenidas:** En internet, escribir TODO EN MAYÚSCULAS equivale a **gritar**.\n7.  **NO uses abreviaturas ni modismos:** Evita \"xq\", \"k\", \"tmb\", \"pa\", etc. Fomenta malos hábitos.\n8.  **NO incluyas imágenes** en tus participaciones de foro (ocupan espacio y dificultan la lectura).\n9.  **Sé breve y conciso:** No escribas párrafos extremadamente largos.\n10. **Cita fuentes:** Indica de dónde obtuviste la información que no es tuya. No plagies.",
+        "Recuerda: la comunicación virtual es principalmente escrita, por eso debemos esforzarnos por ser claros, respetuosos y profesionales. ¡Sigue la netiqueta y la comunidad te lo agradecerá!"
+      ],
+      "context": "netiqueta"
+    },
+    {
+      "tag": "cero_tolerancia_conductas_prohibidas",
+      "patterns": [
+        "qué conductas están prohibidas en prepa en línea",
+        "qué es el hostigamiento escolar",
+        "dónde denunciar acoso en la prepa",
+        "me están haciendo bullying en mi módulo",
+        "puedo hacer una denuncia anónima",
+        "qué pasa si alguien me acosa sexualmente",
+        "cero tolerancia",
+        "acoso en prepa en línea",
+        "qué hago si me hostigan",
+        "denuncias por acoso"
+      ],
+      "responses": [
+        "En Prepa en Línea-SEP existe una política de **CERO TOLERANCIA** contra el hostigamiento y acoso sexual, sin importar sexo, identidad de género, orientación o preferencias sexuales.\n\n**Conductas prohibidas (lista enunciativa):**\n• Contacto físico no consentido (tocamientos, besos, etc.)\n• Conductas hostiles, agresivas o intimidatorias\n• Comentarios, burlas o piropos con connotación sexual\n• Insinuaciones, invitaciones o propuestas de carácter sexual\n• Lenguaje que denigre o cosifique\n• Preguntas intrusivas sobre vida sexual\n• Difusión de material íntimo no deseado\n• Rumores o calumnias sobre la vida sexual\n• Exhibicionismo\n• Obstrucción de denuncias\n\n**📧 ¿Dónde denunciar?**\nEscribe al correo: **denuncias@prepaenlinea.sep.gob.mx**\nTu reporte es confidencial y se te brindará acompañamiento. ¡No estás sola/o!",
+        "El acoso y hostigamiento escolar están prohibidos. Puedes denunciar de manera segura y confidencial al correo oficial de denuncias. La SEP tiene protocolos para proteger a las víctimas y sancionar a los agresores."
+      ],
+      "context": "cero_tolerancia"
     }
   ]
 }
