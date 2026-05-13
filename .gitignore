@@ -52,3 +52,6 @@ data/*.xlsx
 data/*.pkl
 !data/vector_store/
 data/vector_store/*.pkl
+
+# ignora las imagenes
+echo "*.png" >> .gitignore
