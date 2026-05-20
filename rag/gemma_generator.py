@@ -10,19 +10,19 @@ from typing import Optional, Callable
 
 from loguru import logger
 
-from models.gemini_wrapper import GeminiWrapper
+from models.groq_wrapper import GroqWrapper
 
 
 class GemmaGenerator:
     def __init__(self, cache_dir: str = "models/cache", model: str = "gemini-2.5-flash"):
-        logger.info("Initializing GemmaGenerator with Gemini API...")
+        logger.info("Initializing GemmaGenerator with Groq API...")
         start_time = time.time()
         
-        self.wrapper = GeminiWrapper()
+        self.wrapper = GroqWrapper()
         self.model = model
         
         load_time = time.time() - start_time
-        logger.success(f"✅ GemmaGenerator initialized in {load_time:.1f}s")
+        logger.success(f"✅ GemmaGenerator initialized with Groq API in {load_time:.1f}s")
 
     def generate(self, query: str, context: str = "", **kwargs) -> str:
         """Generate a response for the given query.

@@ -48,9 +48,7 @@ data/*.xlsx
 # menu.json SÍ se sube (es ligero, texto plano)
 # data/menu.json
 
-# Pickle files - excluir data/ pero permitir vector_store/
-data/*.pkl
-!data/vector_store/
+# Pickle files - permitir vector_store/
 data/vector_store/*.pkl
 
 # ignora las imagenes
