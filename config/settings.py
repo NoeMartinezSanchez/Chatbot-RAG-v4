@@ -78,7 +78,7 @@ class Settings(BaseSettings):
     
     # ===== INTENTS CONFIGURATION =====
     INTENTS_FILE_PATH: str = "./data/vector_store/intents.json"
-    INTENTS_MIN_CONFIDENCE: float = 0.95  # Confianza mínima para usar intents
+    INTENTS_MIN_CONFIDENCE: float = 0.75  # Confianza mínima para usar intents
     INTENTS_MAX_QUERY_LENGTH: int = 50    # Longitud máxima para considerar intents
     
     # ===== MONITORING & LOGGING =====
