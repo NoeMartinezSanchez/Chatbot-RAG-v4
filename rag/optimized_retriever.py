@@ -45,8 +45,8 @@ class OptimizedRetriever:
         
         # Configuración por defecto (optimizada para velocidad)
         self.config = config or {
-            "top_k_initial": 20,     # Recuperar más para filtrar
-            "top_k_final": 10,        # Más candidatos = mejores matches
+            "top_k_initial": 10,     # Reducido de 20 a 10 para ahorrar tokens
+            "top_k_final": 5,        # Reducido de 10 a 5 para ahorrar tokens
             "min_similarity": 0.2,    # Umbral más bajo para mejor recall
             "use_metadata_filter": True,
             "use_reranking": True,

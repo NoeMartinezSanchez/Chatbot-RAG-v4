@@ -20,23 +20,21 @@ class GroqWrapper:
         
         # Construir el prompt según si hay contexto o no
         if context:
-            prompt = f"""Basado en la siguiente información oficial de Prepa en Línea SEP:
-
-CONTEXTO:
+            prompt = f"""Contexto oficial:
 {context}
 
-PREGUNTA: {question}
+Pregunta: {question}
 
-RESPUESTA (usa SOLO la información del contexto. Si no está en el contexto, responde: "No encontré información específica en los materiales oficiales"):"""
+Respuesta (solo con contexto. Si no aparece, di: "No encontré información oficial"):"""
         else:
-            prompt = f"""Eres un asistente académico de Prepa en Línea SEP.
-Responde de manera clara y amigable: {question}"""
+            prompt = f"""Eres asistente de Prepa en Línea SEP.
+Responde clara y amigable: {question}"""
         
         # Mensajes para Groq
         messages = [
             {
                 "role": "system",
-                "content": "Eres un asistente académico de Prepa en Línea SEP. Hablas en español. Das respuestas claras, precisas y útiles para estudiantes mexicanos de bachillerato."
+                "content": "Eres asistente de Prepa en Línea SEP. Respuestas claras en español para estudiantes mexicanos."
             },
             {
                 "role": "user",
