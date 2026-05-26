@@ -116,6 +116,42 @@ def get_token_stats() -> Dict[str, Any]:
     return stats
 
 
+def is_useful_response(response_text: str) -> bool:
+    useless_patterns = [
+        "no encontré información",
+        "no encontré información específica",
+        "problema procesando tu pregunta",
+        "tuve un problema",
+        "intenta de nuevo",
+        "no sé",
+        "no tengo información"
+    ]
+    response_lower = response_text.lower()
+    return not any(pattern in response_lower for pattern in useless_patterns)
+
+
+def calculate_tokens_por_hora() -> Dict[int, int]:
+    """Lee token_usage_per_query.jsonl y agrupa tokens por hora."""
+    tokens_por_hora: Dict[int, int] = defaultdict(int)
+    file_path = "token_usage_per_query.jsonl"
+    if not os.path.exists(file_path):
+        return {}
+    try:
+        with open(file_path, "r") as f:
+            for line in f:
+                try:
+                    entry = json.loads(line.strip())
+                    ts = entry.get("timestamp", "")
+                    if ts:
+                        dt = datetime.fromisoformat(ts)
+                        tokens_por_hora[dt.hour] += entry.get("tokens", 0)
+                except:
+                    continue
+    except:
+        pass
+    return dict(tokens_por_hora)
+
+
 def calculate_metrics(interactions: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Calcula las métricas de las interacciones."""
     if not interactions:
@@ -131,7 +167,13 @@ def calculate_metrics(interactions: List[Dict[str, Any]]) -> Dict[str, Any]:
             "palabras_clave": [],
             "fuentes_top": [],
             "distribucion_dia": {},
-            "distribucion_hora": {}
+            "distribucion_hora": {},
+            "tasa_exito": 0,
+            "respuestas_utiles": 0,
+            "respuestas_no_utiles": 0,
+            "tokens_por_hora": {},
+            "max_tokens_por_hora": 0,
+            "avg_tokens_por_hora": 0
         }
     
     total = len(interactions)
@@ -194,6 +236,18 @@ def calculate_metrics(interactions: List[Dict[str, Any]]) -> Dict[str, Any]:
     distribucion_dia = dict(sorted(distribucion_dia.items()))
     distribucion_hora = dict(sorted(distribucion_hora.items()))
     
+    # Tasa de éxito real (solo RAG)
+    rag_interactions = [i for i in interactions if i.get("es_rag", False)]
+    total_rag = len(rag_interactions)
+    respuestas_utiles = sum(1 for i in rag_interactions if is_useful_response(i.get("respuesta", "")))
+    respuestas_no_utiles = total_rag - respuestas_utiles
+    tasa_exito = (respuestas_utiles / total_rag * 100) if total_rag > 0 else 0
+    
+    # Tokens por hora
+    tokens_por_hora = calculate_tokens_por_hora()
+    max_tokens_por_hora = max(tokens_por_hora.values()) if tokens_por_hora else 0
+    avg_tokens_por_hora = round(sum(tokens_por_hora.values()) / len(tokens_por_hora)) if tokens_por_hora else 0
+    
     return {
         "total_interacciones": total,
         "tiempo_promedio_ms": round(tiempo_promedio, 2),
@@ -206,7 +260,13 @@ def calculate_metrics(interactions: List[Dict[str, Any]]) -> Dict[str, Any]:
         "palabras_clave": palabras_clave,
         "fuentes_top": fuentes_top,
         "distribucion_dia": distribucion_dia,
-        "distribucion_hora": distribucion_hora
+        "distribucion_hora": distribucion_hora,
+        "tasa_exito": round(tasa_exito, 1),
+        "respuestas_utiles": respuestas_utiles,
+        "respuestas_no_utiles": respuestas_no_utiles,
+        "tokens_por_hora": dict(tokens_por_hora),
+        "max_tokens_por_hora": max_tokens_por_hora,
+        "avg_tokens_por_hora": avg_tokens_por_hora
     }
 
 
@@ -273,6 +333,26 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
     porcentaje = token_stats["porcentaje"]
     prom_tokens = token_stats["promedio_tokens"]
     
+    # Tasa de éxito
+    tasa_exito = metrics.get("tasa_exito", 0)
+    respuestas_utiles = metrics.get("respuestas_utiles", 0)
+    respuestas_no_utiles = metrics.get("respuestas_no_utiles", 0)
+    
+    # ASCII chart de tokens por hora
+    tokens_por_hora = metrics.get("tokens_por_hora", {})
+    max_tph = metrics.get("max_tokens_por_hora", 0)
+    avg_tph = metrics.get("avg_tokens_por_hora", 0)
+    ascii_chart_lines = ["🕐 Consumo de tokens por hora (últimas 24h)", ""]
+    for h in range(24):
+        tokens_h = tokens_por_hora.get(h, 0)
+        if tokens_h > 0:
+            bar_len = max(1, int((tokens_h / max_tph) * 20)) if max_tph > 0 else 1
+            bar = "█" * bar_len
+            ascii_chart_lines.append(f"{h:02d}:00 │ {bar} {tokens_h:,}")
+        else:
+            ascii_chart_lines.append(f"{h:02d}:00 │ · sin consumo")
+    grafico_tokens = "\n".join(ascii_chart_lines)
+
     # Preparar datos para gráficos
     horas_labels = list(range(24))
     horas_values = [metrics.get("distribucion_hora", {}).get(h, 0) for h in horas_labels]
@@ -354,6 +434,9 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
         .progress-fill {{ height: 100%; background: var(--verdeclaro); border-radius: 3px; transition: width 0.3s ease; }}
         .progress-fill.warning {{ background: #f39c12; }}
         .progress-fill.danger {{ background: var(--rojosoft); }}
+        .progress-bar.success .progress-fill.success {{ background: linear-gradient(90deg, #28a745, #20c997); }}
+        
+        .ascii-chart {{ background: #f8f9fa; padding: 16px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6; overflow-x: auto; white-space: pre; margin: 10px 0; border: 1px solid #e9ecef; }}
         
         /* Responsive */
         @media (max-width: 768px) {{
@@ -435,6 +518,34 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
             </div>
         </div>
         
+        <div class="grid">
+            <div class="card">
+                <div class="card-label">📊 Tasa de Éxito</div>
+                <div class="card-value positivo">{tasa_exito:.1f}%</div>
+                <div class="card-sub">útiles: {respuestas_utiles} | no útiles: {respuestas_no_utiles}</div>
+                <div class="progress-bar success"><div class="progress-fill success" style="width:{tasa_exito}%"></div></div>
+            </div>
+            <div class="card">
+                <div class="card-label">✅ Respuestas Útiles</div>
+                <div class="card-value">{respuestas_utiles:,}</div>
+                <div class="card-sub">con información relevante</div>
+            </div>
+            <div class="card">
+                <div class="card-label">❌ Sin Información</div>
+                <div class="card-value">{respuestas_no_utiles:,}</div>
+                <div class="card-sub">errores o no encontrado</div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <div class="chart-title">📈 Consumo de Tokens por Hora</div>
+            <pre class="ascii-chart">{grafico_tokens}</pre>
+            <div style="display:flex;gap:20px;margin-top:8px;flex-wrap:wrap;">
+                <span class="card-sub">🔵 Pico máximo: {max_tph:,} tokens/hora</span>
+                <span class="card-sub">📊 Promedio: {avg_tph:,} tokens/hora</span>
+            </div>
+        </div>
+
         <div class="sources-grid">
             <div class="chart-container">
                 <div class="chart-title">Fuentes Más Usadas</div>
