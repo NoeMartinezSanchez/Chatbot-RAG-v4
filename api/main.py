@@ -194,27 +194,9 @@ async def startup_event():
         
         logger.info("=" * 60)
         
-        # Ejecutar evaluación automática en segundo plano
-        logger.info("🚀 Iniciando evaluación automática...")
-        
-        # Verificar que existe el archivo de test
-        test_set_path = "evaluation/test_set.json"
-        if os.path.exists(test_set_path):
-            logger.info(f"✅ test_set.json encontrado: {test_set_path}")
-            run_automated_evaluation(
-                retriever=rag_system.optimized_retriever,
-                generator=rag_system.generator,
-                test_set_path=test_set_path
-            )
-        else:
-            logger.warning(f"⚠️ test_set.json no encontrado en: {test_set_path}")
-            logger.warning("   La evaluación automática no se ejecutará")
-            eval_dir = "evaluation"
-            if os.path.exists(eval_dir):
-                files = os.listdir(eval_dir)
-                logger.info(f"   Archivos en evaluation/: {files}")
-            else:
-                logger.warning(f"   Directorio evaluation/ no existe")
+        # [DESACTIVADO] Evaluación automática desactivada para ahorrar tokens de API.
+        # Para ejecutarla manualmente, usar: GET /evaluation-results
+        logger.info("⏭️ Evaluación automática desactivada (ahorro de tokens)")
         
         # Generar dashboard de usuarios automáticamente
         try:
