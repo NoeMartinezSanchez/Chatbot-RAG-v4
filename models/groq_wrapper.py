@@ -79,6 +79,16 @@ Responde clara y amigable: {question}"""
                         'tokens': self.token_counter
                     }, f)
                 
+                # Guardar por consulta para el dashboard
+                with open("token_usage_per_query.jsonl", "a") as f:
+                    f.write(json.dumps({
+                        "timestamp": datetime.now().isoformat(),
+                        "tokens": total_tokens,
+                        "prompt_tokens": response.usage.prompt_tokens,
+                        "completion_tokens": response.usage.completion_tokens,
+                        "question": question[:80]
+                    }) + "\n")
+                
                 logger.info(f"📊 Esta consulta: {total_tokens} tokens | Total hoy: {self.token_counter} / 100,000 ({self.token_counter/1000:.1f}%)")
                 
                 if self.token_counter > 80000:

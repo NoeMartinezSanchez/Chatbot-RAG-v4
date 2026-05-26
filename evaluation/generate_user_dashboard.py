@@ -2,6 +2,7 @@
 Generate User Dashboard - Analiza interacciones reales de usuarios con el chatbot.
 """
 import json
+import os
 from pathlib import Path
 from datetime import datetime
 from collections import Counter, defaultdict
@@ -67,6 +68,52 @@ def extract_keywords(questions: List[str], top_n: int = 5) -> List[Dict[str, int
     
     counter = Counter(todas_palabras)
     return [{"palabra": w, "conteo": c} for w, c in counter.most_common(top_n)]
+
+
+def get_token_stats() -> Dict[str, Any]:
+    """Lee el consumo de tokens desde token_usage.json y token_usage_per_query.jsonl."""
+    stats = {
+        "tokens_hoy": 0,
+        "limite": 100000,
+        "porcentaje": 0,
+        "promedio_tokens": 0,
+        "total_consultas": 0,
+    }
+
+    token_file = "token_usage.json"
+    if os.path.exists(token_file):
+        try:
+            with open(token_file, "r") as f:
+                data = json.load(f)
+                today = datetime.now().strftime("%Y-%m-%d")
+                if data.get("date") == today:
+                    stats["tokens_hoy"] = data.get("tokens", 0)
+        except:
+            pass
+
+    stats["porcentaje"] = round((stats["tokens_hoy"] / stats["limite"]) * 100, 1)
+
+    # Calcular promedio desde token_usage_per_query.jsonl
+    per_query_file = "token_usage_per_query.jsonl"
+    token_list = []
+    if os.path.exists(per_query_file):
+        try:
+            with open(per_query_file, "r") as f:
+                for line in f:
+                    try:
+                        entry = json.loads(line.strip())
+                        entry_date = entry.get("timestamp", "")[:10]
+                        if entry_date == datetime.now().strftime("%Y-%m-%d"):
+                            token_list.append(entry.get("tokens", 0))
+                    except:
+                        continue
+        except:
+            pass
+
+    stats["total_consultas"] = len(token_list)
+    stats["promedio_tokens"] = round(sum(token_list) / len(token_list)) if token_list else 0
+
+    return stats
 
 
 def calculate_metrics(interactions: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -181,9 +228,28 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
     if interactions is None:
         interactions = []
     
+    # Leer tokens por consulta para la tabla
+    token_map = {}
+    per_query_file = "token_usage_per_query.jsonl"
+    if os.path.exists(per_query_file):
+        try:
+            with open(per_query_file, "r") as f:
+                for line in f:
+                    try:
+                        entry = json.loads(line.strip())
+                        entry_date = entry.get("timestamp", "")[:10]
+                        if entry_date == datetime.now().strftime("%Y-%m-%d"):
+                            token_map[entry.get("timestamp", "")] = entry.get("tokens", 0)
+                    except:
+                        continue
+        except:
+            pass
+    
+    token_keys = sorted(token_map.keys())
+    
     # Generar tabla de historial reciente (últimas 10)
     historial_html = ""
-    for i in interactions[-10:]:
+    for idx, i in enumerate(reversed(interactions[-10:])):
         ts = formatear_fecha(i.get("timestamp", ""))
         pregunta = html.escape(i.get("pregunta", "-")[:50])
         if len(i.get("pregunta", "")) > 50:
@@ -192,11 +258,20 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
         if len(i.get("respuesta", "")) > 60:
             respuesta += "..."
         tiempo = f"{i.get('tiempo_total_ms', 0):.0f}ms" if i.get("tiempo_total_ms") else "-"
+        tokens_val = i.get("tokens_used", token_map.get(token_keys[-(idx+1)] if idx < len(token_keys) else "", "-"))
+        tokens_cell = f"{tokens_val:,}" if isinstance(tokens_val, int) else "-"
         rag = "Sí" if i.get("es_rag", False) else "No"
-        historial_html += f"<tr><td>{ts}</td><td>{pregunta}</td><td>{respuesta}</td><td>{tiempo}</td><td>{rag}</td></tr>"
+        historial_html += f"<tr><td>{ts}</td><td>{pregunta}</td><td>{respuesta}</td><td>{tiempo}</td><td>{tokens_cell}</td><td>{rag}</td></tr>"
     
     if not historial_html:
-        historial_html = '<tr><td colspan="5" class="no-data">No hay interacciones registradas</td></tr>'
+        historial_html = '<tr><td colspan="6" class="no-data">No hay interacciones registradas</td></tr>'
+
+    # Token stats for cards
+    token_stats = get_token_stats()
+    tokens_hoy = token_stats["tokens_hoy"]
+    limite = token_stats["limite"]
+    porcentaje = token_stats["porcentaje"]
+    prom_tokens = token_stats["promedio_tokens"]
     
     # Preparar datos para gráficos
     horas_labels = list(range(24))
@@ -275,6 +350,11 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
         
         .no-data {{ color: var(--gristexto); font-style: italic; text-align: center; padding: 20px; }}
         
+        .progress-bar {{ width: 100%; height: 6px; background: var(--grisclaro); border-radius: 3px; margin-top: 8px; overflow: hidden; }}
+        .progress-fill {{ height: 100%; background: var(--verdeclaro); border-radius: 3px; transition: width 0.3s ease; }}
+        .progress-fill.warning {{ background: #f39c12; }}
+        .progress-fill.danger {{ background: var(--rojosoft); }}
+        
         /* Responsive */
         @media (max-width: 768px) {{
             body {{ padding: 12px; }}
@@ -342,6 +422,17 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
                 <div class="card-value">{metrics.get("usuarios_unicos", 0):,}</div>
                 <div class="card-sub">Sesiones únicas</div>
             </div>
+            <div class="card">
+                <div class="card-label">Tokens Hoy</div>
+                <div class="card-value">{tokens_hoy:,} <span style="font-size:14px;color:#7f8c8d;">/ {limite:,}</span></div>
+                <div class="card-sub">{porcentaje}% del límite diario</div>
+                <div class="progress-bar"><div class="progress-fill" style="width:{porcentaje}%"></div></div>
+            </div>
+            <div class="card">
+                <div class="card-label">Promedio Tokens</div>
+                <div class="card-value">{prom_tokens:,}</div>
+                <div class="card-sub">por consulta</div>
+            </div>
         </div>
         
         <div class="sources-grid">
@@ -373,7 +464,7 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
             <div class="chart-title">Historial Reciente</div>
             <table id="tablaHistorial">
                 <thead>
-                    <tr><th>Fecha</th><th>Pregunta</th><th>Respuesta</th><th>Tiempo</th><th>RAG</th></tr>
+                    <tr><th>Fecha</th><th>Pregunta</th><th>Respuesta</th><th>Tiempo</th><th>Tokens</th><th>RAG</th></tr>
                 </thead>
                 <tbody>
                     {historial_html}
