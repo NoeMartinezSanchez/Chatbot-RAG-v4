@@ -1,7 +1,12 @@
 # models/groq_wrapper.py
 import os
-from groq import Groq
+import json
 import time
+import logging
+from datetime import datetime
+from groq import Groq
+
+logger = logging.getLogger(__name__)
 
 class GroqWrapper:
     def __init__(self, api_key=None):
@@ -13,7 +18,18 @@ class GroqWrapper:
         self.client = Groq(api_key=self.api_key)
         self.model = "llama-3.3-70b-versatile"
         self.max_retries = 3
-        print("✅ Groq API inicializada correctamente")
+        self.token_counter = 0
+        self.token_file = "token_usage.json"
+        
+        try:
+            with open(self.token_file, 'r') as f:
+                data = json.load(f)
+                if data.get('date') == datetime.now().strftime('%Y-%m-%d'):
+                    self.token_counter = data.get('tokens', 0)
+        except:
+            pass
+        
+        print(f"✅ Groq API inicializada correctamente. Tokens usados hoy: {self.token_counter}")
     
     def generate_with_context(self, context, question, **kwargs):
         """Genera respuesta basada en el contexto recuperado por RAG"""
@@ -52,6 +68,22 @@ Responde clara y amigable: {question}"""
                     max_tokens=1024,
                     top_p=1,
                 )
+                
+                # Monitoreo de tokens
+                total_tokens = response.usage.total_tokens
+                self.token_counter += total_tokens
+                
+                with open(self.token_file, 'w') as f:
+                    json.dump({
+                        'date': datetime.now().strftime('%Y-%m-%d'),
+                        'tokens': self.token_counter
+                    }, f)
+                
+                logger.info(f"📊 Esta consulta: {total_tokens} tokens | Total hoy: {self.token_counter} / 100,000 ({self.token_counter/1000:.1f}%)")
+                
+                if self.token_counter > 80000:
+                    logger.warning(f"⚠️ ALERTA: Cerca del límite diario! {self.token_counter}/100,000")
+                
                 return response.choices[0].message.content
                 
             except Exception as e:
