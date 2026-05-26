@@ -356,7 +356,7 @@ async def chat(request: ChatRequest):
                 "tiempo_retrieval_ms": round(retrieval_time, 2),
                 "tiempo_generacion_ms": round(generation_time, 2),
                 "confianza": round(conf_value, 4),
-                "fuentes_usadas": [s.get("source_file", "unknown") for s in sources] if sources else [],
+                "fuentes_usadas": list(set(s.get("metadata", {}).get("source_file", "unknown") for s in sources)) if sources else [],
                 "es_rag": is_rag,
                 "tokens_generados": tokens_generated,
                 "session_id": conversation_id

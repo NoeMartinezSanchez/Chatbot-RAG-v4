@@ -173,7 +173,7 @@ def calculate_metrics(interactions: List[Dict[str, Any]]) -> Dict[str, Any]:
             todas_fuentes.extend(fuentes)
     
     fuentes_counter = Counter(todas_fuentes)
-    fuentes_top = [{"fuente": f, "conteo": c} for f, c in fuentes_counter.most_common(3)]
+    fuentes_top = [{"fuente": f, "conteo": c} for f, c in fuentes_counter.most_common(10)]
     
     # Distribución por día y hora
     distribucion_dia = defaultdict(int)
