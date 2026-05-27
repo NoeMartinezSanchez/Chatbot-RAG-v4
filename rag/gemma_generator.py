@@ -8,9 +8,9 @@ import logging
 import time
 from typing import Optional, Callable
 
-from loguru import logger
-
 from models.groq_wrapper import GroqWrapper
+
+logger = logging.getLogger(__name__)
 
 
 class GemmaGenerator:
@@ -22,7 +22,7 @@ class GemmaGenerator:
         self.model = model
         
         load_time = time.time() - start_time
-        logger.success(f"✅ GemmaGenerator initialized with Groq API in {load_time:.1f}s")
+        logger.info(f"✅ GemmaGenerator initialized with Groq API in {load_time:.1f}s")
 
     def generate(self, query: str, context: str = "", **kwargs) -> str:
         """Generate a response for the given query.
