@@ -32,6 +32,12 @@ from evaluation.show_results import show_results
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Agregar handler para logs del dashboard
+from utils.log_capture import DashboardLogHandler
+dashboard_log_handler = DashboardLogHandler()
+dashboard_log_handler.setLevel(logging.INFO)
+logging.getLogger().addHandler(dashboard_log_handler)
+
 print("=" * 50)
 print("🚀 CARGANDO API - Registro de endpoints:")
 print("=" * 50)
@@ -550,6 +556,27 @@ async def debug_user_logs():
             result["first_line"] = f.readline()
     
     return result
+
+
+@app.get("/api/logs")
+async def get_logs(level: str = None, limit: int = 200, since: str = None):
+    from pathlib import Path
+    logs = []
+    log_file = Path("data/system_logs.jsonl")
+    if log_file.exists():
+        with open(log_file, "r") as f:
+            for line in f:
+                try:
+                    logs.append(json.loads(line))
+                except:
+                    continue
+    logs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    if level:
+        logs = [l for l in logs if l.get("level") == level.upper()]
+    if since:
+        logs = [l for l in logs if l.get("timestamp", "") > since]
+    total = len(logs)
+    return {"logs": logs[:limit], "total": total, "available_levels": ["INFO", "WARNING", "ERROR", "DEBUG"]}
 
 
 if __name__ == "__main__":

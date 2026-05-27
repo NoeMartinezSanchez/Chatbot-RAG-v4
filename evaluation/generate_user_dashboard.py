@@ -438,6 +438,30 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
         
         .ascii-chart {{ background: #f8f9fa; padding: 16px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6; overflow-x: auto; white-space: pre; margin: 10px 0; border: 1px solid #e9ecef; }}
         
+        /* Pestañas */
+        .dashboard-tabs {{ display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; flex-wrap: wrap; }}
+        .tab-btn {{ background: none; border: none; padding: 10px 20px; font-size: 14px; cursor: pointer; border-radius: 8px 8px 0 0; transition: all 0.2s; font-weight: 500; color: var(--gristexto); }}
+        .tab-btn:hover {{ background: var(--grisclaro); }}
+        .tab-btn.active {{ background: var(--azul-secundario); color: var(--blanco); }}
+        
+        /* Logs */
+        .logs-controls {{ display: flex; gap: 10px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }}
+        .logs-controls select, .logs-controls button {{ padding: 8px 12px; border-radius: 6px; border: 1px solid #ddd; font-size: 13px; background: var(--blanco); }}
+        .log-count {{ margin-left: auto; font-size: 13px; color: var(--gristexto); }}
+        .logs-container {{ max-height: 600px; overflow-y: auto; }}
+        .log-entry {{ background: #f8f9fa; border-left: 4px solid #6c757d; padding: 12px; margin-bottom: 8px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 12px; }}
+        .log-entry.error {{ border-left-color: #dc3545; background: #fff5f5; }}
+        .log-entry.warning {{ border-left-color: #ffc107; background: #fffbf0; }}
+        .log-entry.info {{ border-left-color: #17a2b8; background: #f0f9ff; }}
+        .log-header {{ display: flex; gap: 15px; margin-bottom: 6px; font-size: 11px; flex-wrap: wrap; }}
+        .log-level {{ font-weight: 700; }}
+        .log-time {{ color: var(--gristexto); }}
+        .log-module {{ color: #28a745; }}
+        .log-message {{ font-size: 12px; white-space: pre-wrap; word-break: break-word; }}
+        .log-line {{ font-size: 11px; color: #999; margin-top: 4px; }}
+        .log-empty, .log-error, .log-loading {{ text-align: center; padding: 40px; color: var(--gristexto); }}
+        .log-error {{ color: #dc3545; }}
+        
         /* Responsive */
         @media (max-width: 768px) {{
             body {{ padding: 12px; }}
@@ -464,6 +488,13 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
             <button class="btn" onclick="refresh()">🔄 Actualizar</button>
         </div>
         
+        <div class="dashboard-tabs">
+            <button class="tab-btn active" onclick="showTab('metrics')">📊 Métricas</button>
+            <button class="tab-btn" onclick="showTab('logs')">📋 Logs del Sistema</button>
+            <button class="tab-btn" onclick="showTab('history')">📜 Historial</button>
+        </div>
+        
+        <div id="metrics-tab" class="tab-content">
         <div class="grid">
             <div class="card">
                 <div class="card-label">Total Interacciones</div>
@@ -571,6 +602,9 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
             <canvas id="chartDia"></canvas>
         </div>
         
+        </div>
+        
+        <div id="history-tab" class="tab-content" style="display:none;">
         <div class="chart-container">
             <div class="chart-title">Historial Reciente</div>
             <table id="tablaHistorial">
@@ -582,6 +616,23 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
                 </tbody>
             </table>
         </div>
+    </div>
+    
+    <div id="logs-tab" class="tab-content" style="display:none;">
+        <div class="logs-controls">
+            <select id="log-level-filter">
+                <option value="all">Todos los niveles</option>
+                <option value="ERROR">❌ Solo Errores</option>
+                <option value="WARNING">⚠️ Solo Advertencias</option>
+                <option value="INFO">ℹ️ Solo Info</option>
+            </select>
+            <button onclick="refreshLogs()" class="btn" style="padding:8px 16px;">🔄 Refrescar</button>
+            <span id="log-count" class="log-count"></span>
+        </div>
+        <div class="logs-container" id="logs-container">
+            <div class="log-loading">📋 Cargando logs...</div>
+        </div>
+    </div>
     </div>
     
     <script>
@@ -640,12 +691,52 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
             location.reload();
         }}
         
-        async function refresh() {{
-            const btn = document.querySelector('.btn');
-            btn.textContent = 'Actualizando...';
-            await fetch('/user-dashboard/refresh');
-            location.reload();
+        function showTab(name) {{
+            document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(name + '-tab').style.display = 'block';
+            document.querySelector(`.tab-btn[onclick*="'${{name}}'"]`).classList.add('active');
+            if (name === 'logs') refreshLogs();
         }}
+        
+        function escapeHtml(text) {{
+            return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }}
+        
+        async function refreshLogs() {{
+            const level = document.getElementById('log-level-filter').value;
+            const url = level === 'all' ? '/api/logs?limit=200' : `/api/logs?limit=200&level=${{level}}`;
+            try {{
+                const r = await fetch(url);
+                const data = await r.json();
+                const container = document.getElementById('logs-container');
+                document.getElementById('log-count').textContent = data.logs.length ? `Mostrando ${{data.logs.length}} de ${{data.total}} logs` : '';
+                if (!data.logs.length) {{
+                    container.innerHTML = '<div class="log-empty">No hay logs que coincidan con el filtro</div>';
+                    return;
+                }}
+                container.innerHTML = data.logs.map(log => {{
+                    const cls = log.level.toLowerCase();
+                    const icon = log.level === 'ERROR' ? '❌' : log.level === 'WARNING' ? '⚠️' : 'ℹ️';
+                    const time = new Date(log.timestamp).toLocaleString('es-MX');
+                    return `<div class="log-entry ${{cls}}"><div class="log-header"><span class="log-level">${{icon}} ${{log.level}}</span><span class="log-time">${{time}}</span><span class="log-module">📁 ${{log.module}}</span></div><div class="log-message">${{escapeHtml(log.message)}}</div>${{log.line ? `<div class="log-line">📍 Línea: ${{log.line}}</div>` : ''}}</div>`;
+                }}).join('');
+            }} catch(e) {{
+                document.getElementById('logs-container').innerHTML = '<div class="log-error">❌ Error cargando logs. Verifica que /api/logs existe.</div>';
+            }}
+        }}
+        
+        let logInterval = null;
+        document.addEventListener('visibilitychange', () => {{
+            const logsTab = document.getElementById('logs-tab');
+            const visible = logsTab && logsTab.style.display !== 'none';
+            if (visible && !logInterval) {{
+                logInterval = setInterval(refreshLogs, 10000);
+            }} else if (!visible && logInterval) {{
+                clearInterval(logInterval);
+                logInterval = null;
+            }}
+        }});
     </script>
 </body>
 </html>'''
