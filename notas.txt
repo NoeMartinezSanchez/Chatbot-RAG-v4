@@ -148,7 +148,7 @@ python debug_chunks_pdf_simple.py --name mi_prueba_marzo
 cd D:\PythonProjects\MachineLearning\ChatBot\Chatbot-RAG-Fuente-Base
 
 # 2. Haces cambios en tu código
-# .............
+# ................
 
 # 3. Subes a GitHub
 git add .
