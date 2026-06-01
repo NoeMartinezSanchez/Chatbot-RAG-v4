@@ -12,8 +12,16 @@ class GroqWrapper:
     def __init__(self, api_key=None):
         # Leer API key desde variable de entorno o parámetro
         self.api_key = api_key or os.getenv("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
+        
+        # Si no hay API key, el wrapper funciona en modo "sin conexión"
         if not self.api_key:
-            raise ValueError("GROQ_API_KEY no encontrada. Configúrala en el archivo .env")
+            print("⚠️ GROQ_API_KEY no encontrada. Groq no estará disponible. El chatbot usará respuestas en modo seguro.")
+            self.client = None
+            self.model = None
+            self.max_retries = 3
+            self.token_counter = 0
+            self.token_file = "token_usage.json"
+            return
         
         self.client = Groq(api_key=self.api_key)
         self.model = "llama-3.3-70b-versatile"
@@ -33,6 +41,10 @@ class GroqWrapper:
     
     def generate_with_context(self, context, question, **kwargs):
         """Genera respuesta basada en el contexto recuperado por RAG"""
+        
+        # Si no hay cliente (no hay API key), responder modo seguro
+        if self.client is None:
+            return "⚠️ El sistema está en modo de mantenimiento. Por favor intenta más tarde."
         
         # Construir el prompt según si hay contexto o no
         if context:
