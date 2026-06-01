@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class GroqWrapper:
     def __init__(self, api_key=None):
         # Leer API key desde variable de entorno o parámetro
-        self.api_key = api_key or os.environ.get("GROQ_API_KEY")
+        self.api_key = api_key or os.getenv("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
         if not self.api_key:
             raise ValueError("GROQ_API_KEY no encontrada. Configúrala en el archivo .env")
         
