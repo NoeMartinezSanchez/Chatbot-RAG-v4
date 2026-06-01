@@ -157,7 +157,7 @@ git push github main
 
 # 4. ¡Automáticamente se actualiza tu Space en HF!
 
-#----------FLUJO DE TRABAJO ULTIMO POR FALLA DEL WORKFLOW DE GITHUB--------
+#----------FLUJO DE TRABAJO ULTIMO POR FALLA DEL WORKFLOW DE GITHUB-----------
 
 git add .
 git commit -m "Descripción de tu cambio"
