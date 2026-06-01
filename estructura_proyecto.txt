@@ -8,7 +8,10 @@
 ├── 📁 data/
 │   ├── 📁 backups/
 │   │   ├── 📁 backup_20260414_085008/
-│   │   └── 📁 backup_20260414_225227/
+│   │   ├── 📁 backup_20260414_225227/
+│   │   ├── 📁 backup_20260419_192318/
+│   │   ├── 📁 backup_20260419_200217/
+│   │   └── 📁 backup_20260513_084716/
 │   ├── 📁 vector_store/
 │   │   ├── 📄 documents.pkl
 │   │   ├── 📄 faiss_index.bin
@@ -23,9 +26,14 @@
 │   ├── 📄 __init__.py
 │   ├── 📄 automated_evaluator.py
 │   ├── 📄 generate_dashboard.py
+│   ├── 📄 generate_user_dashboard.py
 │   ├── 📄 logger.py
 │   ├── 📄 performance_logger.py
+│   ├── 📄 show_results.py
 │   └── 📄 test_set.json
+├── 📁 images/
+│   ├── 📄 CPU_upgrade.png
+│   └── 📄 dashboard.png
 ├── 📁 logs/
 │   └── 📄 gemma_wrapper.log
 ├── 📁 models/
@@ -34,7 +42,10 @@
 │   │   ├── 📁 models--TinyLlama--TinyLlama-1.1B-Chat-v1.0/
 │   │   └── 📁 models--google--gemma-1.1-2b-it/
 │   ├── 📄 __init__.py
+│   ├── 📄 gemini_wrapper.py
 │   ├── 📄 gemma_wrapper.py
+│   ├── 📄 groq_wrapper.py
+│   ├── 📄 ollama_wrapper.py
 │   └── 📄 tinyllama_wrapper.py
 ├── 📁 rag/
 │   ├── 📄 __init__.py
@@ -96,6 +107,8 @@
 │   │   └── 📄 wheel.exe
 │   └── 📁 share/
 │       └── 📁 man/
+├── 📁 utils/
+│   └── 📄 log_capture.py
 ├── 📄 .cursorrules
 ├── 📄 .dockerignore
 ├── 📄 .env
@@ -107,9 +120,11 @@
 ├── 📄 app.py
 ├── 📄 estructura_proyecto.txt
 ├── 📄 generate_tree.py
+├── 📄 informe.html
 ├── 📄 notas.txt
 ├── 📄 packages.txt
 ├── 📄 reporte.html
 ├── 📄 requirements.txt
 ├── 📄 reset_faiss.py
+├── 📄 test_groq.py
 └── 📄 verificar_memoria.py
