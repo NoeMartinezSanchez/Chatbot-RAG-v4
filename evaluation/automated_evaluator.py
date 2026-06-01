@@ -14,7 +14,7 @@ from loguru import logger
 
 
 # Usar /data para persistencia en HF Spaces (Storage Bucket)
-DATA_DIR = Path("/data")
+DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 PROJECT_ROOT = Path(__file__).parent.parent
