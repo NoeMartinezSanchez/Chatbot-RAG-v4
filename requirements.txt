@@ -33,3 +33,8 @@ pandas==2.0.3
 google-generativeai>=0.7.0
 
 groq>=0.12.0
+
+# LangChain para orquestación
+langchain>=0.1.0
+langchain-groq>=0.1.0
+pydantic-settings>=2.0.0
