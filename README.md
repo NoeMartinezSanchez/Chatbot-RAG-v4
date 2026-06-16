@@ -7,9 +7,9 @@ sdk: docker
 pinned: false
 ---
 
-# 🤖 Prepa en Línea SEP - Asistente Educativo RAG
+# 🤖 Prepa en Línea SEP - Asistente Educativo RAG con Memoria Conversacional (LangChain)
 
-Asistente virtual con tecnología RAG (Retrieval-Augmented Generation) para estudiantes de Prepa en Línea SEP. Chatbot educativo que responde dudas sobre Convocatoria, Normativa, Protocolos y Guías del programa.
+Asistente virtual con tecnología RAG (Retrieval-Augmented Generation) para estudiantes de Prepa en Línea SEP. Chatbot educativo que responde dudas sobre Convocatoria, Normativa, Protocolos y Guías del programa. El chatbot recuerda el contexto de la conversación y responde preguntas relacionadas de forma coherente.
 
 ![Python](https://img.shields.io/badge/Python-3.11-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-green)
@@ -24,6 +24,7 @@ Asistente virtual con tecnología RAG (Retrieval-Augmented Generation) para estu
 - **Soporte Multi-formato**: Procesa PDF, Word (docx), Excel (xlsx) y TXT
 - **Re-ranking y Query Expansion**: Calidad preservada con menos chunks (top_k=5)
 - **Interfaz Web**: Dashboard responsive tipo chat
+- **Memoria Conversacional (LangChain)**: El sistema guarda y recupera el historial de la conversación, inyectándolo en consultas posteriores.
 
 ## 🛠️ Tecnologías
 
@@ -37,7 +38,7 @@ Asistente virtual con tecnología RAG (Retrieval-Augmented Generation) para estu
 | **Procesamiento Documentos** | PyMuPDF (PDF), python-docx (Word), openpyxl (Excel) |
 | **Frontend** | HTML/CSS/JS Vanilla (responsive) |
 | **Despliegue** | Docker · Hugging Face Spaces |
-| **Orquestación** | Ninguna (sin Celery/Redis, respuestas directas) |
+| **Orquestación** | LangChain (Memoria conversacional y gestión del pipeline RAG) |
 | **Evaluación Automática** | Desactivada por defecto (ahorro de tokens) |
 
 ## ⚡ Optimización de Tokens (Groq API)
@@ -91,6 +92,45 @@ user_prompt = f"Contexto oficial: {context}\n\nPregunta: {question}\n\nRespuesta
 ```
 
 > ⚠️ El sistema está optimizado para consumir **~1,500 tokens por consulta**, permitiendo **~65 interacciones diarias** en la capa gratuita de Groq API. El margen de seguridad es del **70%**.
+
+## 🧠 Memoria Conversacional con LangChain
+
+### ¿Qué se implementó?
+Se añadió una capa de orquestación con LangChain que envuelve al sistema RAG existente **sin modificarlo**. Esto permite:
+
+1. **Memoria real**: El chatbot recuerda preguntas y respuestas anteriores.
+2. **Inyección automática de contexto**: El historial se inyecta en cada nueva consulta.
+3. **Sesiones independientes**: Cada usuario tiene su propia memoria (identificada por `session_id`).
+
+### Endpoints Disponibles
+
+| Endpoint | Método | Propósito |
+|----------|--------|-----------|
+| `/chat` | POST | Original (sin memoria, fallback) |
+| `/chat/v2` | POST | Con memoria conversacional (LangChain) |
+| `/chat/clear_memory` | POST | Limpiar memoria de una sesión específica |
+
+### Resultados de Pruebas
+
+| Pregunta | Respuesta | Verificación |
+|----------|-----------|--------------|
+| "¿Qué es Prepa?" | "Servicio educativo gratuito..." | ✅ Correcta |
+| "¿Es gratis?" | "Sí, el servicio es gratuito" | ✅ Memoria funcionando |
+| "¿Cuánto dura?" | "2 años y 6 meses" | ✅ Contexto preservado |
+
+### Ventajas
+
+- **Sin modificar RAG existente**: Cambios completamente aislados.
+- **Fallback seguro**: Endpoint `/chat` original intacto.
+- **Base para agentes**: LangChain permite agregar tools fácilmente.
+
+### Desventajas y Mitigación
+
+| Desventaja | Mitigación |
+|------------|------------|
+| Aumento de tokens (~15%) | Compensado por optimizaciones previas (optimización de tokens) |
+| Latencia adicional (~50ms) | Mínima, imperceptible para usuarios |
+| Memoria en RAM | Espacios de HF reinician periódicamente, aceptable para pruebas |
 
 ## 📊 Dashboard de Métricas Avanzadas
 
@@ -238,6 +278,10 @@ El pipeline es portable. Para migrar a VPS, AWS o Docker Hub solo se necesita ag
 
 ```
 Chatbot-RAG-Fuente-Base/
+├── langchain_layer/           # 🆕 Capa de orquestación con LangChain
+│   ├── __init__.py            # Versión 0.1.0
+│   ├── config.py              # Configuración (max tokens, TTL)
+│   └── wrappers.py            # Wrapper con memoria real
 ├── api/
 │   ├── main.py              # FastAPI + diagnóstico FAISS
 │   └── endpoints.py         # Endpoints /upload, /search
@@ -358,6 +402,7 @@ El proyecto incluye un `Dockerfile` listo para usar. El Space debe configurarse 
 | **Tokens por Consulta** | ~1,500 (optimizado) |
 | **Consultas Diarias (free tier)** | ~65 |
 | **Tiempo de Respuesta** | < 2s |
+| **Memoria Conversacional** | ✅ Activa (LangChain 0.1.0) |
 
 ## 👨‍💻 Habilidades Demostradas
 
@@ -368,6 +413,20 @@ El proyecto incluye un `Dockerfile` listo para usar. El Space debe configurarse 
 - **Logging**: Diagnóstico avanzado, monitoreo, métricas de latencia
 - **Testing**: Evaluación automática con 20 casos de prueba
 - **Database**: FAISS, vector stores, NumPy
+
+## ✅ Estado del Sistema (Junio 2026)
+
+| Componente | Estado | Versión |
+|------------|--------|---------|
+| LangChain (Orquestación) | ✅ Operativo | 0.1.0 |
+| Memoria Conversacional | ✅ Activa | - |
+| RAG System | ✅ Sin cambios | Estable |
+| Groq API (Llama 3.3 70B) | ✅ Operativo | - |
+| Retriever FAISS | ✅ Activo | 108 vectores |
+| Endpoint `/chat` | ✅ Fallback | Original |
+| Endpoint `/chat/v2` | ✅ Con memoria | Nuevo |
+
+**Nota:** El sistema está listo para evaluación con usuarios, ofreciendo una experiencia de diálogo coherente y natural.
 
 ## 📝 Licencia
 

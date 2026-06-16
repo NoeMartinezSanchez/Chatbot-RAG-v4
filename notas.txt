@@ -190,3 +190,6 @@ https://ecotecds-chatbot-rag-v4.hf.space/dashboard
 
 https://ecotecds-chatbot-rag-v4.hf.space/user-dashboard
 
+
+---Interfaz visual de la API----------------------
+https://ecotecds-Chatbot-RAG-v4.hf.space/api/docs
