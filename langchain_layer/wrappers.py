@@ -22,39 +22,39 @@ class LangChainRAGWrapper:
         self.date_extractor = DateExtractor()
         print(f"✅ LangChain wrapper con INYECCIÓN DE MEMORIA activada")
     
-    def _annotate_fechas(self, question: str, response_text: str) -> str:
-        palabras_fecha = ["fecha", "plazo", "convocatoria", "registro", "inscripción", "cuándo", "cuando"]
+    def _agregar_contexto_temporal(self, response_text: str, question: str) -> str:
+        palabras_fecha = ["fecha", "plazo", "convocatoria", "registro", "inscripción", "cuándo", "cuando", "resultados"]
         if not any(p in question.lower() for p in palabras_fecha):
             return response_text
         fechas = self.date_extractor.extract_dates(response_text)
         if not fechas:
             return response_text
         fecha_actual = datetime.now().date()
-        notas = []
+        mensajes = []
         for f in fechas:
-            if f.get('tipo') == 'rango' and 'fecha_inicio' in f and 'fecha_fin' in f:
+            if f.get('tipo') == 'fecha' and 'fecha' in f:
+                fecha = datetime.fromisoformat(f['fecha']).date()
+                if fecha < fecha_actual:
+                    mensajes.append(f"Ya pasó (era el {f['texto_original']})")
+                elif fecha == fecha_actual:
+                    mensajes.append("¡Es hoy!")
+                else:
+                    dias = (fecha - fecha_actual).days
+                    mensajes.append(f"Faltan {dias} días (es el {f['texto_original']})")
+            elif f.get('tipo') == 'rango' and 'fecha_inicio' in f and 'fecha_fin' in f:
                 fecha_inicio = datetime.fromisoformat(f['fecha_inicio']).date()
                 fecha_fin = datetime.fromisoformat(f['fecha_fin']).date()
                 if fecha_fin < fecha_actual:
-                    dias_pasados = (fecha_actual - fecha_fin).days
-                    notas.append(f"💡 **Nota:** Este evento terminó hace {dias_pasados} días.")
+                    dias = (fecha_actual - fecha_fin).days
+                    mensajes.append(f"Ya terminó (hace {dias} días)")
                 elif fecha_inicio <= fecha_actual <= fecha_fin:
-                    dias_restantes = (fecha_fin - fecha_actual).days
-                    notas.append(f"🔥 **¡Está vigente!** Faltan {dias_restantes} días para que termine.")
+                    dias = (fecha_fin - fecha_actual).days
+                    mensajes.append(f"¡Está vigente! Faltan {dias} días")
                 elif fecha_inicio > fecha_actual:
-                    dias_faltan = (fecha_inicio - fecha_actual).days
-                    notas.append(f"📅 **Aún no comienza.** Faltan {dias_faltan} días.")
-            elif f.get('tipo') == 'fecha' and 'fecha' in f:
-                fecha = datetime.fromisoformat(f['fecha']).date()
-                if fecha < fecha_actual:
-                    notas.append(f"💡 Nota: Esta fecha ya pasó.")
-                elif fecha == fecha_actual:
-                    notas.append(f"📌 ¡Hoy es la fecha!")
-                else:
-                    dias_faltan = (fecha - fecha_actual).days
-                    notas.append(f"📅 Faltan {dias_faltan} días.")
-        if notas:
-            response_text += "\n\n" + "\n".join(notas)
+                    dias = (fecha_inicio - fecha_actual).days
+                    mensajes.append(f"Comienza en {dias} días")
+        if mensajes:
+            response_text += f"\n\n📌 **Actualización:** {mensajes[0]}."
         return response_text
 
     @staticmethod
@@ -78,14 +78,12 @@ class LangChainRAGWrapper:
 
         fecha_hoy = self._fecha_actual_es()
 
-        partes = [f"Hoy es {fecha_hoy}."]
-        partes.append("IMPORTANTE: Usa esta fecha como referencia temporal. Si la pregunta menciona plazos, convocatorias o fechas, compáralas con la fecha de hoy y responde en consecuencia.")
+        partes = [f"📅 Hoy es {fecha_hoy}."]
         if history_text:
-            partes.append(f"Historial de la conversación:\n{history_text}")
-        partes.append(f"Pregunta actual: {question}")
-        partes.append("Responde basándote en el contexto recuperado y el historial si es relevante.")
+            partes.append(f"Contexto previo: {history_text}")
+        partes.append(f"Pregunta: {question}")
 
-        enhanced_question = "\n\n".join(partes)
+        enhanced_question = "\n".join(partes)
 
         palabras_clave_fecha = ["fecha", "hoy", "día"]
         palabras_clave_saludo = ["hola", "saludos", "buenos días", "buenas tardes", "buenas noches"]
@@ -117,7 +115,7 @@ Responde de manera natural, amigable y breve (máximo 2-3 oraciones).
 Si preguntan por la fecha, dila claramente.
 Si saludan, saluda cordialmente."""
             response_text = llm.generate(prompt_directo)
-            response_text = self._annotate_fechas(question, response_text)
+            response_text = self._agregar_contexto_temporal(response_text, question)
             is_rag, confidence, sources = False, 0.0, []
 
             if self.memory_enabled:
@@ -140,7 +138,7 @@ Si saludan, saluda cordialmente."""
         print(f"🧪 ENHANCED_QUESTION enviada al RAG:\n---\n{enhanced_question}\n---")
 
         response_text, is_rag, confidence, sources = self.rag_system.process_query(enhanced_question)
-        response_text = self._annotate_fechas(question, response_text)
+        response_text = self._agregar_contexto_temporal(response_text, question)
 
         if self.memory_enabled:
             memory.save_context(
