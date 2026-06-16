@@ -1,4 +1,5 @@
-"""LangChain wrappers with REAL memory injection - FIXED VERSION"""
+"""LangChain wrappers with REAL memory injection + temporal awareness"""
+from datetime import datetime
 from typing import Dict, Any
 from langchain.memory import ConversationBufferMemory
 from collections import defaultdict
@@ -18,51 +19,57 @@ class LangChainRAGWrapper:
         self.memory_enabled = memory_enabled
         print(f"✅ LangChain wrapper con INYECCIÓN DE MEMORIA activada")
     
+    @staticmethod
+    def _fecha_actual_es() -> str:
+        meses = [
+            "enero", "febrero", "marzo", "abril", "mayo", "junio",
+            "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+        ]
+        now = datetime.now()
+        return f"{now.day} de {meses[now.month - 1]} de {now.year}"
+
     def query_with_memory(self, question: str, session_id: str = "default") -> Dict[str, Any]:
-        # Obtener memoria de esta sesión
         memory = _session_memories[session_id]
-        
-        # 🔥 RECUPERAR el historial guardado
+
         history_text = ""
         if self.memory_enabled:
             history_vars = memory.load_memory_variables({})
             if "chat_history" in history_vars:
                 messages = history_vars["chat_history"]
-                # Formatear historial como texto
                 history_text = "\n".join([f"- {msg.type}: {msg.content}" for msg in messages])
-        
-        # 🔥 INYECTAR historial en la pregunta (si existe)
+
+        fecha_hoy = self._fecha_actual_es()
+
+        partes = [f"Hoy es {fecha_hoy}."]
+        partes.append("IMPORTANTE: Usa esta fecha como referencia temporal. Si la pregunta menciona plazos, convocatorias o fechas, compáralas con la fecha de hoy y responde en consecuencia.")
         if history_text:
-            enhanced_question = f"""Historial de la conversación:
-{history_text}
+            partes.append(f"Historial de la conversación:\n{history_text}")
+        partes.append(f"Pregunta actual: {question}")
+        partes.append("Responde basándote en el contexto recuperado y el historial si es relevante.")
 
-Pregunta actual: {question}
+        enhanced_question = "\n\n".join(partes)
 
-Responde basándote en el historial si es relevante."""
-        else:
-            enhanced_question = question
-        
-        # Llamar al RAG con la pregunta enriquecida
-        result = self.rag_system.generate_response(enhanced_question)
-        
-        # Guardar la interacción en memoria para el futuro
+        print(f"🧪 ENHANCED_QUESTION enviada al RAG:\n---\n{enhanced_question}\n---")
+
+        response_text, is_rag, confidence, sources = self.rag_system.process_query(enhanced_question)
+
         if self.memory_enabled:
             memory.save_context(
                 {"input": question},
-                {"output": result.get("response", "")}
+                {"output": response_text}
             )
-        
-        # Retornar respuesta con métricas
+
         return {
-            "response": result.get("response", ""),
-            "sources": result.get("sources", []),
-            "is_rag_response": result.get("is_rag_response", True),
-            "confidence": result.get("confidence", 0.0),
+            "response": response_text,
+            "sources": sources,
+            "is_rag_response": is_rag,
+            "confidence": confidence,
             "session_id": session_id,
             "langchain_version": True,
             "memory_active": self.memory_enabled,
             "history_length": len(memory.buffer) if hasattr(memory, 'buffer') else 0,
-            "history_injected": bool(history_text)  # Nuevo: indica si se usó historial
+            "history_injected": bool(history_text),
+            "current_date": fecha_hoy
         }
     
     def clear_memory(self, session_id: str = "default") -> Dict[str, Any]:
