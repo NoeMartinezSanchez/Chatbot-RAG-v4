@@ -4,6 +4,7 @@ from typing import Dict, Any
 from langchain.memory import ConversationBufferMemory
 from collections import defaultdict
 from models.groq_wrapper import GroqWrapper
+from scripts.extract_dates import DateExtractor
 
 # Almacenamiento de memorias por sesión
 _session_memories = defaultdict(lambda: ConversationBufferMemory(
@@ -18,8 +19,44 @@ class LangChainRAGWrapper:
     def __init__(self, rag_system, memory_enabled: bool = True):
         self.rag_system = rag_system
         self.memory_enabled = memory_enabled
+        self.date_extractor = DateExtractor()
         print(f"✅ LangChain wrapper con INYECCIÓN DE MEMORIA activada")
     
+    def _annotate_fechas(self, question: str, response_text: str) -> str:
+        palabras_fecha = ["fecha", "plazo", "convocatoria", "registro", "inscripción", "cuándo", "cuando"]
+        if not any(p in question.lower() for p in palabras_fecha):
+            return response_text
+        fechas = self.date_extractor.extract_dates(response_text)
+        if not fechas:
+            return response_text
+        fecha_actual = datetime.now().date()
+        notas = []
+        for f in fechas:
+            if f.get('tipo') == 'rango' and 'fecha_inicio' in f and 'fecha_fin' in f:
+                fecha_inicio = datetime.fromisoformat(f['fecha_inicio']).date()
+                fecha_fin = datetime.fromisoformat(f['fecha_fin']).date()
+                if fecha_fin < fecha_actual:
+                    dias_pasados = (fecha_actual - fecha_fin).days
+                    notas.append(f"💡 **Nota:** Este evento terminó hace {dias_pasados} días.")
+                elif fecha_inicio <= fecha_actual <= fecha_fin:
+                    dias_restantes = (fecha_fin - fecha_actual).days
+                    notas.append(f"🔥 **¡Está vigente!** Faltan {dias_restantes} días para que termine.")
+                elif fecha_inicio > fecha_actual:
+                    dias_faltan = (fecha_inicio - fecha_actual).days
+                    notas.append(f"📅 **Aún no comienza.** Faltan {dias_faltan} días.")
+            elif f.get('tipo') == 'fecha' and 'fecha' in f:
+                fecha = datetime.fromisoformat(f['fecha']).date()
+                if fecha < fecha_actual:
+                    notas.append(f"💡 Nota: Esta fecha ya pasó.")
+                elif fecha == fecha_actual:
+                    notas.append(f"📌 ¡Hoy es la fecha!")
+                else:
+                    dias_faltan = (fecha - fecha_actual).days
+                    notas.append(f"📅 Faltan {dias_faltan} días.")
+        if notas:
+            response_text += "\n\n" + "\n".join(notas)
+        return response_text
+
     @staticmethod
     def _fecha_actual_es() -> str:
         meses = [
@@ -80,6 +117,7 @@ Responde de manera natural, amigable y breve (máximo 2-3 oraciones).
 Si preguntan por la fecha, dila claramente.
 Si saludan, saluda cordialmente."""
             response_text = llm.generate(prompt_directo)
+            response_text = self._annotate_fechas(question, response_text)
             is_rag, confidence, sources = False, 0.0, []
 
             if self.memory_enabled:
@@ -102,6 +140,7 @@ Si saludan, saluda cordialmente."""
         print(f"🧪 ENHANCED_QUESTION enviada al RAG:\n---\n{enhanced_question}\n---")
 
         response_text, is_rag, confidence, sources = self.rag_system.process_query(enhanced_question)
+        response_text = self._annotate_fechas(question, response_text)
 
         if self.memory_enabled:
             memory.save_context(
