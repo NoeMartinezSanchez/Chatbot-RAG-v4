@@ -51,11 +51,17 @@ class LangChainRAGWrapper:
         enhanced_question = "\n\n".join(partes)
 
         general_keywords = [
-            "qué fecha es hoy", "qué día es hoy", "fecha actual",
-            "qué hora es", "hora actual", "quién eres", "cómo te llamas",
+            "qué fecha es hoy", "que fecha es hoy",
+            "qué día es hoy", "que dia es hoy",
+            "fecha actual",
+            "qué hora es", "que hora es",
+            "hora actual",
+            "quién eres", "quien eres",
+            "cómo te llamas", "como te llamas",
             "hola", "buenos días", "buenas tardes", "buenas noches", "saludos"
         ]
         es_general = any(kw in question.lower() for kw in general_keywords)
+        print(f"🔍 Detección general: question='{question}' → es_general={es_general}")
 
         if es_general and not self.memory_enabled:
             es_general = False
@@ -71,7 +77,7 @@ Pregunta del usuario: {question}
 Responde de manera natural, amigable y breve (máximo 2-3 oraciones).
 Si preguntan por la fecha, dila claramente.
 Si saludan, saluda cordialmente."""
-            response_text = llm.generate(prompt_directo)
+            response_text = llm.generate_response(prompt_directo)
             is_rag, confidence, sources = False, 0.0, []
 
             if self.memory_enabled:
