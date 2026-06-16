@@ -1,8 +1,9 @@
-"""LangChain wrappers with REAL memory injection + temporal awareness"""
+"""LangChain wrappers with REAL memory injection + temporal awareness + direct responses"""
 from datetime import datetime
 from typing import Dict, Any
 from langchain.memory import ConversationBufferMemory
 from collections import defaultdict
+from models.groq_wrapper import GroqWrapper
 
 # Almacenamiento de memorias por sesión
 _session_memories = defaultdict(lambda: ConversationBufferMemory(
@@ -49,6 +50,47 @@ class LangChainRAGWrapper:
 
         enhanced_question = "\n\n".join(partes)
 
+        general_keywords = [
+            "qué fecha es hoy", "qué día es hoy", "fecha actual",
+            "qué hora es", "hora actual", "quién eres", "cómo te llamas",
+            "hola", "buenos días", "buenas tardes", "buenas noches", "saludos"
+        ]
+        es_general = any(kw in question.lower() for kw in general_keywords)
+
+        if es_general and not self.memory_enabled:
+            es_general = False
+
+        if es_general:
+            print(f"📢 Pregunta general detectada (sin RAG): {question}")
+            llm = GroqWrapper()
+            prompt_directo = f"""Eres un asistente educacional de Prepa en Línea SEP.
+Hoy es {fecha_hoy}.
+
+Pregunta del usuario: {question}
+
+Responde de manera natural, amigable y breve (máximo 2-3 oraciones).
+Si preguntan por la fecha, dila claramente.
+Si saludan, saluda cordialmente."""
+            response_text = llm.generate(prompt_directo)
+            is_rag, confidence, sources = False, 0.0, []
+
+            if self.memory_enabled:
+                memory.save_context({"input": question}, {"output": response_text})
+
+            return {
+                "response": response_text,
+                "sources": sources,
+                "is_rag_response": is_rag,
+                "confidence": confidence,
+                "session_id": session_id,
+                "langchain_version": True,
+                "memory_active": self.memory_enabled,
+                "history_length": len(memory.buffer) if hasattr(memory, 'buffer') else 0,
+                "history_injected": bool(history_text),
+                "current_date": fecha_hoy,
+                "direct_response": True
+            }
+
         print(f"🧪 ENHANCED_QUESTION enviada al RAG:\n---\n{enhanced_question}\n---")
 
         response_text, is_rag, confidence, sources = self.rag_system.process_query(enhanced_question)
@@ -69,7 +111,8 @@ class LangChainRAGWrapper:
             "memory_active": self.memory_enabled,
             "history_length": len(memory.buffer) if hasattr(memory, 'buffer') else 0,
             "history_injected": bool(history_text),
-            "current_date": fecha_hoy
+            "current_date": fecha_hoy,
+            "direct_response": False
         }
     
     def clear_memory(self, session_id: str = "default") -> Dict[str, Any]:
