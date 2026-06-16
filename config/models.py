@@ -5,6 +5,7 @@ class ChatRequest(BaseModel):
     message: str
     user_id: Optional[str] = None
     conversation_id: Optional[str] = None
+    session_id: Optional[str] = "default"
 
 class ChatResponse(BaseModel):
     response: str

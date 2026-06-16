@@ -27,6 +27,7 @@ from data.build_menu_json import load_menu_json
 from evaluation.performance_logger import log_latency
 from evaluation.automated_evaluator import run_automated_evaluation
 from evaluation.show_results import show_results
+from langchain_layer.wrappers import LangChainRAGWrapper
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -102,6 +103,7 @@ app.add_middleware(
 
 # Inicializar sistema RAG
 rag_system = RAGSystem()
+langchain_wrapper = LangChainRAGWrapper(rag_system, memory_enabled=True)
 
 # Almacenamiento simple en memoria para feedback
 feedback_store = {}
@@ -263,50 +265,22 @@ async def chat(request: ChatRequest):
         user_id = request.user_id or str(uuid.uuid4())
         conversation_id = request.conversation_id or str(uuid.uuid4())
         
-        # Detectar saludos y responder directamente sin RAG
-        msg_lower = request.message.lower().strip()
-        saludos = ["hola", "buenos días", "buenas tardes", "buenas", "holi", "hello", "hey", "qué tal", "cómo estás", "buen día"]
-        despedidas = ["adiós", "chao", "bye", "hasta luego", "me voy", "nos vemos", "me retiro"]
-        gracias = ["gracias", "thank", "agradezco", "muchas gracias", "te agradezco"]
-        
-        if any(s in msg_lower for s in saludos):
-            response_text = "¡Hola! Bienvenido a Prepa en Línea SEP. Estoy aquí para ayudarte con tus dudas sobre el programa. ¿Qué necesitas saber?"
-            is_rag = False
-            confidence = 1.0
-            sources = []
-            retrieval_time = 0
-            generation_time = 0
-        elif any(s in msg_lower for s in despedidas):
-            response_text = "¡Hasta luego! Éxito en tus estudios. Cuando tengas dudas sobre Prepa en Línea, vuelve a escribirme."
-            is_rag = False
-            confidence = 1.0
-            sources = []
-            retrieval_time = 0
-            generation_time = 0
-        elif any(s in msg_lower for s in gracias):
-            response_text = "¡De nada! Si tienes más dudas sobre Prepa en Línea, con gusto te ayudo. ¡Éxito en tus estudios!"
-            is_rag = False
-            confidence = 1.0
-            sources = []
-            retrieval_time = 0
-            generation_time = 0
-        else:
-            # Procesar consulta normal con RAG
-            retrieval_end = time.time()
-            retrieval_time = (retrieval_end - retrieval_start) * 1000
-            
-            generation_start = time.time()
-            response_text, is_rag, confidence, sources = rag_system.process_query(
-                request.message
-            )
-            generation_end = time.time()
-            generation_time = (generation_end - generation_start) * 1000
-        
-        # DEBUG: Verificar qué se recibe
+        # Usar LangChain wrapper (detecta saludos, fecha, memoria, RAG)
+        wrapper_result = langchain_wrapper.query_with_memory(
+            question=request.message,
+            session_id=request.session_id or "default"
+        )
+        response_text = wrapper_result["response"]
+        is_rag = wrapper_result["is_rag_response"]
+        confidence = wrapper_result["confidence"]
+        sources = wrapper_result.get("sources", [])
+        retrieval_time = 0
+        generation_time = 0
+
         logger.info(f"🔍 DEBUG - response_text tipo: {type(response_text)}, largo: {len(response_text) if response_text else 0}")
         logger.info(f"🔍 DEBUG - response_text contenido: '{response_text[:100]}...'")
         logger.info(f"🔍 DEBUG - sources count: {len(sources) if sources else 0}")
-        logger.info(f"📤 Respuesta generada: {'RAG' if is_rag else 'Intent'} - Confianza: {confidence:.2%}")
+        logger.info(f"📤 Respuesta generada: {'RAG' if is_rag else 'Directo'} - Confianza: {confidence:.2%}")
         
         # Crear respuesta
         conf_value = confidence if confidence is not None else 0.5
