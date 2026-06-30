@@ -1,106 +1,213 @@
-# CONTEXTO ACTUAL DEL PROYECTO: ChatBot con Gemini 2.5 Flash + RAG
+# Chatbot-RAG-Fuente-Base — AGENTS.md
 
-## DESCRIPCIÓN GENERAL
-Chatbot educativo para Prepa en Línea SEP que utiliza arquitectura RAG con Gemini 2.5 Flash como modelo generativo via Google AI API. El sistema recupera documentos relevantes de FAISS y genera respuestas contextualizadas.
+## Build / Run / Test Commands
 
-## ESTADO ACTUAL (Abril 2026)
-✅ Integración con Google AI API (Gemini 2.5 Flash)
-✅ Wrapper funcional en models/gemini_wrapper.py
-✅ Evaluación automática en evaluation/automated_evaluator.py
-✅ Diagnóstico del vector store en logs de inicio
-✅ Interfaz web en static/index.html
-✅ API FastAPI con endpoint /chat
+```bash
+# Install dependencies
+pip install -r requirements.txt
 
-## TECNOLOGÍAS PRINCIPALES
-- **Framework API**: FastAPI (Python 3.11)
-- **LLM**: Gemini 2.5 Flash via Google AI API
-- **Vector Store**: FAISS (FlatL2)
-- **Embeddings**: intfloat/multilingual-e5-small (384 dims)
-- **Ejecución**: CPU con 32GB RAM (HF Spaces: 8 vCPU)
-- **Parámetros actuales**: temperature=0.1, max_tokens=256
+# Run the API server (development with hot-reload)
+python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
-## ESTRUCTURA DE ARCHIVOS CLAVE
+# Run server via app.py entry point
+python app.py
 
-Chatbot-RAG-Fuente-Base/
-├── api/
-│   ├── main.py           # Punto de entrada + diagnóstico FAISS al inicio
-│   └── endpoints.py     # Endpoints /upload, /search
-├── rag/
-│   ├── core.py         # Clase RAGSystem
-│   ├── gemma_generator.py  # Generator → GeminiWrapper
-│   ├── optimized_retriever.py  # Retrieval con sinónimos
-│   ├── retriever.py     # VectorStoreFAISS
-│   └── embeddings.py   # EmbeddingModel (e5-small)
-├── models/
-│   └── gemini_wrapper.py  # Google AI API wrapper
-├── evaluation/
-│   ├── automated_evaluator.py  # Tests automáticos
-│   └── test_set.json       # 20 preguntas de evaluación
-├── scripts/
-│   └── load_chunks_to_rag.py  # Carga chunks con prefijo "passage: "
-├── config/
-│   └── settings.py       # Configuración centralizada
-└── data/
-    └── vector_store/     # Índice FAISS y metadatos
+# Run ALL tests (pytest)
+python -m pytest tests/ -v
 
-## CONFIGURACIÓN ACTUAL (Abril 2026)
+# Run ALL tests (native entry points, no pytest required)
+python tests/test_rag.py
+python tests/test_api.py
 
-### Embeddings (e5-small)
-- Modelo: intfloat/multilingual-e5-small
-- Prefijos: "query: " para preguntas, "passage: " para chunks
-- Dimensiones: 384
+# Run a SINGLE test file with pytest
+python -m pytest tests/test_rag.py -v
 
-### Retrieval
-- top_k_initial: 15
-- top_k_final: 7
-- min_similarity: 0.3 (reducido para diagnóstico)
-- use_query_expansion: True
-- use_multi_query: True
-- use_synonyms: True
+# Run a SINGLE test function with pytest
+python -m pytest tests/test_rag.py::test_rag_initialization -v
 
-### Generación (Gemini 2.5 Flash)
-- Modelo: gemini-2.0-flash
-- API: Google AI API
-- Temperature: 0.1
-- Max output tokens: 256
-- Timeout: 60s
+# Run with coverage
+python -m pytest tests/ --cov=. --cov-report=term
 
-## PROBLEMAS IDENTIFICADOS Y SOLUCIONES
+# Docker build & run
+docker build -t chatbot-rag .
+docker run -p 7860:7860 -e GOOGLE_API_KEY=your_key chatbot-rag
 
-### 1. Respuestas vacías del modelo
-✅ RESUELTO: Prompt simplificado + parámetros optimizados
-✅ Parámetros optimizados: temperature=0.1, max_tokens=256
+# Load document chunks into FAISS vector store
+python scripts/load_chunks_to_rag.py
 
-### 2. Retrieval no encuentra chunks
-✅ EN PROCESO: Diagnosticado con código en api/main.py
-✅ min_similarity reducido a 0.3
-✅ Verificar que chunks usen prefijo "passage: " al indexar
+# Run automated evaluation
+python -m evaluation.automated_evaluator
 
-### 3. Embeddings no coinciden
-✅Cambiado a intfloat/multilingual-e5-small
-✅ Re-indexado con prefijos "passage: " requeridos
-
-## EVALUACIÓN
-
-- 20 preguntas de test en evaluation/test_set.json
-- Categorías: convocatoria, normativa, guia, protocolo, reglas_comunicacion
-- Dificultades: facil (7), medio (7), difficile (6)
-- Ejecución automática al inicio del Space
-
-## CONFIGURACIÓN DE API
-
-### Variables de entorno requeridas:
-```
-GOOGLE_API_KEY=tu_api_key_de_google
+# Generate dashboard
+python -m evaluation.generate_dashboard
 ```
 
-### Para obtener API Key:
-1. Ir a https://aistudio.google.com/apikey
-2. Crear una nueva API key
-3. Agregar al archivo .env o variable de entorno
+## Required Environment Variables
 
-## NOTAS PARA HF SPACES
+| Variable | Description |
+|---|---|
+| `GOOGLE_API_KEY` | Google AI API key for Gemini 2.5 Flash |
+| `GEMINI_API_KEY` | Alias for GOOGLE_API_KEY (fallback) |
+| `GROQ_API_KEY` | Groq API key (alternative provider) |
+| `LOG_LEVEL` | Logging level (default: INFO) |
+| `ENVIRONMENT` | `development`, `staging`, or `production` |
 
-1. Configurar GOOGLE_API_KEY en secrets del Space
-2. Diagnóstico se imprime en logs de inicio
-3. Resultados de evaluación en /data/dashboard.html
+Place in `.env` file or as OS environment variables.
+
+## Python & Tooling
+
+- **Python**: 3.11 (target, also compatible with 3.10+)
+- **API Framework**: FastAPI + Uvicorn (no Gunicorn)
+- **Config**: `pydantic-settings` via `config/settings.py` (reads from `.env` / env vars)
+- **Models**: Pydantic v2 (no attrs, no dataclasses for API schemas)
+- **Logging**: `logging` stdlib + `loguru` in some modules; `logger = logging.getLogger(__name__)` per module
+- **No linter/formatter configured** (no ruff, black, flake8, mypy in requirements). Do NOT add linters unless asked.
+
+## Code Style Guidelines
+
+### Imports
+
+1. **stdlib first** (os, sys, json, logging, time, uuid, datetime, pathlib, etc.)
+2. **Third-party** (fastapi, pydantic, numpy, faiss, sentence_transformers, google.generativeai)
+3. **Local** (from config.xxx, from rag.xxx, from models.xxx, from evaluation.xxx, from utils.xxx)
+4. Separate groups with a blank line.
+
+```python
+import os
+import logging
+from typing import List, Optional
+
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+from config.settings import settings
+from rag.core import RAGSystem
+```
+
+### Naming Conventions
+
+- **Classes**: `PascalCase` (e.g., `RAGSystem`, `GeminiWrapper`, `VectorStoreFAISS`)
+- **Functions/methods**: `snake_case` (e.g., `process_query`, `_clean_query`, `embed_text`)
+- **Variables**: `snake_case` (e.g., `query_embedding`, `top_k`, `context_str`)
+- **Constants**: `UPPER_SNAKE_CASE` (e.g., `TOP_K_RESULTS`, `SIMILARITY_THRESHOLD`)
+- **Private methods**: prefixed with `_` (e.g., `_rag_process`, `_save`)
+- **Module-level logger**: `logger = logging.getLogger(__name__)` (always at module top after imports)
+- **Filenames**: `snake_case.py` (e.g., `gemini_wrapper.py`, `optimized_retriever.py`)
+
+### Type Hints
+
+- **Mandatory** for all function signatures (parameters and return types)
+- Use `from typing import List, Dict, Any, Optional, Tuple, Callable`
+- Use `Optional[str]` rather than `str | None` (Python 3.10+ compat)
+- Pydantic models for all API request/response schemas
+
+```python
+def process_query(self, query: str) -> Tuple[str, bool, float, list]:
+def embed_batch(self, texts: List[str], is_passage: bool = False) -> np.ndarray:
+```
+
+### Docstrings
+
+- Google-style docstrings with `Args:` and `Returns:` sections
+- Module-level docstring at top of file (triple-quoted string, can be a single line)
+- Required for public methods; optional for private helpers
+
+```python
+def generate(self, query: str, context: str = "", max_length: int = 256) -> str:
+    """Generate a response for the given query.
+    
+    Args:
+        query: User question/query.
+        context: Retrieved context from RAG system (optional).
+        max_length: Maximum tokens to generate.
+    
+    Returns:
+        Generated response string.
+    """
+```
+
+### Error Handling Pattern
+
+```python
+try:
+    # operation
+    logger.info(f"Operation succeeded: ...")
+except Exception as e:
+    logger.error(f"Operation failed: {e}", exc_info=True)
+    return "User-facing fallback message"  # or raise HTTPException for API endpoints
+```
+
+- Always log the error with `logger.error(...)`
+- Use `exc_info=True` for unexpected errors to capture stack traces
+- API endpoints raise `HTTPException(status_code=500, detail=str(e))`
+- Internal methods return fallback strings (never propagate raw errors to the user in Spanish)
+- Graceful degradation: if a component fails (e.g., Gemini), the system returns a friendly message
+
+### Logging
+
+- Module-level: `logger = logging.getLogger(__name__)`
+- Use structured prefixes: `"✅ ..."` (success), `"❌ ..."` (error), `"⚠️ ..."` (warning), `"📩 ..."` (incoming message), `"📤 ..."` (outgoing), `"🔍 ..."` (debug)
+- Always include enough context (query length, response preview, source count, etc.)
+
+### API Conventions
+
+- FastAPI app in `api/main.py`, sub-routes in `api/endpoints.py` under `/documents`
+- Pydantic models in `config/models.py` (`ChatRequest`, `ChatResponse`, `FeedbackRequest`, `Document`)
+- CORS: `allow_origins=["*"]` (already configured)
+- Standard headers: `X-User-ID`, `X-Conversation-ID`, `X-Message-ID`, `X-Response-Type`
+- `/chat` returns JSON with `response`, `sources`, `is_rag_response`, `confidence`
+- `/health` returns static `{"status": "healthy", ...}`
+- All endpoints wrap body in try/except with `HTTPException`
+
+### RAG Pipeline Conventions
+
+- **Embeddings**: `intfloat/multilingual-e5-small` (384 dims). Always use `"query: "` prefix for user queries, `"passage: "` prefix for indexed chunks.
+- **Vector store**: FAISS (FlatL2 index) persisted in `data/vector_store/` via pickle + .bin
+- **Retrieval**: `OptimizedRetriever` wraps `VectorStoreFAISS` with query expansion, synonyms, and multi-query support
+- **Generator**: `GemmaGenerator` → `GroqWrapper` (class name is legacy; actually uses Gemini 2.5 Flash via Google AI API or Groq)
+- **Intents**: JSON-based intent matching for greetings/farewells in `VectorStoreFAISS.search_intents()`. Intents always take priority over RAG for saludos, despedidas, gracias.
+- `RAGSystem.process_query()` returns `Tuple[str, bool, float, list]` → (response, is_rag, confidence, sources)
+
+### Session & Conversation ID
+
+- Every `/chat` request may include `user_id`, `conversation_id`, `session_id`
+- If not provided, the API generates UUIDs
+- Conversations are stored in an in-memory dict (volatile; no database)
+- User interactions persisted to `/data/user_interactions.jsonl` for dashboard
+
+### Testing
+
+- Tests live in `tests/test_rag.py` and `tests/test_api.py`
+- Tests use `sys.path.append` + direct imports (no conftest.py)
+- `test_api.py` uses `fastapi.testclient.TestClient`
+- `test_rag.py` uses pytest assertions
+- Tests can also be run directly via `if __name__ == "__main__"` blocks
+- Do NOT create new test files without following the existing patterns
+- No mocking framework used; real components are instantiated
+
+### Project Structure Rules
+
+```
+api/           → FastAPI routes (main.py, endpoints.py)
+config/        → Settings + Pydantic models
+rag/           → Core RAG: embeddings, retriever, generator, optimized_retriever, core
+models/        → LLM wrappers (gemini, groq, ollama, tinyllama)
+evaluation/    → Automated tests, dashboards, performance logging
+scripts/       → One-off data loading and setup scripts
+tests/         → pytest test files
+data/          → FAISS index, metadata, documents, logs
+static/        → Web UI (index.html, dashboard.html)
+utils/         → Log capture utilities
+langchain_layer/ → LangChain orchestration wrapper (legacy/deprecated)
+```
+
+- Keep each module focused: wrappers in `models/`, RAG pipeline logic in `rag/`, API in `api/`
+- Do NOT import from `models/` into `api/` directly — go through `rag/core.py`
+
+### Deployment Notes
+
+- Hugging Face Spaces: set `GOOGLE_API_KEY` in Space secrets
+- Docker: `python:3.11-slim`, exposes port `7860`
+- No database — everything is file-based (FAISS index, JSONL logs, pickle metadata)
+- API supports `ENVIRONMENT=production` with debug/workers/reload toggles in Settings
+- Healthcheck at `/health` — used by Render/HF Spaces for uptime monitoring

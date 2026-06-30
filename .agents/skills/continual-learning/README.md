@@ -1,0 +1,183 @@
+# opencode-continual-learning
+
+Automatically and incrementally keeps `AGENTS.md` up to date by mining the current session's conversation for high-signal learnings.
+
+## Features
+
+- **Automatic learning**: after a configurable number of completed turns and elapsed time, the plugin silently injects a prompt that tells the AI to run the `continual-learning` skill and update `AGENTS.md`
+- **`/continual-learning` command**: manually trigger a learning pass at any time
+- **`AGENTS.md`-aware updates**: the AI reads existing entries and updates them in place rather than appending blindly, keeping the file clean and deduplicated
+- **Noise-resistant**: only high-signal, reusable information is written—recurring preferences and durable workspace facts only; one-off instructions and transient details are excluded
+- **Configurable cadence**: tune the trigger thresholds via environment variables
+- **Standalone skill + plugin automation**: the canonical `SKILL.md` lives in `skills/continual-learning/` for `npx skills` installs, and the plugin mirrors it into `.opencode/skills/` on first load for OpenCode
+
+## Requirements
+
+- [OpenCode](https://opencode.ai/) v1.2.15 or later
+
+## Installation
+
+### Standalone skill (`npx skills`)
+
+Install the reusable skill into any supported agent:
+
+```bash
+npx skills add https://github.com/baradghimire/opencode-continual-learning --skill continual-learning
+```
+
+### OpenCode plugin (automation)
+
+Add to your OpenCode config (`~/.config/opencode/opencode.json`):
+
+```json
+{
+  "plugin": ["opencode-continual-learning"]
+}
+```
+
+Restart OpenCode and you're ready to go.
+
+Optionally, pin to a specific version for stability:
+
+```json
+{
+  "plugin": ["opencode-continual-learning@0.4.1"]
+}
+```
+
+## Usage
+
+The plugin runs silently in the background. After the cadence threshold is met (default: 10 completed turns **and** 120 minutes since the last run), it injects a prompt that asks the AI to invoke the `continual-learning` skill. The AI reads `AGENTS.md`, mines the session conversation, and writes back only:
+
+- `## Learned User Preferences` — recurring corrections and stated preferences
+- `## Learned Workspace Facts` — durable facts about the project (patterns, conventions, tech choices)
+
+To trigger manually, run `/continual-learning` (the skill is available as a slash command).
+
+## What gets written to AGENTS.md
+
+The AI only stores items that meet all of these criteria:
+
+| Criterion | Example |
+|---|---|
+| Actionable in future sessions | "Always use `pnpm` instead of `npm`" |
+| Stable across sessions | "The API layer lives in `packages/api/src/`" |
+| Repeated or stated as a broad rule | User has corrected the same thing multiple times |
+| Non-sensitive | No credentials, personal data |
+
+Items that are **never** stored: secrets, one-off task instructions, transient details (branch names, commit hashes, temporary error messages).
+
+## Configuration
+
+### Cadence (environment variables)
+
+| Variable | Default | Description |
+|---|---|---|
+| `CONTINUAL_LEARNING_MIN_TURNS` | `10` | Minimum completed turns before triggering |
+| `CONTINUAL_LEARNING_MIN_MINUTES` | `120` | Minimum minutes since last run |
+
+### State file
+
+Per-project cadence state is stored at:
+
+```
+<project>/.opencode/state/continual-learning.json
+```
+
+Delete this file to reset the turn counter and timer.
+
+### Skill file
+
+The plugin checks for the skill in this order:
+
+1. **Global**: `~/.agents/skills/continual-learning/SKILL.md` — if present, skips local copy
+2. **Project-local**: `<project>/.opencode/skills/continual-learning/SKILL.md` — created only if global doesn't exist
+
+If you install the skill globally (via `npx skills add`), the plugin won't create project-local copies. This keeps projects clean when you have the skill available globally.
+
+## Contributing
+
+```bash
+git clone https://github.com/baradghimire/opencode-continual-learning
+cd opencode-continual-learning
+bun install
+```
+
+Symlink the plugin to your OpenCode config for local development:
+
+```bash
+mkdir -p ~/.config/opencode/plugins
+ln -sf "$(pwd)/src/plugin.ts" ~/.config/opencode/plugins/continual-learning.ts
+```
+
+Run the type checker:
+
+```bash
+bun run typecheck
+```
+
+## Releasing
+
+This repository uses an automated release flow with minimal manual steps.
+
+### Workflow Overview
+
+| File | Trigger | Purpose |
+|------|---------|---------|
+| `ci.yml` | PRs + pushes to `main` | Type checking and validation |
+| `release-please.yml` | Push to `main` | Opens release PR with version bump and changelog |
+| `release.yml` | `release.published` | Publishes to npm with provenance |
+
+### Step-by-Step
+
+1. **Open a feature branch** from `main`
+2. **Make changes**, commit with [Conventional Commits](https://www.conventionalcommits.org/)
+3. **Push and open a PR** — `ci` workflow runs typecheck
+4. **Merge to `main`** — requires PR review (direct pushes blocked by ruleset)
+5. **`release-please` creates/updates a Release PR** — includes version bump and changelog
+6. **Review and merge the Release PR** — creates a `v*` tag and a published GitHub Release
+7. **`release` workflow runs automatically** — builds, attests, uploads tarball, and publishes to npm with provenance
+
+### Direct pushes to `main` are blocked
+
+The repository has a ruleset enforcing PR-based changes with required review. All changes must go through pull requests.
+
+### GitHub Actions Details
+
+- **`ci`**: Validates TypeScript on every PR and push to `main`
+- **`release-please`**: Uses [googleapis/release-please-action](https://github.com/googleapis/release-please-action) to manage releases. Parses Conventional Commits to determine semver bumps.
+- **`release`**: Publishes to npm with `--provenance` flag. Uses Bun for dependencies, npm for publish (npm provenance not yet available in Bun).
+- **`oc-zen-free`**: Reusable workflow that selects free OpenCode models first, falling back to `opencode/kimi-k2`.
+
+### Required Secret for Full Release Automation
+
+Set a repository secret named `RELEASE_PLEASE_TOKEN` (PAT or GitHub App token with repo/workflow permissions).
+
+Using the default `GITHUB_TOKEN` can prevent downstream PR-triggered workflows from firing on release-please-created PRs.
+
+### Manual Release Trigger
+
+You can manually trigger release-please from the GitHub Actions UI if needed:
+
+1. Go to **Actions** → **release-please** → **Run workflow**
+2. Select branch `main` and run
+
+## Attribution
+
+This plugin is inspired by and draws directly from:
+
+- **[cursor/plugins](https://github.com/cursor/plugins)** — the continual-learning concept, cadence logic, SKILL.md format, and `AGENTS.md` output contract. Key inspiration at commit [`9c39b57`](https://github.com/cursor/plugins/tree/9c39b574a4c2f4374b568effd115b6dc6fbe3bf4/continual-learning):
+  - [`continual-learning/skills/continual-learning/SKILL.md`](https://github.com/cursor/plugins/blob/9c39b574a4c2f4374b568effd115b6dc6fbe3bf4/continual-learning/skills/continual-learning/SKILL.md) — skill definition and workflow
+  - [`continual-learning/hooks/continual-learning-stop.ts`](https://github.com/cursor/plugins/blob/9c39b574a4c2f4374b568effd115b6dc6fbe3bf4/continual-learning/hooks/continual-learning-stop.ts) — cadence state management logic
+
+- **[joshuadavidthomas/opencode-handoff](https://github.com/joshuadavidthomas/opencode-handoff)** — this repository was forked from Josh Thomas' work. It provided the OpenCode plugin architecture patterns, `@opencode-ai/plugin` and `@opencode-ai/sdk` usage, and the event hook structure. Key inspiration at release [`v0.5.0`](https://github.com/joshuadavidthomas/opencode-handoff/tree/v0.5.0) (commit [`2a9b523`](https://github.com/joshuadavidthomas/opencode-handoff/commit/2a9b523265bff09053b378457204a2294074d075)).
+
+## License
+
+opencode-continual-learning is licensed under the MIT license. See the [`LICENSE`](LICENSE) file for more information.
+
+---
+
+opencode-continual-learning is not built by, or affiliated with, the OpenCode team.
+
+OpenCode is ©2025 Anomaly.

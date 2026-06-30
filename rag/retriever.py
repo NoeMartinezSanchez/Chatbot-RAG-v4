@@ -15,6 +15,61 @@ from config.settings import settings  # <-- SE AÑADIO ESTA LINEA
 
 logger = logging.getLogger(__name__)
 
+# --- Placeholder resolution cache ---
+_RESOLVER_URL_MAP: Optional[Dict[str, str]] = None
+_RESOLVER_FECHA_MAP: Optional[Dict[str, Dict[str, str]]] = None
+
+def _load_resolver_maps():
+    global _RESOLVER_URL_MAP, _RESOLVER_FECHA_MAP
+    if _RESOLVER_URL_MAP is None:
+        url_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'mapeo_urls_global.json')
+        try:
+            with open(url_path, 'r', encoding='utf-8') as f:
+                _RESOLVER_URL_MAP = json.load(f)
+            logger.info(f"Loaded URL map with {len(_RESOLVER_URL_MAP)} entries")
+        except Exception as e:
+            logger.error(f"Failed to load URL map: {e}")
+            _RESOLVER_URL_MAP = {}
+    if _RESOLVER_FECHA_MAP is None:
+        fecha_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'mapeo_fechas_completo.json')
+        try:
+            with open(fecha_path, 'r', encoding='utf-8') as f:
+                _RESOLVER_FECHA_MAP = json.load(f)
+            logger.info(f"Loaded fecha map with {len(_RESOLVER_FECHA_MAP)} entries")
+        except Exception as e:
+            logger.error(f"Failed to load fecha map: {e}")
+            _RESOLVER_FECHA_MAP = {}
+
+def resolver_placeholders(text: str) -> str:
+    """Replace urlN and fechaN placeholders in text with actual values.
+
+    Args:
+        text: Text that may contain placeholders like url1, url2, fecha1, etc.
+
+    Returns:
+        Text with all placeholders resolved to their actual values.
+    """
+    _load_resolver_maps()
+    result = text
+
+    # Replace URL placeholders (longest keys first to avoid partial overlap)
+    if _RESOLVER_URL_MAP:
+        for key in sorted(_RESOLVER_URL_MAP.keys(), key=len, reverse=True):
+            result = result.replace(key, _RESOLVER_URL_MAP[key])
+
+    # Replace fecha placeholders (longest keys first to avoid partial overlap)
+    if _RESOLVER_FECHA_MAP:
+        for key in sorted(_RESOLVER_FECHA_MAP.keys(), key=len, reverse=True):
+            entry = _RESOLVER_FECHA_MAP[key]
+            valor = entry.get('valor_actual', '')
+            if valor:
+                result = result.replace(key, valor)
+
+    if result != text:
+        logger.info(f"Placeholders resolved in text (len before: {len(text)}, after: {len(result)})")
+
+    return result
+
 class VectorStoreFAISS:
     """
     Almacén vectorial optimizado para CPU usando FAISS.

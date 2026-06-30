@@ -10,7 +10,7 @@ import re
 
 from config.settings import settings
 from .embeddings import EmbeddingModel
-from .retriever import VectorStoreFAISS
+from .retriever import VectorStoreFAISS, resolver_placeholders
 from .generator import TinyLlamaGenerator
 from .gemma_generator import GemmaGenerator
 from .optimized_retriever import OptimizedRetriever
@@ -174,6 +174,9 @@ class RAGSystem:
             if not context_str.strip():
                 return "No encontré información específica sobre eso en los materiales de Prepa en Línea SEP.", False, 0.0, []
             
+            # Resolver placeholders (urlN, fechaN) en el contexto
+            context_str = resolver_placeholders(context_str)
+
             # Variables para métricas
             generation_start = time.time()
             tokens_generated = 0

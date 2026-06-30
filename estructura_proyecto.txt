@@ -1,4 +1,7 @@
 📦 Chatbot-RAG-Fuente-Base/
+├── 📁 .agents/
+│   └── 📁 skills/
+│       └── 📁 continual-learning/
 ├── 📁 api/
 │   ├── 📄 endpoints.py
 │   └── 📄 main.py
@@ -11,7 +14,8 @@
 │   │   ├── 📁 backup_20260414_225227/
 │   │   ├── 📁 backup_20260419_192318/
 │   │   ├── 📁 backup_20260419_200217/
-│   │   └── 📁 backup_20260513_084716/
+│   │   ├── 📁 backup_20260513_084716/
+│   │   └── 📁 backup_20260624_075831/
 │   ├── 📁 vector_store/
 │   │   ├── 📄 documents.pkl
 │   │   ├── 📄 faiss_index.bin
@@ -20,6 +24,8 @@
 │   ├── 📄 Navegación Jerárquica_FER.xlsx
 │   ├── 📄 create_prepa_excel.py
 │   ├── 📄 intents.json
+│   ├── 📄 mapeo_fechas_categorizadas.json
+│   ├── 📄 mapeo_urls_global.json
 │   ├── 📄 menu.json
 │   └── 📄 tickets_config.json
 ├── 📁 evaluation/
@@ -34,6 +40,10 @@
 ├── 📁 images/
 │   ├── 📄 CPU_upgrade.png
 │   └── 📄 dashboard.png
+├── 📁 langchain_layer/
+│   ├── 📄 __init__.py
+│   ├── 📄 config.py
+│   └── 📄 wrappers.py
 ├── 📁 logs/
 │   └── 📄 gemma_wrapper.log
 ├── 📁 models/
@@ -57,6 +67,7 @@
 │   └── 📄 retriever.py
 ├── 📁 scripts/
 │   ├── 📄 debug_rag_loader.py
+│   ├── 📄 extract_dates.py
 │   ├── 📄 load_chunks_to_rag.py
 │   ├── 📄 setup_local.py
 │   └── 📄 upload_documents.py
@@ -126,5 +137,6 @@
 ├── 📄 reporte.html
 ├── 📄 requirements.txt
 ├── 📄 reset_faiss.py
+├── 📄 skills-lock.json
 ├── 📄 test_groq.py
 └── 📄 verificar_memoria.py

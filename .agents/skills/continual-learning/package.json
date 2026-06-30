@@ -1,0 +1,43 @@
+{
+  "name": "opencode-continual-learning",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Automatically and incrementally keeps AGENTS.md up to date by mining session conversations for high-signal learnings",
+  "author": "Barad Ghimire",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/baradghimire/opencode-continual-learning.git"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "agent",
+    "ai",
+    "agents-md",
+    "continual-learning",
+    "memory"
+  ],
+  "main": "src/plugin.ts",
+  "files": [
+    "skills/continual-learning/SKILL.md",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opencode-ai/plugin": "^1.2.15",
+    "@opencode-ai/sdk": "^1.2.15"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^22.0.0",
+    "typescript": "~5.9.3"
+  },
+  "engines": {
+    "bun": ">=1.0.0",
+    "node": ">=18"
+  }
+}

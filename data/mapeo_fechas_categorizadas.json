@@ -1,0 +1,62 @@
+{
+  "periodo_resultados": {
+    "categoria": "periodo_resultados",
+    "patron": "del XX al XX de XXXX de XXXX",
+    "valor_actual": "del 15 al 26 de Junio de 2026",
+    "descripcion": "Periodo para consultar resultados"
+  },
+  "periodo_modulo": {
+    "categoria": "periodo_modulo",
+    "patron": "Módulo 1 del XX al XX de XXXX de XXXX",
+    "valor_actual": "del 13 de Julio al 15 de Agosto de 2026",
+    "descripcion": "Periodo del módulo 1"
+  },
+  "periodo_convocatoria": {
+    "categoria": "periodo_convocatoria",
+    "patron": "del XX al XX de XXXX",
+    "valor_actual": "del 10 al 20 de Agosto de 2026",
+    "descripcion": "Periodo de registro a convocatoria"
+  },
+  "generacion": {
+    "categoria": "generacion",
+    "patron": "Generación XX",
+    "valor_actual": "Generación 62",
+    "descripcion": "Número de generación"
+  },
+  "fecha_limite_inscripcion": {
+    "categoria": "fecha_limite_inscripcion",
+    "patron": "a más tardar el XX de XXXX de XXXX",
+    "valor_actual": "30 de Julio de 2026",
+    "descripcion": "Fecha límite para completar inscripción"
+  },
+  "sesion_informativa": {
+    "categoria": "sesion_informativa",
+    "patron": "el XX de XXXX a las XX:XX",
+    "valor_actual": "10 de Junio a las 18:00",
+    "descripcion": "Fecha y hora de sesión informativa"
+  },
+  "fecha_generica": {
+    "categoria": "fecha_generica",
+    "patron": "XX de XXXX de XXXX",
+    "valor_actual": "20 de Julio de 2026",
+    "descripcion": "Fecha específica (día, mes, año)"
+  },
+  "fecha_simple": {
+    "categoria": "fecha_simple",
+    "patron": "XX de XXXX",
+    "valor_actual": "20 de Julio",
+    "descripcion": "Fecha sin año (mes y día)"
+  },
+  "mes_anio": {
+    "categoria": "mes_anio",
+    "patron": "XXXX de XXXX",
+    "valor_actual": "Julio de 2026",
+    "descripcion": "Solo mes y año"
+  },
+  "hora": {
+    "categoria": "hora",
+    "patron": "XX:XX",
+    "valor_actual": "18:00",
+    "descripcion": "Hora específica"
+  }
+}

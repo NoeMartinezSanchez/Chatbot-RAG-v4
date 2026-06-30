@@ -130,10 +130,13 @@ python reset_faiss.py --create-empty
 Eliminar sin crear backup
 python reset_faiss.py --no-backup
 
-#------------CARGAR LOS CHUNKS---------------------
+#------------CARGAR LOS CHUNKS DE DOCUMENTACION OFICIAL---------------------
 
 python scripts/load_chunks_to_rag.py --chunks "..\Documentos RAG\output\chunks\ready_for_rag\all_chunks.jsonl"
 
+#------------CARGAR LOS CHUNKS DE DOCUMENTACION OFICIAL Y LOS DE MESA DE SERVICIO-----------
+
+python scripts/load_chunks_to_rag.py --chunks "..\Documentos RAG\output\chunks\ready_for_rag/all_chunks_combined.jsonl"
 
 #------------EJECUTAR EL DEBUG PARA DOCUMENTOS PDF--------------------
 

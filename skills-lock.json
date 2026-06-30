@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "continual-learning": {
+      "source": "baradghimire/opencode-continual-learning",
+      "sourceType": "github",
+      "computedHash": "a3b38afbff0813f5b9635712aea3d4807b8b4bb9236edcb63027c76081004078"
+    }
+  }
+}
