@@ -25,6 +25,7 @@
 │   ├── 📄 create_prepa_excel.py
 │   ├── 📄 intents.json
 │   ├── 📄 mapeo_fechas_categorizadas.json
+│   ├── 📄 mapeo_fechas_completo.json
 │   ├── 📄 mapeo_urls_global.json
 │   ├── 📄 menu.json
 │   └── 📄 tickets_config.json
