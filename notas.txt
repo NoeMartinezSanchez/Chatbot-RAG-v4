@@ -160,12 +160,31 @@ git push github main
 
 # 4. ¡Automáticamente se actualiza tu Space en HF!
 
-#----------FLUJO DE TRABAJO ULTIMO POR FALLA DEL WORKFLOW DE GITHUB-----------
+#----------Eliminación de archivos en local-----------
+1.-Eliminar
+git rm informe.html
 
+2.-Hacer commit
 git add .
-git commit -m "Descripción de tu cambio"
-git push v4 main --force
-git push github main --force
+git commit -m " Limpieza: informe.htlm y reporte.html"
+
+3.-Subir a GitHub
+git push github main
+
+#------------Dejar de trakear archivos colocandolos en gitignore------
+
+1.-Actualizar gitignore
+echo "AGENTS.md" >> .gitignore
+
+# 2. Lo eliminas del tracking (pero lo mantienes local)
+git rm --cached AGENTS.md
+
+# 3. Commit
+git add .
+git commit -m "Stop tracking AGENTS.md"
+
+# 4. Push
+git push github main
 
 --------trabajo en Oracle cloud------------------
 

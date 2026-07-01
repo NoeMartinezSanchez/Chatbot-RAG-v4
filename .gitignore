@@ -53,3 +53,6 @@ data/vector_store/*.pkl
 
 # ignora las imagenes
 echo "*.png" >> .gitignore
+
+# ignora archivos personales, sin informacion sensible, solo notas y cosas del entorno de trabajo como notas.txt y agents
+echo "AGENTS.md" >> .gitignore
