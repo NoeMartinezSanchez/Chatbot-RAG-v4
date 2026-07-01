@@ -56,3 +56,4 @@ echo "*.png" >> .gitignore
 
 # ignora archivos personales, sin informacion sensible, solo notas y cosas del entorno de trabajo como notas.txt y agents
 echo "AGENTS.md" >> .gitignore
+echo "notas.txt" >> .gitignore

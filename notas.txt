@@ -1,0 +1,243 @@
+#Para arrancar el ambiente virtual
+.\tinyllama_env\Scripts\Activate.ps1
+.\tinyllama_env\Scripts\Activate.ps1
+
+#Para verificar si la api esta corriendo
+netstat -ano | findstr :8000
+
+# Ejecutar la ap
+tinyllama_env\Scripts\python.exe -m uvicorn api.main:app --reload
+
+# Abre en navegador:
+# - http://localhost:8000       ← Interfaz web del chatbot
+
+# Aca esta la aplicacion
+http://localhost:8000/
+
+# interfaz interactiva
+http://localhost:8000/api/docs
+
+# Prueba Intents
+
+{
+  "message": "hola, tengo una duda sobre el módulo",
+  "user_id": "usuario_prueba"
+}
+
+# Prueba RAG
+
+{
+  "message": "No guarde mi número de folio proporcionado al finalizar su pre-registro",
+  "user_id": "string",
+  "conversation_id": "string"
+}
+
+# Limpiar cache del pip
+pip cache purge
+
+
+#---------CARGA DE EXCEL--------------------
+python scripts/upload_documents.py --file data/documents/tickets_2.xlsx
+
+#---------CARGA DE PDF---------------------
+# 1. Verificar que el sistema RAG funciona
+python scripts/load_chunks_to_rag.py --verify
+
+# 2. Cargar los 144 chunks
+python scripts/load_chunks_to_rag.py --chunks output/chunks/ready_for_rag/all_chunks.jsonl
+
+
+# 3. Modo verbose para ver detalles
+python scripts/load_chunks_to_rag.py --chunks output/chunks/ready_for_rag/all_chunks.jsonl --verbose
+
+# Verificar que los chunks se cargaron
+python scripts/load_chunks_to_rag.py --verify
+
+# Deberías ver que el índice FAISS ahora tiene 575 vectores
+
+
+## -----------Borrado manual de la base de conocimientos -----------------
+
+# 1. Detén cualquier servidor/proceso del chatbot que esté corriendo
+#    Esto libera los archivos para poder borrarlos
+
+# 2. Navega al directorio de tu proyecto
+cd /ruta/a/tu/proyecto
+
+# 3. Borra TODOS los archivos de FAISS y documentos
+rm -rf data/vector_store/*
+
+------------------------------------------------------------
+
+Ahora deberías tener:
+
+🌐 Interfaz Web: http://localhost:8000
+
+📚 API Docs (Swagger): http://localhost:8000/docs
+
+📖 API Redoc: http://localhost:8000/redoc
+
+🩺 Health Check: http://localhost:8000/health
+
+📊 Estadísticas: http://localhost:8000/stats
+
+-------------------------------------------------------------------------
+
+## COMO SE USA EL DEBUGER -----------------------------------------------
+
+# Prueba simple
+python debug_rag_avanzado.py --query "¿Cómo cambio mi correo electrónico?"
+
+# Suite completa
+python debug_rag_avanzado.py --suite
+
+# Con nombre personalizado
+python debug_rag_avanzado.py --suite --name "antes_mejoras"
+
+# Comparar después de mejoras
+python debug_rag_avanzado.py --suite --name "despues_mejoras" --compare "antes_mejoras"
+
+---------GIT-----------------------------------------------------
+
+# 3. Al terminar, verifica cambios
+git status
+
+# 4. Añade archivos modificados
+git add .
+# O archivos específicos: git add archivo.py
+
+# 5. Haz commit con mensaje descriptivo
+git commit -m "Agregada funcionalidad X"
+
+# 6. Sube cambios
+git push origin main
+
+
+
+#------------------BORRAR DATOS DE FAISS--------------------------------
+
+reset_faiss.py en la raíz de tu proyecto. Luego:
+
+Uso básico (con confirmación)
+python reset_faiss.py
+
+Forzar eliminación sin preguntar
+python reset_faiss.py --force
+
+Eliminar y crear índice vacío automáticamente
+python reset_faiss.py --create-empty
+
+Eliminar sin crear backup
+python reset_faiss.py --no-backup
+
+#------------CARGAR LOS CHUNKS DE DOCUMENTACION OFICIAL---------------------
+
+python scripts/load_chunks_to_rag.py --chunks "..\Documentos RAG\output\chunks\ready_for_rag\all_chunks.jsonl"
+
+#------------CARGAR LOS CHUNKS DE DOCUMENTACION OFICIAL Y LOS DE MESA DE SERVICIO-----------
+
+python scripts/load_chunks_to_rag.py --chunks "..\Documentos RAG\output\chunks\ready_for_rag/all_chunks_combined.jsonl"
+
+#------------EJECUTAR EL DEBUG PARA DOCUMENTOS PDF--------------------
+
+python debug_chunks_pdf_simple.py
+
+python debug_chunks_pdf_simple.py --name mi_prueba_marzo
+
+
+#------------FLUJO DE TRABAJO ACTUAL CON HFS----------------------------
+
+# 1. Trabajas en tu copia local
+cd D:\PythonProjects\MachineLearning\ChatBot\Chatbot-RAG-Fuente-Base
+
+# 2. Haces cambios en tu código
+#
+
+# 3. Subes a GitHub
+git add .
+git commit -m "Descripción de tus cambios"
+git push github main
+
+# 4. ¡Automáticamente se actualiza tu Space en HF!
+
+#----------Eliminación de archivos en local y tambien el el repositorio-----------
+1.-Eliminar
+git rm informe.html
+
+2.-Hacer commit
+git add .
+git commit -m " Limpieza: informe.htlm y reporte.html"
+
+3.-Subir a GitHub
+git push github main
+
+#------------Eliminar archivos de github pero mantenerlos en local------
+
+# 1. ANTES DE ELIMINAR: Haz una copia de seguridad
+cp notas.txt notas.txt.backup
+
+# 2. Verifica que el archivo está en GitHub
+git ls-files | grep notas.txt
+# Output: notas.txt ✅
+
+# 3. Elimina el archivo del repositorio
+rm notas.txt
+
+# 4. Commit de eliminación
+git add .
+git commit -m "🗑️ Remove notas.txt from repository"
+
+# 5. Push a GitHub
+git push github main
+
+# 6. ¡RECUPERA EL ARCHIVO! (3 opciones)
+
+# Opción A: Restaurar desde backup
+mv notas.txt.backup notas.txt
+
+# Opción B: Recuperar del último commit (si no hiciste backup)
+git checkout HEAD~1 -- notas.txt  # HEAD~1 = commit anterior
+
+# Opción C: Si ya pasaron varios commits, usa el hash específico
+git log --oneline -- notas.txt  # Encuentra el hash
+git checkout <hash> -- notas.txt
+
+# 7. Agregar a .gitignore (si no lo hiciste antes)
+echo "notas.txt" >> .gitignore
+git add .gitignore
+git commit -m "🔧 Ignore notas.txt"
+git push github main
+
+# 8. Verificar todo
+git status  # ✅ nothing to commit, working tree clean
+ls -la notas.txt  # ✅ El archivo existe con su contenido
+
+--------trabajo en Oracle cloud------------------
+
+Conexion a la nube por ssh
+
+ssh -i C:\Users\mecat\.ssh\oci_key ubuntu@140.84.189.188
+
+Verificar que el servicio este corriendo
+
+sudo systemctl status chatbot
+
+
+------------dashBoard de resultados de la evaluacion automatizada-----------
+
+https://tu-space.hf.space/dashboard
+
+https://huggingface.co/spaces/ecotecds/Chatbot-RAG-v4/dashboard
+
+
+---En esta direccion se puede ver el dashboard del chatbot con la evaluacion automatizada-----------------
+
+https://ecotecds-chatbot-rag-v4.hf.space/dashboard
+
+---Dashboard de interacciones reales-------------
+
+https://ecotecds-chatbot-rag-v4.hf.space/user-dashboard
+
+
+---Interfaz visual de la API----------------------
+https://ecotecds-Chatbot-RAG-v4.hf.space/api/docs
