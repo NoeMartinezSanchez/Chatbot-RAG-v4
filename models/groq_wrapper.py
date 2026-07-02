@@ -24,7 +24,7 @@ class GroqWrapper:
             return
         
         self.client = Groq(api_key=self.api_key)
-        self.model = "llama-3.3-70b-versatile"
+        self.model = "openai/gpt-oss-120b"
         self.max_retries = 3
         self.token_counter = 0
         self.token_file = "token_usage.json"
