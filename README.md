@@ -13,12 +13,12 @@ Asistente virtual con tecnología RAG (Retrieval-Augmented Generation) para estu
 
 ![Python](https://img.shields.io/badge/Python-3.11-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-green)
-![Groq](https://img.shields.io/badge/Groq-LLaMA%203.3%2070B-orange)
+![Groq](https://img.shields.io/badge/Groq-GPT%20OSS%20120B-orange)
 ![HuggingFace](https://img.shields.io/badge/Deployed%20on-HuggingFace%20Spaces-yellow)
 
 ## 🎯 Características Principales
 
-- **RAG con Groq API**: Sistema de Retrieval-Augmented Generation usando LLaMA 3.3 70B Versatile vía Groq API
+- **RAG con Groq API**: Sistema de Retrieval-Augmented Generation usando GPT OSS 120B vía Groq API
 - **Sin GPU necesaria**: Todo via APIs externas (Groq, embeddings); ejecución en CPU
 - **Búsqueda Vectorial**: FAISS con embeddings multilingües optimizados para español
 - **Soporte Multi-formato**: Procesa PDF, Word (docx), Excel (xlsx) y TXT
@@ -31,7 +31,7 @@ Asistente virtual con tecnología RAG (Retrieval-Augmented Generation) para estu
 | Categoría | Tecnología |
 |----------|------------|
 | **Framework API** | FastAPI + Uvicorn |
-| **LLM** | Groq API — LLaMA 3.3 70B Versatile |
+| **LLM** | Groq API — GPT OSS 120B |
 | **Embeddings** | intfloat/multilingual-e5-small (local, 384 dims) |
 | **Vector Store** | FAISS (cpu, FlatL2, top_k=5 optimizado) |
 | **Re-ranking** | Activado con query expansion |
@@ -293,7 +293,7 @@ Chatbot-RAG-Fuente-Base/
 │   ├── retriever.py         # VectorStoreFAISS
 │   └── embeddings.py        # EmbeddingModel (e5-small)
 ├── models/
-│   ├── groq_wrapper.py      # Groq API wrapper (LLaMA 3.3 70B)
+│   ├── groq_wrapper.py      # Groq API wrapper (GPT OSS 120B)
 │   ├── gemini_wrapper.py    # Gemini API wrapper (alternativa)
 │   ├── ollama_wrapper.py    # Legacy (no usado)
 │   └── tinyllama_wrapper.py # Legacy (no usado)
@@ -407,7 +407,7 @@ El proyecto incluye un `Dockerfile` listo para usar. El Space debe configurarse 
 ## 👨‍💻 Habilidades Demostradas
 
 - **Machine Learning**: RAG, embeddings, vector search
-- **Deep Learning**: LLMs (LLaMA 3.3 vía Groq API), prompt engineering
+- **Deep Learning**: LLMs (GPT OSS 120B vía Groq API), prompt engineering
 - **APIs**: FastAPI, RESTful design
 - **DevOps**: Docker, Hugging Face Spaces
 - **Logging**: Diagnóstico avanzado, monitoreo, métricas de latencia
@@ -421,7 +421,7 @@ El proyecto incluye un `Dockerfile` listo para usar. El Space debe configurarse 
 | LangChain (Orquestación) | ✅ Operativo | 0.1.0 |
 | Memoria Conversacional | ✅ Activa | - |
 | RAG System | ✅ Sin cambios | Estable |
-| Groq API (Llama 3.3 70B) | ✅ Operativo | - |
+| Groq API (GPT OSS 120B) | ✅ Operativo | - |
 | Retriever FAISS | ✅ Activo | 108 vectores |
 | Endpoint `/chat` | ✅ Fallback | Original |
 | Endpoint `/chat/v2` | ✅ Con memoria | Nuevo |
