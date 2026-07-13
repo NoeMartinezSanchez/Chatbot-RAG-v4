@@ -3,11 +3,14 @@ Generate User Dashboard - Analiza interacciones reales de usuarios con el chatbo
 """
 import json
 import os
+import logging
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import Counter, defaultdict
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import re
+
+logger = logging.getLogger(__name__)
 
 
 def read_interactions(log_path: str = "/data/user_interactions.jsonl") -> List[Dict[str, Any]]:
@@ -270,6 +273,132 @@ def calculate_metrics(interactions: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+def calculate_sla_metrics(metrics: Dict[str, Any]) -> Dict[str, Any]:
+    THRESHOLD_RESPONSE_GREEN = 2000
+    THRESHOLD_RESPONSE_YELLOW = 4000
+    THRESHOLD_SUCCESS_GREEN = 90.0
+    THRESHOLD_SUCCESS_YELLOW = 70.0
+    THRESHOLD_NOTFOUND_GREEN = 10.0
+    THRESHOLD_NOTFOUND_YELLOW = 20.0
+    THRESHOLD_TOKENS_GREEN = 70.0
+    THRESHOLD_TOKENS_YELLOW = 85.0
+
+    def status(value, green, yellow):
+        if value < green:
+            return "green"
+        elif value < yellow:
+            return "yellow"
+        else:
+            return "red"
+
+    p95 = metrics.get("tiempo_p95_ms", 0)
+    success_rate = metrics.get("tasa_exito", 0)
+    not_found = metrics.get("tasa_no_encontrado", 0)
+    token_pct = metrics.get("token_porcentaje", 0)
+
+    sla_response = {
+        "label": "Tiempo de Respuesta P95",
+        "value": f"{p95:.0f}ms",
+        "status": status(p95, THRESHOLD_RESPONSE_GREEN, THRESHOLD_RESPONSE_YELLOW),
+        "thresholds": f"🟢 < {THRESHOLD_RESPONSE_GREEN}ms | 🟡 < {THRESHOLD_RESPONSE_YELLOW}ms | 🔴 ≥ {THRESHOLD_RESPONSE_YELLOW}ms"
+    }
+    sla_success = {
+        "label": "Tasa de Éxito",
+        "value": f"{success_rate:.1f}%",
+        "status": status(100 - success_rate, 100 - THRESHOLD_SUCCESS_GREEN, 100 - THRESHOLD_SUCCESS_YELLOW) if success_rate > 0 else "red",
+        "thresholds": f"🟢 > {THRESHOLD_SUCCESS_GREEN}% | 🟡 > {THRESHOLD_SUCCESS_YELLOW}% | 🔴 ≤ {THRESHOLD_SUCCESS_YELLOW}%"
+    }
+    sla_notfound = {
+        "label": "Tasa No Encontrado",
+        "value": f"{not_found:.1f}%",
+        "status": status(not_found, THRESHOLD_NOTFOUND_GREEN, THRESHOLD_NOTFOUND_YELLOW),
+        "thresholds": f"🟢 < {THRESHOLD_NOTFOUND_GREEN}% | 🟡 < {THRESHOLD_NOTFOUND_YELLOW}% | 🔴 ≥ {THRESHOLD_NOTFOUND_YELLOW}%"
+    }
+    sla_tokens = {
+        "label": "Uso de Tokens",
+        "value": f"{token_pct:.1f}%",
+        "status": status(token_pct, THRESHOLD_TOKENS_GREEN, THRESHOLD_TOKENS_YELLOW),
+        "thresholds": f"🟢 < {THRESHOLD_TOKENS_GREEN}% | 🟡 < {THRESHOLD_TOKENS_YELLOW}% | 🔴 ≥ {THRESHOLD_TOKENS_YELLOW}%"
+    }
+    items = [sla_response, sla_success, sla_notfound, sla_tokens]
+    status_map = {"green": 3, "yellow": 2, "red": 1}
+    total_score = sum(status_map[i["status"]] for i in items)
+    max_score = len(items) * 3
+    overall_pct = (total_score / max_score) * 100
+    if overall_pct >= 80:
+        overall_status = "green"
+    elif overall_pct >= 50:
+        overall_status = "yellow"
+    else:
+        overall_status = "red"
+
+    return {
+        "items": items,
+        "overall_status": overall_status,
+        "overall_pct": round(overall_pct, 0)
+    }
+
+
+def calculate_roi(metrics: Dict[str, Any]) -> Dict[str, Any]:
+    HUMAN_AGENT_COST_PER_HOUR = 15.0
+    HUMAN_AVG_HANDLING_MINUTES = 10.0
+    WORKING_DAYS_PER_MONTH = 22
+
+    total_queries = metrics.get("total_interacciones", 0)
+    bot_avg_ms = metrics.get("tiempo_promedio_ms", 0)
+    bot_avg_minutes = bot_avg_ms / 60000.0 if bot_avg_ms > 0 else 0.5
+
+    human_minutes = total_queries * HUMAN_AVG_HANDLING_MINUTES
+    bot_minutes = total_queries * bot_avg_minutes
+    time_saved_minutes = human_minutes - bot_minutes
+    time_saved_hours = time_saved_minutes / 60.0
+
+    cost_human = (human_minutes / 60.0) * HUMAN_AGENT_COST_PER_HOUR
+    cost_bot = 0.0
+    total_savings = cost_human - cost_bot
+
+    active_days = max(1, (datetime.now() - datetime.strptime("2026-01-01", "%Y-%m-%d")).days)
+    monthly_savings = (total_savings / active_days) * WORKING_DAYS_PER_MONTH
+    yearly_savings = monthly_savings * 12
+
+    savings_per_query = HUMAN_AVG_HANDLING_MINUTES * (HUMAN_AGENT_COST_PER_HOUR / 60.0)
+
+    return {
+        "total_queries": total_queries,
+        "bot_avg_minutes": round(bot_avg_minutes, 2),
+        "human_avg_minutes": HUMAN_AVG_HANDLING_MINUTES,
+        "time_saved_minutes": round(time_saved_minutes, 0),
+        "time_saved_hours": round(time_saved_hours, 1),
+        "total_savings": round(total_savings, 2),
+        "monthly_savings": round(monthly_savings, 2),
+        "yearly_savings": round(yearly_savings, 2),
+        "savings_per_query": round(savings_per_query, 2),
+        "human_cost_rate": HUMAN_AGENT_COST_PER_HOUR
+    }
+
+
+def send_telegram_alert(message: str) -> bool:
+    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+    if not bot_token or not chat_id:
+        logger.warning("TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID no configurados")
+        return False
+    try:
+        import requests
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
+        resp = requests.post(url, json=payload, timeout=10)
+        if resp.status_code == 200:
+            logger.info("Alerta Telegram enviada correctamente")
+            return True
+        else:
+            logger.error(f"Error enviando alerta Telegram: {resp.status_code} {resp.text}")
+            return False
+    except Exception as e:
+        logger.error(f"Error en conexión Telegram: {e}")
+        return False
+
+
 def formatear_fecha(timestamp_str):
     """Formatea timestamp ISO a DD/MM/YYYY HH:MM."""
     if not timestamp_str:
@@ -338,6 +467,33 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
     respuestas_utiles = metrics.get("respuestas_utiles", 0)
     respuestas_no_utiles = metrics.get("respuestas_no_utiles", 0)
     
+    # SLA y ROI
+    metrics_with_tokens = dict(metrics)
+    metrics_with_tokens["token_porcentaje"] = porcentaje
+    sla_data = calculate_sla_metrics(metrics_with_tokens)
+    roi_data = calculate_roi(metrics)
+    
+    # Pre-format SLA status icons
+    sla_status_icon = {"green": "🟢", "yellow": "🟡", "red": "🔴"}
+    sla_overall_icon = sla_status_icon.get(sla_data["overall_status"], "⚪")
+    sla_items_html = ""
+    for item in sla_data["items"]:
+        icon = sla_status_icon.get(item["status"], "⚪")
+        sla_items_html += f"""<div class="sla-item {item["status"]}">
+            <div class="sla-indicator {item["status"]}">{icon}</div>
+            <div class="sla-info">
+                <div class="sla-label">{item["label"]}</div>
+                <div class="sla-value">{item["value"]}</div>
+            </div>
+        </div>"""
+    
+    # Pre-format ROI cards
+    roi_total_savings = roi_data["total_savings"]
+    roi_monthly = roi_data["monthly_savings"]
+    roi_yearly = roi_data["yearly_savings"]
+    roi_time_saved = roi_data["time_saved_hours"]
+    roi_per_query = roi_data["savings_per_query"]
+    
     # ASCII chart de tokens por hora
     tokens_por_hora = metrics.get("tokens_por_hora", {})
     max_tph = metrics.get("max_tokens_por_hora", 0)
@@ -383,6 +539,7 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard de Usuarios - Prepa en Línea SEP</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         /* Paleta de colores del chatbot */
         :root {{
@@ -462,6 +619,46 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
         .log-empty, .log-error, .log-loading {{ text-align: center; padding: 40px; color: var(--gristexto); }}
         .log-error {{ color: #dc3545; }}
         
+        /* SLA */
+        .sla-overview {{ display: flex; gap: 24px; flex-wrap: wrap; }}
+        .sla-overall {{ flex: 1; min-width: 220px; text-align: center; padding: 24px; border-radius: 12px; }}
+        .sla-overall.green {{ background: #e8f8e8; border: 2px solid #2ecc71; }}
+        .sla-overall.yellow {{ background: #fff8e1; border: 2px solid #f39c12; }}
+        .sla-overall.red {{ background: #fde8e8; border: 2px solid #e74c3c; }}
+        .sla-overall-icon {{ font-size: 48px; margin-bottom: 8px; }}
+        .sla-overall-text {{ font-size: 13px; color: var(--gristexto); margin-bottom: 4px; }}
+        .sla-overall-value {{ font-size: 28px; font-weight: 700; }}
+        .sla-overall.green .sla-overall-value {{ color: #27ae60; }}
+        .sla-overall.yellow .sla-overall-value {{ color: #e67e22; }}
+        .sla-overall.red .sla-overall-value {{ color: #c0392b; }}
+        .sla-overall-pct {{ font-size: 14px; color: var(--gristexto); margin-top: 4px; }}
+        .sla-thresholds-note {{ font-size: 11px; color: #aaa; margin-top: 8px; }}
+        .sla-breakdown {{ flex: 2; min-width: 300px; display: flex; flex-direction: column; gap: 12px; }}
+        .sla-item {{ display: flex; align-items: center; gap: 16px; padding: 16px; border-radius: 10px; }}
+        .sla-item.green {{ background: #e8f8e8; border-left: 4px solid #2ecc71; }}
+        .sla-item.yellow {{ background: #fff8e1; border-left: 4px solid #f39c12; }}
+        .sla-item.red {{ background: #fde8e8; border-left: 4px solid #e74c3c; }}
+        .sla-indicator {{ font-size: 28px; width: 44px; text-align: center; }}
+        .sla-info {{ flex: 1; }}
+        .sla-label {{ font-size: 12px; color: var(--gristexto); text-transform: uppercase; letter-spacing: 0.3px; }}
+        .sla-value {{ font-size: 22px; font-weight: 700; color: var(--azul-principal); }}
+        
+        /* ROI */
+        .roi-card .card-value {{ font-size: 24px; }}
+        .roi-methodology {{ padding: 8px 0; line-height: 1.8; color: var(--azul-principal); font-size: 14px; }}
+        .roi-methodology ul {{ padding-left: 24px; }}
+        .roi-methodology li {{ margin-bottom: 8px; }}
+        
+        /* PDF */
+        @media print {{
+            body {{ padding: 0; }}
+            .btn, .dashboard-tabs {{ display: none !important; }}
+            .tab-content {{ display: block !important; }}
+            .tab-content#logs-tab {{ display: none !important; }}
+            .tab-content#history-tab {{ display: none !important; }}
+            .card, .chart-container {{ break-inside: avoid; box-shadow: none; border: 1px solid #ddd; }}
+        }}
+        
         /* Responsive */
         @media (max-width: 768px) {{
             body {{ padding: 12px; }}
@@ -485,11 +682,16 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
                 <h1>Dashboard de Interacciones Reales</h1>
                 <p class="subtitle">Métricas de uso del chatbot por estudiantes reales</p>
             </div>
-            <button class="btn" onclick="refresh()">🔄 Actualizar</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn" onclick="exportPDF()">📄 Exportar Reporte</button>
+                <button class="btn" onclick="refresh()">🔄 Actualizar</button>
+            </div>
         </div>
         
         <div class="dashboard-tabs">
             <button class="tab-btn active" onclick="showTab('metrics')">📊 Métricas</button>
+            <button class="tab-btn" onclick="showTab('sla')">🎯 SLA</button>
+            <button class="tab-btn" onclick="showTab('roi')">💰 ROI</button>
             <button class="tab-btn" onclick="showTab('logs')">📋 Logs del Sistema</button>
             <button class="tab-btn" onclick="showTab('history')">📜 Historial</button>
         </div>
@@ -604,7 +806,93 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
         
         </div>
         
-        <div id="history-tab" class="tab-content" style="display:none;">
+        <div id="sla-tab" class="tab-content" style="display:none;">
+        <div class="chart-container">
+            <div class="chart-title">🎯 Cumplimiento de SLA</div>
+            <div class="sla-overview">
+                <div class="sla-overall {sla_data["overall_status"]}">
+                    <div class="sla-overall-icon">{sla_overall_icon}</div>
+                    <div class="sla-overall-text">Estado General del SLA</div>
+                    <div class="sla-overall-value">{sla_data["overall_status"].upper()}</div>
+                    <div class="sla-overall-pct">{sla_data["overall_pct"]:.0f}% de cumplimiento</div>
+                    <div class="sla-thresholds-note">Verde ≥ 80% · Amarillo ≥ 50% · Rojo &lt; 50%</div>
+                </div>
+                <div class="sla-breakdown">
+                    {sla_items_html}
+                </div>
+            </div>
+        </div>
+        <div class="chart-container">
+            <div class="chart-title">📋 Definición de Umbrales SLA</div>
+            <table>
+                <thead>
+                    <tr><th>Indicador</th><th>🟢 Verde</th><th>🟡 Amarillo</th><th>🔴 Rojo</th></tr>
+                </thead>
+                <tbody>
+                    {''.join(f'<tr><td>{item["label"]}</td><td style="color:#2ecc71;">Verde</td><td style="color:#f39c12;">Amarillo</td><td style="color:#e74c3c;">Rojo</td></tr>' for item in sla_data["items"])}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div id="roi-tab" class="tab-content" style="display:none;">
+        <div class="grid">
+            <div class="card roi-card">
+                <div class="card-label">💰 Ahorro Total</div>
+                <div class="card-value positivo">${roi_total_savings:,.2f}</div>
+                <div class="card-sub">Desde el inicio del servicio</div>
+            </div>
+            <div class="card roi-card">
+                <div class="card-label">📅 Ahorro Mensual Estimado</div>
+                <div class="card-value positivo">${roi_monthly:,.2f}</div>
+                <div class="card-sub">Basado en {roi_data["total_queries"]:,} consultas procesadas</div>
+            </div>
+            <div class="card roi-card">
+                <div class="card-label">📆 Ahorro Anual Proyectado</div>
+                <div class="card-value positivo">${roi_yearly:,.2f}</div>
+                <div class="card-sub">Proyección a 12 meses</div>
+            </div>
+            <div class="card roi-card">
+                <div class="card-label">⏱️ Tiempo Ahorrado</div>
+                <div class="card-value positivo">{roi_time_saved:,.1f} hrs</div>
+                <div class="card-sub">Equivalente a {roi_time_saved / 8:.1f} días laborales</div>
+            </div>
+        </div>
+        <div class="chart-container">
+            <div class="chart-title">📊 Desglose de Ahorro por Consulta</div>
+            <table>
+                <thead>
+                    <tr><th>Métrica</th><th>Valor</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Total de consultas procesadas</td><td><strong>{roi_data["total_queries"]:,}</strong></td></tr>
+                    <tr><td>Tiempo promedio del bot por consulta</td><td><strong>{roi_data["bot_avg_minutes"]:.2f} min</strong></td></tr>
+                    <tr><td>Tiempo promedio humano estimado</td><td><strong>{roi_data["human_avg_minutes"]:.0f} min</strong></td></tr>
+                    <tr><td>Ahorro de tiempo por consulta</td><td><strong>{roi_data["human_avg_minutes"] - roi_data["bot_avg_minutes"]:.2f} min</strong></td></tr>
+                    <tr><td>Costo evitado por consulta</td><td><strong>${roi_data["human_cost_rate"] / 60 * roi_data["human_avg_minutes"]:.2f}</strong></td></tr>
+                    <tr><td>Costo por hora de agente humano</td><td><strong>${roi_data["human_cost_rate"]:.2f}/hora</strong></td></tr>
+                    <tr><td>Ahorro total en tiempo</td><td><strong>{roi_time_saved:,.1f} horas ({roi_time_saved / 8:.1f} días)</strong></td></tr>
+                    <tr><td>Ahorro mensual estimado</td><td><strong>${roi_monthly:,.2f}</strong></td></tr>
+                    <tr><td>Ahorro anual proyectado</td><td><strong>${roi_yearly:,.2f}</strong></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="chart-container">
+            <div class="chart-title">💡 Metodología de Cálculo</div>
+            <div class="roi-methodology">
+                <p>El cálculo de ROI compara el tiempo que tomaría a un agente humano resolver las mismas consultas versus el tiempo real del chatbot:</p>
+                <ul>
+                    <li><strong>Costo agente humano:</strong> ${roi_data["human_cost_rate"]:.0f} USD/hora (promedio para soporte educativo)</li>
+                    <li><strong>Tiempo humano por consulta:</strong> {roi_data["human_avg_minutes"]:.0f} minutos (estimado)</li>
+                    <li><strong>Tiempo del chatbot:</strong> {roi_data["bot_avg_minutes"]:.2f} minutos promedio</li>
+                    <li><strong>Costo operativo del chatbot:</strong> $0 USD (capa gratuita Groq)</li>
+                    <li><strong>Fórmula:</strong> Ahorro = (Tiempo_humano - Tiempo_bot) × Consultas × Costo_hora / 60</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div id="history-tab" class="tab-content" style="display:none;">
         <div class="chart-container">
             <div class="chart-title">Historial Reciente</div>
             <table id="tablaHistorial">
@@ -737,6 +1025,48 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
                 logInterval = null;
             }}
         }});
+        
+        async function exportPDF() {{
+            const btn = event.target || document.querySelector('.btn');
+            const originalText = btn.textContent;
+            btn.textContent = '⏳ Generando PDF...';
+            btn.disabled = true;
+            
+            try {{
+                const element = document.querySelector('.container');
+                const fecha = new Date().toLocaleDateString('es-MX', {{
+                    year: 'numeric', month: 'long', day: 'numeric'
+                }});
+                
+                const opt = {{
+                    margin:        [10, 10, 10, 10],
+                    filename:     `Reporte-Chatbot-RAG-${{fecha.replace(/ /g, '-')}}.pdf`,
+                    image:        {{ type: 'jpeg', quality: 0.98 }},
+                    html2canvas:  {{ scale: 2, useCORS: true, logging: false }},
+                    jsPDF:        {{ unit: 'mm', format: 'a4', orientation: 'portrait' }},
+                    pagebreak:    {{ mode: ['avoid-all', 'css', 'legacy'] }}
+                }};
+                
+                // Mostrar todas las pestañas temporalmente para capturar contenido
+                document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'block');
+                
+                await html2pdf().set(opt).from(element).save();
+                
+                // Restaurar visibilidad de pestañas
+                document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+                const activeTab = document.querySelector('.tab-btn.active');
+                if (activeTab) {{
+                    const tabName = activeTab.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    document.getElementById(tabName + '-tab').style.display = 'block';
+                }}
+            }} catch (e) {{
+                console.error('Error generando PDF:', e);
+                alert('Error al generar el PDF. Revisa la consola para más detalles.');
+            }} finally {{
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }}
+        }}
     </script>
 </body>
 </html>'''
@@ -757,6 +1087,33 @@ def generate_user_dashboard(
     
     print(f"[OK] Dashboard generado: {output_path}")
     print(f"     Interacciones procesadas: {metrics['total_interacciones']}")
+    
+    token_porcentaje = get_token_stats()["porcentaje"]
+    sla_data = calculate_sla_metrics({**metrics, "token_porcentaje": token_porcentaje})
+    roi_data = calculate_roi(metrics)
+    print(f"     SLA General: {sla_data['overall_status'].upper()} ({sla_data['overall_pct']:.0f}%)")
+    print(f"     Ahorro Total: ${roi_data['total_savings']:,.2f} | Mensual: ${roi_data['monthly_savings']:,.2f}")
+    
+    # Alertas críticas vía Telegram
+    if sla_data["overall_status"] == "red":
+        msg = (
+            f"🚨 *ALERTA SLA - Dashboard {datetime.now().strftime('%d/%m/%Y')}*\n"
+            f"Estado general del servicio: 🔴 CRÍTICO\n"
+            f"Cumplimiento: {sla_data['overall_pct']:.0f}%\n\n"
+        )
+        for item in sla_data["items"]:
+            icon = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(item["status"], "⚪")
+            msg += f"{icon} {item['label']}: {item['value']}\n"
+        msg += f"\n📊 Dashboard: {output_path}"
+        send_telegram_alert(msg)
+    
+    if metrics.get("tasa_no_encontrado", 0) > 25:
+        send_telegram_alert(
+            f"⚠️ *Alerta de Calidad - {datetime.now().strftime('%d/%m/%Y')}*\n"
+            f"Tasa de 'No encontrado' elevada: {metrics['tasa_no_encontrado']:.1f}%\n"
+            f"Por encima del umbral del 25%"
+        )
+    
     return output_path
 
 
