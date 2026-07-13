@@ -378,25 +378,31 @@ def calculate_roi(metrics: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def send_telegram_alert(message: str) -> bool:
+    import time
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
     if not bot_token or not chat_id:
-        logger.warning("TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID no configurados")
+        logger.debug("TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID no configurados")
         return False
-    try:
-        import requests
-        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-        payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
-        resp = requests.post(url, json=payload, timeout=10)
-        if resp.status_code == 200:
-            logger.info("Alerta Telegram enviada correctamente")
-            return True
-        else:
-            logger.error(f"Error enviando alerta Telegram: {resp.status_code} {resp.text}")
-            return False
-    except Exception as e:
-        logger.error(f"Error en conexión Telegram: {e}")
-        return False
+    import requests
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
+    max_retries = 3
+    backoff = [2, 4, 8]
+    for attempt in range(max_retries):
+        try:
+            resp = requests.post(url, json=payload, timeout=30)
+            if resp.status_code == 200:
+                logger.debug(f"Alerta Telegram enviada (intento {attempt + 1})")
+                return True
+            else:
+                logger.debug(f"Telegram respondió {resp.status_code} (intento {attempt + 1})")
+        except Exception as e:
+            logger.debug(f"Fallo conexión Telegram (intento {attempt + 1}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(backoff[attempt])
+    logger.debug("Alerta Telegram no enviada tras reintentos")
+    return False
 
 
 def formatear_fecha(timestamp_str):
