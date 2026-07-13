@@ -189,12 +189,15 @@ async def startup_event():
             
             if vs and vs.index:
                 q_emb = query_embedding.reshape(1, -1).astype('float32')
-                results = vs.index.search(q_emb, 3)
-                logger.info(f"   Resultados (distancias): {results[0]}")
-                if results[0][0] < 1000:  # Distancia baja = similar
-                    logger.info(f"   ✅ Búsqueda exitosa! Distancia: {results[0][0]:.4f}")
+                distances, indices = vs.index.search(q_emb, 3)
+                distancia_array = distances[0]
+                num_results = distancia_array.size if hasattr(distancia_array, 'size') else len(distancia_array)
+                distancias_lista = distancia_array.tolist() if hasattr(distancia_array, 'tolist') else list(distancia_array)
+                logger.info(f"   Resultados (distancias): {distancias_lista}")
+                if num_results > 0 and distancia_array[0] < 1000:
+                    logger.info(f"   ✅ Búsqueda exitosa! Distancia: {float(distancia_array[0]):.4f}")
                 else:
-                    logger.warning(f"   ❌ Sin resultados próximos. Distancias: {results[0]}")
+                    logger.warning(f"   ❌ Sin resultados próximos. Distancias: {distancias_lista}")
             else:
                 logger.warning("   ❌ No se pudo probar búsqueda - índice no disponible")
         except Exception as e:
