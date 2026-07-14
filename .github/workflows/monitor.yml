@@ -1,64 +1,25 @@
 # ============================================================
 # 📡 MONITOREO CONTINUO DEL CHATBOT EN PRODUCCIÓN
 # ============================================================
-# Esta versión NO CONSUME TOKENS de Groq.
-# Solo verifica que el servicio esté vivo y respondiendo.
-#
-# Estrategia de monitoreo:
-# 1. Health Check (/health) - 0 tokens
-# 2. Verificar que el servidor responda - 0 tokens
-# 3. Verificar que el endpoint /chat existe - 0 tokens
+# Versión optimizada: Usa Health Check como indicador principal.
 # ============================================================
 
 name: 📡 Monitoreo Continuo del Chatbot
 
-# ============================================================
-# 📅 CUANDO SE EJECUTA
-# ============================================================
 on:
-  # ⏰ Programado: Cada 10 minutos (para ahorrar recursos)
   schedule:
-    - cron: '*/10 * * * *'  # Cada 10 minutos
-    
-  # 🔧 Manual: Permite ejecutar desde la interfaz de GitHub
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 
-# ============================================================
-# 🧪 TRABAJO: HEALTH CHECK SIN TOKENS
-# ============================================================
 jobs:
   health-check:
-    name: 🔍 Verificar Estado del Servicio (Sin Tokens)
+    name: 🔍 Verificar Estado del Servicio
     runs-on: ubuntu-latest
-    timeout-minutes: 3  # Máximo 3 minutos
+    timeout-minutes: 3
     
     steps:
       # --------------------------------------------------------
-      # PASO 1: Verificar que el servidor RESPONDA (Ping)
-      # --------------------------------------------------------
-      - name: 🔍 Ping al Servidor (Verificar que está vivo)
-        id: ping
-        run: |
-          echo "🔍 Verificando que el servidor esté vivo..."
-          echo "🌐 URL: https://ecotecds-Chatbot-RAG-v4.hf.space"
-          
-          # Verificar que el servidor responda (solo cabeceras)
-          # HEAD request es más ligero que GET
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-            --head \
-            --max-time 10 \
-            https://ecotecds-Chatbot-RAG-v4.hf.space || echo "000")
-          
-          echo "ping_code=$HTTP_CODE" >> $GITHUB_OUTPUT
-          
-          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "301" ]; then
-            echo "✅ Servidor responde (HTTP $HTTP_CODE)"
-          else
-            echo "❌ Servidor NO responde (HTTP $HTTP_CODE)"
-          fi
-      
-      # --------------------------------------------------------
-      # PASO 2: Verificar Health Check (/health) - 0 tokens
+      # PASO 1: Health Check - Endpoint /health
       # --------------------------------------------------------
       - name: 💚 Health Check - Endpoint /health
         id: health
@@ -66,8 +27,6 @@ jobs:
           echo "💚 Verificando health check del chatbot..."
           echo "🌐 URL: https://ecotecds-Chatbot-RAG-v4.hf.space/health"
           
-          # Health check NO consume tokens de Groq
-          # Es solo un endpoint interno que devuelve el estado
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
             --max-time 15 \
             https://ecotecds-Chatbot-RAG-v4.hf.space/health || echo "000")
@@ -76,21 +35,12 @@ jobs:
           
           if [ "$HTTP_CODE" = "200" ]; then
             echo "✅ Health Check: OK (HTTP 200) - SIN CONSUMO DE TOKENS"
-            
-            # Opcional: Verificar que la respuesta sea JSON válido
-            RESPONSE=$(curl -s --max-time 15 \
-              https://ecotecds-Chatbot-RAG-v4.hf.space/health)
-            
-            if echo "$RESPONSE" | grep -q '"status"'; then
-              echo "✅ Health Check: Respuesta JSON válida"
-              echo "📝 Estado: $(echo $RESPONSE | grep -o '"status":"[^"]*"' | cut -d'"' -f4)"
-            fi
           else
             echo "❌ Health Check: FALLÓ (HTTP $HTTP_CODE)"
           fi
       
       # --------------------------------------------------------
-      # PASO 3: Verificar que el endpoint /chat EXISTE (sin llamarlo)
+      # PASO 2: Verificar existencia del endpoint /chat
       # --------------------------------------------------------
       - name: 🔍 Verificar existencia del endpoint /chat
         id: chat_endpoint
@@ -98,45 +48,35 @@ jobs:
           echo "🔍 Verificando que el endpoint /chat existe..."
           echo "🌐 URL: https://ecotecds-Chatbot-RAG-v4.hf.space/chat"
           
-          # Usamos OPTIONS o HEAD para verificar que el endpoint existe
-          # SIN hacer una llamada real que consuma tokens
+          # Usar GET en lugar de HEAD para evitar 405
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-            --head \
             --max-time 10 \
             https://ecotecds-Chatbot-RAG-v4.hf.space/chat || echo "000")
           
           echo "chat_endpoint_code=$HTTP_CODE" >> $GITHUB_OUTPUT
           
-          # 404 = No existe, 405 = Método no permitido pero existe, 200 = OK
-          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "405" ] || [ "$HTTP_CODE" = "302" ]; then
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "405" ]; then
             echo "✅ Endpoint /chat existe (HTTP $HTTP_CODE) - SIN CONSUMO DE TOKENS"
           else
             echo "⚠️ Endpoint /chat no disponible (HTTP $HTTP_CODE)"
           fi
       
       # --------------------------------------------------------
-      # PASO 4: Enviar ALERTA DE CAÍDA (solo si falló algo)
+      # PASO 3: Enviar ALERTA DE CAÍDA
       # --------------------------------------------------------
       - name: 📱 Enviar Alerta de Caída
-        if: |
-          steps.ping.outputs.ping_code != '200' ||
-          steps.health.outputs.health_code != '200' ||
-          steps.chat_endpoint.outputs.chat_endpoint_code == '404'
+        if: steps.health.outputs.health_code != '200'
         run: |
           echo "🚨 ¡ALERTA! El chatbot no está respondiendo correctamente"
           
-          # Obtener estados para el mensaje
-          PING_CODE="${{ steps.ping.outputs.ping_code }}"
           HEALTH_CODE="${{ steps.health.outputs.health_code }}"
           CHAT_CODE="${{ steps.chat_endpoint.outputs.chat_endpoint_code }}"
           
-          # Construir el mensaje de alerta
           MESSAGE="🚨 *ALERTA: CHATBOT CAÍDO O DEGRADADO*
 
           El sistema no está respondiendo correctamente en producción.
 
-          📊 *Estado de los servicios (SIN consumo de tokens):*
-          • Ping al Servidor: $([ "$PING_CODE" = "200" ] && echo "✅ OK" || echo "❌ Falló (HTTP $PING_CODE)")
+          📊 *Estado de los servicios:*
           • Health Check: $([ "$HEALTH_CODE" = "200" ] && echo "✅ OK" || echo "❌ Falló (HTTP $HEALTH_CODE)")
           • Endpoint /chat: $([ "$CHAT_CODE" = "200" ] || [ "$CHAT_CODE" = "405" ] && echo "✅ OK" || echo "❌ Falló (HTTP $CHAT_CODE)")
 
@@ -151,7 +91,6 @@ jobs:
           
           echo "📨 Enviando alerta a Telegram..."
           
-          # Enviar a Telegram
           curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
             -d "text=$MESSAGE" \
@@ -160,14 +99,11 @@ jobs:
           echo "✅ Alerta enviada a Telegram"
       
       # --------------------------------------------------------
-      # PASO 5: Enviar ALERTA DE RECUPERACIÓN
+      # PASO 4: Enviar ALERTA DE RECUPERACIÓN
       # --------------------------------------------------------
       - name: 📱 Enviar Alerta de Recuperación
         if: |
-          (steps.ping.outputs.ping_code == '200' &&
-           steps.health.outputs.health_code == '200' &&
-           (steps.chat_endpoint.outputs.chat_endpoint_code == '200' ||
-            steps.chat_endpoint.outputs.chat_endpoint_code == '405')) &&
+          steps.health.outputs.health_code == '200' &&
           (github.event_name == 'workflow_dispatch')
         run: |
           echo "✅ El servicio está funcionando correctamente"
@@ -177,7 +113,6 @@ jobs:
           El servicio ha vuelto a funcionar correctamente en producción.
 
           📊 *Estado actual:*
-          • Ping al Servidor: ✅ OK
           • Health Check: ✅ OK
           • Endpoint /chat: ✅ OK
 
@@ -194,7 +129,7 @@ jobs:
             -d "parse_mode=Markdown"
       
       # --------------------------------------------------------
-      # PASO 6: Resumen de la ejecución
+      # PASO 5: Resumen de la ejecución
       # --------------------------------------------------------
       - name: 📊 Resumen de Ejecución
         if: always()
@@ -203,7 +138,6 @@ jobs:
           echo "📊 RESUMEN DE MONITOREO (0 TOKENS GASTADOS)"
           echo "=========================================="
           echo "🕐 Fecha: $(date '+%d/%m/%Y %H:%M:%S')"
-          echo "📋 Ping: ${{ steps.ping.outputs.ping_code }}"
           echo "💚 Health Check: ${{ steps.health.outputs.health_code }}"
           echo "🔗 Endpoint /chat: ${{ steps.chat_endpoint.outputs.chat_endpoint_code }}"
           echo "=========================================="
