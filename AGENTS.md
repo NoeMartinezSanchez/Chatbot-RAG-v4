@@ -668,5 +668,18 @@ Drive (Control Escolar): https://drive.google.com/drive/folders/1F-4jh_OQKukr5QF
 
 Drive (Documentación general): https://drive.google.com/drive/folders/1dL29njdNFeeLCTo5BpSj5k9IwS9j-DNC
 
-Última actualización: 24 de Junio de 2026
-Versión del AGENTS.md: 3.0.0
+Última actualización: 13 de Julio de 2026
+Versión del AGENTS.md: 3.1.0
+
+## Learned User Preferences
+- Prefer silent graceful degradation (debug logging, no user-facing errors) for non-critical features like Telegram notifications
+- Maintain existing CSS design/style when adding new dashboard sections; reuse `--azul-*` / `--verde*` / `--rojo*` CSS variables
+- Dashboard SLA thresholds should be clearly documented and visually color-coded (green/yellow/red)
+
+## Learned Workspace Facts
+- FAISS `index.search()` returns tuple `(distances, indices)` where distances is a 2D numpy array; always unpack and access scalars via `array[0][0]`, never compare an array slice directly in an `if`
+- Token stats from `get_token_stats()` live in a separate dict from the `metrics` dict; merge them via `{**metrics, "token_porcentaje": porcentaje}` when SLA needs token usage data
+- `send_telegram_alert()` uses 3 retries with exponential backoff (2s, 4s, 8s), 30s timeout, and only `logger.debug()` — never interrupts dashboard generation on failure
+- Dashboard HTML is one large Python f-string; JavaScript braces must be doubled (`{{` / `}}`) and all Python variable substitutions use single braces `{var}`
+- `requests` is already in `requirements.txt`; no install needed for Telegram integration
+- Dashboard has SLA (response P95, success rate, not-found rate, token usage) and ROI (time/cost savings vs human agent at $15/hr, 10 min/query) tabs exportable to PDF via html2pdf.js CDN
