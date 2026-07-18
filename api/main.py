@@ -28,6 +28,8 @@ from evaluation.performance_logger import log_latency
 from evaluation.automated_evaluator import run_automated_evaluation
 from evaluation.show_results import show_results
 from langchain_layer.wrappers import LangChainRAGWrapper
+from security.sanitizer import InputSanitizer
+from security.monitor import get_monitor
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -263,6 +265,35 @@ async def chat(request: ChatRequest):
     
     try:
         logger.info(f"📩 Mensaje recibido: {request.message[:50]}...")
+        
+        # ===== SANITIZACIÓN DE SEGURIDAD =====
+        sanitized = InputSanitizer.sanitize(request.message)
+        if not sanitized.is_safe:
+            monitor = get_monitor()
+            for t in sanitized.threats:
+                monitor.log_incident(
+                    threat_type=t.threat_type,
+                    severity=t.severity,
+                    snippet=t.snippet[:120],
+                    session_id=request.session_id or "default",
+                    details={"pattern": t.pattern, "position": t.position, "original_message": request.message[:100]},
+                )
+            logger.warning(f"🔒 Bloqueada consulta maliciosa (severidad: {sanitized.severity}): {request.message[:80]}")
+            return JSONResponse(
+                content={
+                    "response": "⚠️ No puedo procesar esa solicitud.",
+                    "sources": [],
+                    "is_rag_response": False,
+                    "confidence": 0.0,
+                    "security_blocked": True,
+                    "session_id": request.session_id or "default",
+                },
+                headers={
+                    "X-Security-Blocked": "true",
+                    "X-Security-Severity": sanitized.severity,
+                }
+            )
+        # ===== FIN SANITIZACIÓN =====
         
         # Generar IDs si no existen
         user_id = request.user_id or str(uuid.uuid4())

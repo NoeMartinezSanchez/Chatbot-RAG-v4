@@ -46,10 +46,13 @@ class InputSanitizer:
 
     ESCAPE_PATTERNS = [
         (r"ignora\s*(instrucciones|prompt|todo)", "ignore_instructions", "high"),
-        (r"ignora\s*(las|todas)\s*(instrucciones|reglas)", "ignore_instructions", "high"),
+        (r"ignora\s*(las|todas|tus)\s*(instrucciones|reglas)", "ignore_instructions", "high"),
+        (r"ignora\s*(las|todas)\s*tus\s*(instrucciones|reglas)", "ignore_instructions", "high"),
         (r"olvida\s*(instrucciones|prompt|reglas|todo)", "forget_instructions", "high"),
-        (r"olvida\s*(las|todas)\s*(instrucciones|reglas)", "forget_instructions", "high"),
+        (r"olvida\s*(las|todas|tus)\s*(instrucciones|reglas)", "forget_instructions", "high"),
+        (r"olvida\s*(las|todas)\s*tus\s*(instrucciones|reglas)", "forget_instructions", "high"),
         (r"no\s*sigas\s*(instrucciones|reglas)", "dont_follow", "high"),
+        (r"no\s*sigas\s*(las|tus)\s*(instrucciones|reglas)", "dont_follow", "high"),
         (r"desvíate", "deviate", "high"),
         (r"actúa\s*como\s*(si\s*no\s*)?(fueras|fueses)", "act_as", "medium"),
         (r"eres\s*libre", "you_are_free", "medium"),
@@ -60,6 +63,8 @@ class InputSanitizer:
         (r"muéstrame\s*(tu\s*)?prompt", "show_prompt", "critical"),
         (r"dime\s*(tu\s*)?prompt", "tell_prompt", "critical"),
         (r"reveal\s*(your\s*)?prompt", "reveal_prompt", "critical"),
+        (r"override\s*(security|protocols|system)", "override_security", "high"),
+        (r"bypass\s*(security|restrictions|rules)", "bypass_security", "high"),
         (r"token\s*de\s*sistema", "system_token", "high"),
         (r"eres\s*un\s*asistente\s*(anterior|diferente)", "different_assistant", "medium"),
     ]
