@@ -431,6 +431,46 @@ async def get_rag_stats():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/security/stats")
+async def get_security_stats():
+    """Estadísticas de incidentes de seguridad en tiempo real"""
+    from security.monitor import get_monitor
+    monitor = get_monitor()
+    return {
+        "status": "success",
+        "data": monitor.get_stats(),
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/security/incidents")
+async def get_security_incidents(limit: int = 50, min_severity: str = "low"):
+    """Incidentes de seguridad recientes"""
+    from security.monitor import get_monitor
+    monitor = get_monitor()
+    incidents = monitor.get_recent_incidents(limit=limit, min_severity=min_severity)
+    return {
+        "status": "success",
+        "incidents": incidents,
+        "count": len(incidents),
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.post("/security/validate")
+async def validate_text(text: str):
+    """Validar texto contra el sanitizer (pruebas manuales)"""
+    from security.sanitizer import InputSanitizer
+    result = InputSanitizer.sanitize(text)
+    return {
+        "status": "success",
+        "is_safe": result.is_safe,
+        "severity": result.severity,
+        "threats": [
+            {"type": t.threat_type, "severity": t.severity, "position": t.position, "snippet": t.snippet[:60]}
+            for t in result.threats
+        ],
+        "threat_count": len(result.threats)
+    }
+
 @app.get("/menu")
 async def get_menu():
     """Endpoint para obtener la estructura del menú jerárquico"""

@@ -11,6 +11,7 @@ Chatbot RAG para Prepa en Línea SEP con:
 - **Memoria**: BufferMemory con historial de conversaciones
 - **CI/CD**: Pipeline automatizado con GitHub Actions
 - **Despliegue**: Automático a Hugging Face Spaces
+- **Monitoreo continuo**: Health check cada 10 min con alertas Telegram (0 tokens gastados)
 
 ---
 
@@ -29,6 +30,7 @@ Chatbot RAG para Prepa en Línea SEP con:
 12. [Estructura del Proyecto](#-estructura-del-proyecto)
 13. [Estado Actual](#-estado-actual-del-sistema)
 14. [Roadmap](#-roadmap-y-próximos-pasos)
+15. [Monitoreo Continuo](#-monitoreo-continuo-en-producción)
 
 ---
 
@@ -82,6 +84,8 @@ HF_TOKEN	Token para despliegue automático a HF Spaces (CI/CD)	❌ Solo CI/CD
 TIMEZONE	Zona horaria para fechas (ej: America/Mexico_City)	✅ Sí
 LOG_LEVEL	Nivel de logging (default: INFO)	❌ No
 ENVIRONMENT	development, staging o production	❌ No
+TELEGRAM_BOT_TOKEN	Token del bot de Telegram para alertas de monitoreo	❌ Solo monitoreo
+TELEGRAM_CHAT_ID	Chat ID de Telegram para recibir alertas	❌ Solo monitoreo
 GOOGLE_API_KEY	DEPRECATED: Solo compatibilidad con versiones anteriores	❌ No
 GEMINI_API_KEY	DEPRECATED: Solo compatibilidad con versiones anteriores	❌ No
 📌 IMPORTANTE: Colocar en .env o como variables de entorno del sistema.
@@ -384,6 +388,59 @@ Detección de errores	En producción	Antes del despliegue
 Tiempo de recuperación	15-30 min manual	0 min
 Despliegue a HF Spaces	Manual	Automático
 
+## 📡 Monitoreo Continuo en Producción
+
+Workflow: `monitor.yml` — cada 10 minutos
+
+### Jobs del Pipeline
+
+**Health Check** (health-check):
+1. 💚 **Health Check** — Endpoint `/health` (HTTP 200 = OK)
+2. 🔍 **Verificar endpoint `/chat`** — Confirma que existe (HTTP 200 o 405)
+3. 📱 **Alerta de Caída** — Se envía a Telegram si health != 200
+4. 📱 **Alerta de Recuperación** — Se envía en ejecución manual cuando el servicio ya responde
+5. 📊 **Resumen de Ejecución** — Siempre se imprime
+
+### Características Clave
+
+| Característica | Detalle |
+|---|---|
+| Token consumption | **0 tokens** — solo usa HTTP status codes |
+| Frecuencia | Cada 10 minutos (cron: `*/10 * * * *`) |
+| Timeout por paso | 15s health, 10s chat endpoint |
+| Timeout total del job | 3 minutos |
+| Alertas | Telegram vía `sendMessage` API |
+| Notificación de caída | Automática si health != 200 |
+| Notificación de recuperación | Solo en `workflow_dispatch` manual |
+
+### Variables de Entorno Requeridas (Secrets)
+
+| Variable | Propósito |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | Token del bot de Telegram |
+| `TELEGRAM_CHAT_ID` | Chat ID para recibir alertas |
+
+### Mensaje de Alerta (Ejemplo)
+
+```text
+🚨 ALERTA: CHATBOT CAÍDO O DEGRADADO
+• Health Check: ❌ Falló (HTTP 503)
+• Endpoint /chat: ❌ Falló (HTTP 000)
+📅 Fecha: 14/07/2026 15:30:00
+💰 Tokens consumidos en monitoreo: 0
+🔧 Acción Requerida: Revisar logs en HF Spaces
+```
+
+### Ventajas
+
+| Aspecto | Beneficio |
+|---|---|
+| ✅ 0 tokens consumidos | No afecta cuota gratuita de Groq |
+| ✅ Detección temprana | Máximo 10 min para detectar caída |
+| ✅ Sin dependencias externas | Solo curl + API de Telegram |
+| ✅ Notificación inmediata | Telegram en tiempo real |
+| ✅ Historial en GitHub Actions | Logs disponibles en cada ejecución |
+
 📝 Guías de Estilo de Código
 Imports
 stdlib primero (os, sys, json, logging, time, datetime, pathlib)
@@ -549,7 +606,8 @@ Chatbot-RAG-Fuente-Base/
 │   └── skills/
 ├── .github/
 │   └── workflows/                  # CI/CD pipeline
-│       └── test-deploy.yml
+│       ├── test-deploy.yml              # CI/CD: Test & Deploy
+│       └── monitor.yml                  # 📡 Monitoreo continuo (cada 10 min)
 ├── api/
 │   ├── endpoints.py                # Rutas API (/documents)
 │   └── main.py                     # FastAPI app principal
@@ -614,6 +672,7 @@ Endpoint /chat	✅ Con LangChain	Memoria + tiempo + placeholders
 Endpoint /chat/v2	✅ Con memoria	Alternativo
 Endpoint clear_memory	✅ Activo	Limpieza por sesión
 Documentación API	✅ Swagger	/api/docs
+Monitoreo Continuo	✅ Activo	Health check c/10 min + alertas Telegram
 Costos mensuales	✅ $0 USD	Capa gratuita Groq
 Métricas de Rendimiento
 Métrica	Valor
@@ -636,7 +695,7 @@ Prioridad	Acción	Impacto esperado	Estado
 7	Agente que decida cuándo usar RAG	Optimizar tokens automáticamente	⏳ Pendiente
 8	Monitoreo de placeholders no resueltos	Detectar placeholders sin resolver	⏳ Pendiente
 9	Balancear contenido del vector store	Más documentos normativos	⏳ Pendiente
-10	Notificaciones Telegram/Slack en CI/CD	Visibilidad inmediata de fallos	⏳ Pendiente
+10	Notificaciones Telegram/Slack en CI/CD	Visibilidad inmediata de fallos	✅ Completado
 
 📌 Notas Finales
 Convenciones Importantes
@@ -668,8 +727,8 @@ Drive (Control Escolar): https://drive.google.com/drive/folders/1F-4jh_OQKukr5QF
 
 Drive (Documentación general): https://drive.google.com/drive/folders/1dL29njdNFeeLCTo5BpSj5k9IwS9j-DNC
 
-Última actualización: 13 de Julio de 2026
-Versión del AGENTS.md: 3.1.0
+Última actualización: 14 de Julio de 2026
+Versión del AGENTS.md: 3.2.0
 
 ## Learned User Preferences
 - Prefer silent graceful degradation (debug logging, no user-facing errors) for non-critical features like Telegram notifications
@@ -683,3 +742,7 @@ Versión del AGENTS.md: 3.1.0
 - Dashboard HTML is one large Python f-string; JavaScript braces must be doubled (`{{` / `}}`) and all Python variable substitutions use single braces `{var}`
 - `requests` is already in `requirements.txt`; no install needed for Telegram integration
 - Dashboard has SLA (response P95, success rate, not-found rate, token usage) and ROI (time/cost savings vs human agent at $15/hr, 10 min/query) tabs exportable to PDF via html2pdf.js CDN
+- Monitoring workflow (`monitor.yml`) uses `curl` HTTP status codes only — 0 Groq tokens consumed; runs every 10 min via `cron: '*/10 * * * *'`
+- Telegram alerts use `sendMessage` API with Markdown parse mode; alert on health != 200, recovery only on `workflow_dispatch`
+- Monitor has 5 steps: Health Check, Chat Endpoint Check, Failure Alert, Recovery Alert, Execution Summary; total job timeout is 3 minutes
+- Secrets for monitoring: `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` — these are GitHub Actions secrets, not in `.env`

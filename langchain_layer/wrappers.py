@@ -5,6 +5,8 @@ from langchain.memory import ConversationBufferMemory
 from collections import defaultdict
 from models.groq_wrapper import GroqWrapper
 from scripts.extract_dates import DateExtractor
+from security.sanitizer import InputSanitizer
+from security.monitor import get_monitor
 
 # Almacenamiento de memorias por sesión
 _session_memories = defaultdict(lambda: ConversationBufferMemory(
@@ -56,6 +58,19 @@ class LangChainRAGWrapper:
         return f"{dias_semana[now.weekday()]} {now.day} de {meses[now.month - 1]} de {now.year}"
 
     def query_with_memory(self, question: str, session_id: str = "default") -> Dict[str, Any]:
+        sanitized = InputSanitizer.sanitize(question)
+        monitor = get_monitor()
+        for t in sanitized.threats:
+            monitor.log_incident(
+                threat_type=t.threat_type,
+                severity=t.severity,
+                snippet=t.snippet,
+                session_id=session_id,
+                details={"pattern": t.pattern, "position": t.position},
+            )
+
+        question = sanitized.cleaned_text
+
         memory = _session_memories[session_id]
 
         history_text = ""
