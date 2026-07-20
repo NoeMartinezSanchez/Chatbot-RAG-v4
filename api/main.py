@@ -1,5 +1,5 @@
 from pathlib import Path
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -7,6 +7,7 @@ import logging
 import json
 import uuid
 from datetime import datetime
+from collections import defaultdict
 import os
 import sys
 import time
@@ -110,6 +111,28 @@ langchain_wrapper = LangChainRAGWrapper(rag_system, memory_enabled=True)
 # Almacenamiento simple en memoria para feedback
 feedback_store = {}
 conversation_store = {}
+
+# Rate limiting: IP -> lista de timestamps
+rate_limit_store = defaultdict(list)
+RATE_LIMIT_MAX = 10
+RATE_LIMIT_WINDOW = 60  # segundos
+
+
+def _get_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _check_rate_limit(ip: str) -> bool:
+    now = time.time()
+    timestamps = rate_limit_store[ip]
+    timestamps[:] = [t for t in timestamps if now - t < RATE_LIMIT_WINDOW]
+    if len(timestamps) >= RATE_LIMIT_MAX:
+        return False
+    timestamps.append(now)
+    return True
 
 # Estado del menú jerárquico
 app.state.menu = {}
@@ -258,16 +281,31 @@ async def health():
     }
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(chat_request: ChatRequest, fastapi_request: Request):
     """Endpoint principal para chat"""
     start_time = time.time()
     retrieval_start = start_time
     
     try:
-        logger.info(f"📩 Mensaje recibido: {request.message[:50]}...")
+        # ===== RATE LIMITING =====
+        ip = _get_client_ip(fastapi_request)
+        if not _check_rate_limit(ip):
+            logger.warning(f"⚠️ Rate limit excedido para IP: {ip}")
+            return JSONResponse(
+                content={
+                    "response": "Has excedido el límite de consultas. Espera un momento.",
+                    "sources": [],
+                    "is_rag_response": False,
+                    "confidence": 0.0,
+                },
+                status_code=429,
+            )
+        # ===== FIN RATE LIMITING =====
+        
+        logger.info(f"📩 Mensaje recibido: {chat_request.message[:50]}...")
         
         # ===== SANITIZACIÓN DE SEGURIDAD =====
-        sanitized = InputSanitizer.sanitize(request.message)
+        sanitized = InputSanitizer.sanitize(chat_request.message)
         if not sanitized.is_safe:
             monitor = get_monitor()
             for t in sanitized.threats:
@@ -275,10 +313,10 @@ async def chat(request: ChatRequest):
                     threat_type=t.threat_type,
                     severity=t.severity,
                     snippet=t.snippet[:120],
-                    session_id=request.session_id or "default",
-                    details={"pattern": t.pattern, "position": t.position, "original_message": request.message[:100]},
+                    session_id=chat_request.session_id or "default",
+                    details={"pattern": t.pattern, "position": t.position, "original_message": chat_request.message[:100]},
                 )
-            logger.warning(f"🔒 Bloqueada consulta maliciosa (severidad: {sanitized.severity}): {request.message[:80]}")
+            logger.warning(f"🔒 Bloqueada consulta maliciosa (severidad: {sanitized.severity}): {chat_request.message[:80]}")
             return JSONResponse(
                 content={
                     "response": "⚠️ No puedo procesar esa solicitud.",
@@ -286,7 +324,7 @@ async def chat(request: ChatRequest):
                     "is_rag_response": False,
                     "confidence": 0.0,
                     "security_blocked": True,
-                    "session_id": request.session_id or "default",
+                    "session_id": chat_request.session_id or "default",
                 },
                 headers={
                     "X-Security-Blocked": "true",
@@ -296,13 +334,13 @@ async def chat(request: ChatRequest):
         # ===== FIN SANITIZACIÓN =====
         
         # Generar IDs si no existen
-        user_id = request.user_id or str(uuid.uuid4())
-        conversation_id = request.conversation_id or str(uuid.uuid4())
+        user_id = chat_request.user_id or str(uuid.uuid4())
+        conversation_id = chat_request.conversation_id or str(uuid.uuid4())
         
         # Usar LangChain wrapper (detecta saludos, fecha, memoria, RAG)
         wrapper_result = langchain_wrapper.query_with_memory(
-            question=request.message,
-            session_id=request.session_id or "default"
+            question=chat_request.message,
+            session_id=chat_request.session_id or "default"
         )
         response_text = wrapper_result["response"]
         is_rag = wrapper_result["is_rag_response"]
@@ -332,7 +370,7 @@ async def chat(request: ChatRequest):
         
         conversation_store[conversation_id].append({
             "message_id": message_id,
-            "user_message": request.message,
+            "user_message": chat_request.message,
             "assistant_response": response_text,
             "timestamp": datetime.now().isoformat(),
             "is_rag": is_rag,
@@ -357,14 +395,14 @@ async def chat(request: ChatRequest):
             generation_time_ms=generation_time,
             total_time_ms=total_time,
             tokens_generated=tokens_generated,
-            question=request.message
+            question=chat_request.message
         )
         
         # Guardar interacción de usuario para dashboard dinámico
         try:
             interaction = {
                 "timestamp": datetime.now().isoformat(),
-                "pregunta": request.message,
+                "pregunta": chat_request.message,
                 "respuesta": response_text,
                 "tiempo_total_ms": round(total_time, 2),
                 "tiempo_retrieval_ms": round(retrieval_time, 2),

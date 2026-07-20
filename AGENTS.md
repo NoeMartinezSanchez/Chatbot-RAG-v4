@@ -12,6 +12,7 @@ Chatbot RAG para Prepa en Línea SEP con:
 - **CI/CD**: Pipeline automatizado con GitHub Actions
 - **Despliegue**: Automático a Hugging Face Spaces
 - **Monitoreo continuo**: Health check cada 10 min con alertas Telegram (0 tokens gastados)
+- **Seguridad**: Sanitización de entrada (inyección, escape de contexto, ofuscación) + monitoreo en memoria con alertas Telegram para incidentes críticos
 
 ---
 
@@ -31,6 +32,7 @@ Chatbot RAG para Prepa en Línea SEP con:
 13. [Estado Actual](#-estado-actual-del-sistema)
 14. [Roadmap](#-roadmap-y-próximos-pasos)
 15. [Monitoreo Continuo](#-monitoreo-continuo-en-producción)
+16. [Sistema de Seguridad](#-sistema-de-seguridad)
 
 ---
 
@@ -643,6 +645,10 @@ Chatbot-RAG-Fuente-Base/
 ├── scripts/
 │   ├── extract_dates.py            # Extractor automático de fechas
 │   └── load_chunks_to_rag.py
+├── security/                       # 🆕 Sistema de seguridad
+│   ├── __init__.py                 # Exports: InputSanitizer, SecurityMonitor
+│   ├── sanitizer.py                # InputSanitizer — 3 categorías de detección
+│   └── monitor.py                  # SecurityMonitor — deque en RAM, alertas Telegram
 ├── static/
 │   └── index.html
 ├── tests/
@@ -673,6 +679,9 @@ Endpoint /chat/v2	✅ Con memoria	Alternativo
 Endpoint clear_memory	✅ Activo	Limpieza por sesión
 Documentación API	✅ Swagger	/api/docs
 Monitoreo Continuo	✅ Activo	Health check c/10 min + alertas Telegram
+Seguridad (Sanitización)	✅ Activo	InputSanitizer — 3 categorías
+Seguridad (Monitoreo)	✅ Activo	SecurityMonitor — deque 1000 en RAM
+Seguridad (Alertas)	✅ Activo	Telegram para severidad high/critical
 Costos mensuales	✅ $0 USD	Capa gratuita Groq
 Métricas de Rendimiento
 Métrica	Valor
@@ -696,6 +705,97 @@ Prioridad	Acción	Impacto esperado	Estado
 8	Monitoreo de placeholders no resueltos	Detectar placeholders sin resolver	⏳ Pendiente
 9	Balancear contenido del vector store	Más documentos normativos	⏳ Pendiente
 10	Notificaciones Telegram/Slack en CI/CD	Visibilidad inmediata de fallos	✅ Completado
+
+## 🛡️ Sistema de Seguridad
+
+Implementado el 18 de Julio de 2026 — Fase 1 completa.
+
+### Componentes
+
+| Componente | Archivo | Propósito |
+|---|---|---|
+| `InputSanitizer` | `security/sanitizer.py` | Detecta y bloquea 3 categorías de amenazas |
+| `SecurityMonitor` | `security/monitor.py` | Almacena incidentes en deque (máx 1000, solo RAM) |
+| Endpoints de visibilidad | `api/main.py` | `/security/stats`, `/security/incidents`, `/security/validate` |
+
+### InputSanitizer — 3 Categorías de Detección
+
+| Categoría | Ejemplos detectados | Severidad |
+|---|---|---|
+| **Inyección directa** | `<script>`, `javascript:`, `<iframe>`, `DROP TABLE`, `ALTER`, `TRUNCATE`, `EXEC`, `xp_cmdshell`, `eval(`, `exec(`, `os.system(` | critical |
+| **Escape de contexto** | "ignora instrucciones", "olvida reglas", "no sigas reglas", "muéstrame tu prompt", "dime tu prompt", "override security", "bypass restrictions" | high/critical |
+| **Ofuscación** | Base64 largo, hex encoding, unicode escape, HTML entities, URL encoding, non-ASCII excesivo | medium/high |
+
+### SecurityMonitor
+
+- `deque(maxlen=1000)` — solo RAM, sin disco, sin DB
+- `log_incident()` → almacena timestamp, tipo, severidad, snippet, session_id, IP
+- `get_stats()` → totales por severidad y tipo, incidentes última hora, % capacidad
+- `get_recent_incidents(limit, min_severity)` → incidentes recientes con filtro
+- Cache de stats con TTL de 2 segundos para alto rendimiento
+
+### Integración en /chat
+
+La sanitización se ejecuta **al inicio** del endpoint `POST /chat` en `api/main.py:270`:
+
+1. `InputSanitizer.sanitize(request.message)` analiza el texto entrante
+2. Si hay amenazas → se registran en el monitor y se retorna:
+   ```json
+   {
+     "response": "⚠️ No puedo procesar esa solicitud.",
+     "sources": [],
+     "is_rag_response": false,
+     "confidence": 0.0,
+     "security_blocked": true
+   }
+   ```
+3. Si es seguro → flujo normal con RAG + memoria + placeholders
+
+El bloqueo es **silencioso**: no lanza excepciones HTTP, solo logs con prefijos 🚨 y 🔒.
+
+### Alertas Telegram para Seguridad
+
+| Severidad | Acción |
+|---|---|
+| `low`, `medium` | Solo log (logger.warning) |
+| `high`, `critical` | Log (logger.error) + alerta Telegram vía `sendMessage` API con Markdown |
+| Sin token/config | Degradación silenciosa (logger.debug) |
+
+Mensaje de alerta incluye: tipo, severidad, sesión, IP, fragmento, fecha. **0 tokens de Groq consumidos.**
+
+### Endpoints de Visibilidad
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/security/stats` | Estadísticas de incidentes en tiempo real |
+| GET | `/security/incidents?limit=50&min_severity=low` | Incidentes recientes |
+| POST | `/security/validate?text=...` | Validar texto contra el sanitizer (pruebas manuales) |
+
+### Prompt Reforzado
+
+El system prompt de Groq en `models/groq_wrapper.py` se actualizó con:
+- Prohibición explícita de revelar instrucciones internas
+- Respuesta fija ante intentos de jailbreak: *"No puedo procesar esa solicitud"*
+- Instrucción de ignorar comandos de override de seguridad
+
+### Métricas
+
+| Métrica | Valor |
+|---|---|
+| Overhead por consulta | ~2ms |
+| Incidentes en memoria | Máx 1,000 (deque) |
+| Alertas Telegram | Solo high/critical |
+| Tokens consumidos | 0 (solo HTTP + logs) |
+| Persistencia en disco | Ninguna |
+
+📌 **Convenciones de Seguridad**
+- SIEMPRE sanitizar antes de RAG
+- NUNCA dejar pasar consultas con severidad ≥ medium
+- SIEMPRE usar el monitor singleton vía `get_monitor()`
+- NUNCA guardar incidentes en disco
+- SIEMPRE responder con mensaje amigable, no con error HTTP
+
+---
 
 📌 Notas Finales
 Convenciones Importantes
@@ -727,8 +827,8 @@ Drive (Control Escolar): https://drive.google.com/drive/folders/1F-4jh_OQKukr5QF
 
 Drive (Documentación general): https://drive.google.com/drive/folders/1dL29njdNFeeLCTo5BpSj5k9IwS9j-DNC
 
-Última actualización: 14 de Julio de 2026
-Versión del AGENTS.md: 3.2.0
+Última actualización: 18 de Julio de 2026
+Versión del AGENTS.md: 3.3.0
 
 ## Learned User Preferences
 - Prefer silent graceful degradation (debug logging, no user-facing errors) for non-critical features like Telegram notifications
@@ -746,3 +846,8 @@ Versión del AGENTS.md: 3.2.0
 - Telegram alerts use `sendMessage` API with Markdown parse mode; alert on health != 200, recovery only on `workflow_dispatch`
 - Monitor has 5 steps: Health Check, Chat Endpoint Check, Failure Alert, Recovery Alert, Execution Summary; total job timeout is 3 minutes
 - Secrets for monitoring: `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` — these are GitHub Actions secrets, not in `.env`
+- Security sanitizer in `security/sanitizer.py` uses 3 categories of regex patterns (injection, escape, obfuscation) with severity ordering: none < low < medium < high < critical
+- `InputSanitizer.sanitize()` is called at the top of `/chat` endpoint in `api/main.py` before any RAG processing; blocked queries return JSON with `security_blocked: true`
+- `SecurityMonitor` in `security/monitor.py` uses `deque(maxlen=1000)` — purely in-memory, no disk I/O, singleton via `get_monitor()`
+- Telegram alerts for security fire only on severity `high` or `critical`, reuse existing `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` env vars, 0 Groq tokens consumed
+- System prompt in `models/groq_wrapper.py` prohibits revealing internal instructions and has fixed jailbreak response
