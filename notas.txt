@@ -164,7 +164,7 @@ git push github main
 1.-Eliminar
 git rm informe.html
 
-2.-Hacer commit
+2.-Hacer commit    
 git add .
 git commit -m " Limpieza: informe.htlm y reporte.html"
 
