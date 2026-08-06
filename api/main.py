@@ -11,6 +11,8 @@ from collections import defaultdict
 import os
 import sys
 import time
+from typing import Optional, List, Dict, Any, Union
+
 
 # AÑADIR ESTAS LÍNEAS PARA PRODUCCIÓN
 # Asegurar que el directorio raíz está en el path
