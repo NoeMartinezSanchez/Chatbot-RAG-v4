@@ -1,0 +1,33 @@
+{
+  "generated_at": "2026-08-05T03:37:11.880932+00:00",
+  "days_window": 7,
+  "daily_stats": [],
+  "system_health": {
+    "status": "healthy",
+    "db_name": "chatbot_rag_db",
+    "total_conversations": 0,
+    "metrics_last_hour": 0,
+    "total_feedback": 0,
+    "avg_latency_ms_last_hour": 0.0
+  },
+  "feedback_stats": {
+    "days": 7,
+    "total_feedback": 0,
+    "avg_rating": 0.0,
+    "correct_count": 0,
+    "incorrect_count": 0,
+    "rating_distribution": {}
+  },
+  "cache_stats": {
+    "total_entries": 0,
+    "total_hits": 0,
+    "avg_hits": 0.0
+  },
+  "executive_summary": {
+    "message": "Sistema saludable. 0 conversaciones en los últimos 7 días. Calificación promedio 0.0/5 (Satisfacción baja — revisar respuestas). Latencia óptima (0 ms en la última hora). 0 cache hits con 0 entradas.",
+    "status": "healthy",
+    "total_conversations_daily": 0,
+    "avg_rating": 0.0,
+    "avg_latency_ms_last_hour": 0.0
+  }
+}

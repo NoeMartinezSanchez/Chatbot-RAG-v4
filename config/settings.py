@@ -95,7 +95,37 @@ class Settings(BaseSettings):
     ENABLE_RATE_LIMITING: bool = False
     RATE_LIMIT_REQUESTS: int = 100
     RATE_LIMIT_WINDOW: int = 60  # segundos
-    
+
+    # ===== MONGODB CONFIGURATION =====
+    MONGODB_URI: str = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+    MONGODB_DB_NAME: str = os.getenv("MONGODB_DB_NAME", "chatbot_rag_db")
+    MONGODB_ENABLE_LOGGING: bool = os.getenv("MONGODB_ENABLE_LOGGING", "true").lower() == "true"
+    MONGODB_RETRY_WRITES: bool = os.getenv("MONGODB_RETRY_WRITES", "true").lower() == "true"
+    MONGODB_MAX_POOL_SIZE: int = int(os.getenv("MONGODB_MAX_POOL_SIZE", "50"))
+    MONGODB_TIMEOUT_MS: int = int(os.getenv("MONGODB_TIMEOUT_MS", "5000"))
+
+    # Collection names (opcional, para mantener consistencia)
+    MONGODB_COLL_CONVERSATIONS: str = os.getenv("MONGODB_COLL_CONVERSATIONS", "conversations")
+    MONGODB_COLL_METRICS: str = os.getenv("MONGODB_COLL_METRICS", "metrics")
+    MONGODB_COLL_FEEDBACK: str = os.getenv("MONGODB_COLL_FEEDBACK", "feedback")
+    MONGODB_COLL_USERS: str = os.getenv("MONGODB_COLL_USERS", "users")
+    MONGODB_COLL_SESSIONS: str = os.getenv("MONGODB_COLL_SESSIONS", "sessions")
+    MONGODB_COLL_RAG_CACHE: str = os.getenv("MONGODB_COLL_RAG_CACHE", "rag_cache")
+    MONGODB_COLL_LOGS: str = os.getenv("MONGODB_COLL_LOGS", "logs")
+
+    # ===== RAG CACHE CONFIGURATION =====
+    RAG_CACHE_ENABLED: bool = os.getenv("RAG_CACHE_ENABLED", "true").lower() == "true"
+    RAG_CACHE_TTL_HOURS: int = int(os.getenv("RAG_CACHE_TTL_HOURS", "24"))
+
+    # ===== RETENTION POLICY (días) =====
+    RETENTION_CONVERSATIONS_DAYS: int = int(os.getenv("RETENTION_CONVERSATIONS_DAYS", "90"))
+    RETENTION_METRICS_DAYS: int = int(os.getenv("RETENTION_METRICS_DAYS", "30"))
+    RETENTION_LOGS_DAYS: int = int(os.getenv("RETENTION_LOGS_DAYS", "14"))
+    RETENTION_FEEDBACK_DAYS: int = int(os.getenv("RETENTION_FEEDBACK_DAYS", "180"))
+
+    # API key opcional para endpoints /admin (vacío = sin protección)
+    ADMIN_API_KEY: Optional[str] = os.getenv("ADMIN_API_KEY")
+
     # ===== AWS (FUTURO) =====
     AWS_ACCESS_KEY_ID: Optional[str] = None
     AWS_SECRET_ACCESS_KEY: Optional[str] = None

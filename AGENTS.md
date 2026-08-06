@@ -9,6 +9,8 @@ Chatbot RAG para Prepa en Línea SEP con:
 - **Placeholders dinámicos**: URLs y fechas actualizables sin reindexación
 - **Conciencia temporal**: Extracción automática de fechas y contexto
 - **Memoria**: BufferMemory con historial de conversaciones
+- **Persistencia**: MongoDB Atlas (motor async) para conversaciones, métricas y feedback
+- **Caché de respuestas**: RAGCacheService (MD5 + TTL) para reducir latencia y consumo
 - **CI/CD**: Pipeline automatizado con GitHub Actions
 - **Despliegue**: Automático a Hugging Face Spaces
 - **Monitoreo continuo**: Health check cada 10 min con alertas Telegram (0 tokens gastados)
@@ -33,6 +35,8 @@ Chatbot RAG para Prepa en Línea SEP con:
 14. [Roadmap](#-roadmap-y-próximos-pasos)
 15. [Monitoreo Continuo](#-monitoreo-continuo-en-producción)
 16. [Sistema de Seguridad](#-sistema-de-seguridad)
+17. [Persistencia MongoDB](#-persistencia-mongodb)
+18. [Caché, Logging y Retención](#-caché-logging-y-retención)
 
 ---
 
@@ -79,6 +83,25 @@ python -m evaluation.generate_dashboard
 
 # Verificar sistema de memoria
 python verificar_memoria.py
+
+# Probar conexión a MongoDB Atlas
+python -m scripts.test_mongodb_connection
+
+# Probar repositorios y servicios MongoDB
+python -m scripts.test_services
+
+# Probar integración completa (MongoDB + API con StubRAG)
+python -m scripts.test_integration
+
+# Probar cache de respuestas RAG
+python -m scripts.test_cache
+
+# Política de retención (dry-run primero)
+python scripts/retention_policy.py --dry-run
+python scripts/retention_policy.py
+
+# Generar reporte de dashboard (JSON)
+python scripts/generate_dashboard_report.py
 🔑 Variables de Entorno Requeridas
 Variable	Descripción	Obligatoria
 GROQ_API_KEY	API key para Groq con GPT OSS 120B	✅ Sí
@@ -90,6 +113,15 @@ TELEGRAM_BOT_TOKEN	Token del bot de Telegram para alertas de monitoreo	❌ Solo 
 TELEGRAM_CHAT_ID	Chat ID de Telegram para recibir alertas	❌ Solo monitoreo
 GOOGLE_API_KEY	DEPRECATED: Solo compatibilidad con versiones anteriores	❌ No
 GEMINI_API_KEY	DEPRECATED: Solo compatibilidad con versiones anteriores	❌ No
+MONGODB_URI	URI de conexión a MongoDB Atlas (ej: mongodb+srv://user:pass@cluster.mongodb.net/)	✅ Sí (si MongoDB habilitado)
+MONGODB_DB_NAME	Nombre de la base de datos (default: chatbot_rag_db)	❌ No
+RAG_CACHE_TTL_HOURS	TTL del caché de respuestas en horas (default: 24)	❌ No
+RAG_CACHE_ENABLED	Habilitar/deshabilitar caché (default: true)	❌ No
+RETENTION_CONVERSATIONS_DAYS	Días a conservar conversaciones (default: 90)	❌ No
+RETENTION_METRICS_DAYS	Días a conservar métricas (default: 30)	❌ No
+RETENTION_LOGS_DAYS	Días a conservar logs (default: 14)	❌ No
+RETENTION_FEEDBACK_DAYS	Días a conservar feedback (default: 180)	❌ No
+ADMIN_API_KEY	API key opcional para endpoints /admin (vacío = sin protección)	❌ No
 📌 IMPORTANTE: Colocar en .env o como variables de entorno del sistema.
 
 🐍 Python & Tooling
@@ -104,6 +136,8 @@ Models: Pydantic v2 (no attrs, no dataclasses para schemas API)
 Logging: logging stdlib + loguru en algunos módulos
 
 Orquestación: LangChain v0.1.0+ con integración Groq
+
+Persistencia: MongoDB Atlas con motor (async) + pymongo/dnspython
 
 Embeddings: SentenceTransformers con intfloat/multilingual-e5-small
 
@@ -243,44 +277,43 @@ Componentes Implementados
 python
 # langchain_layer/wrappers.py
 class LangChainRAGWrapper:
-    def __init__(self):
-        self.rag_system = RAGSystem()
+    def __init__(self, rag_system, memory_enabled: bool = True, mongodb_enabled: bool = True):
+        self.rag_system = rag_system
         self.memory = ConversationBufferMemory()
         self.date_extractor = DateExtractor()
         self.llm = GroqWrapper()
+        self.conv_service = ConversationService()
+        self.metrics_service = MetricsService()
     
-    def query_with_memory(self, question: str, session_id: str):
-        # 1. Recuperar historial
-        history = self.memory.load_memory_variables({})
-        
-        # 2. Inyectar contexto en la pregunta (SOLO para el prompt, NO para retrieval)
-        enhanced_question = f"Historial: {history}\nFecha actual: {fecha_hoy}\nPregunta: {question}"
-        
-        # 3. Separar pregunta REAL para retrieval (¡CRÍTICO!)
+    async def query_with_memory(self, question: str, session_id: str, user_id: str = None, conversation_id: str = None):
+        # 1. Sanitizar entrada (InputSanitizer)
+        # 2. Cargar historial desde MongoDB (_load_history)
+        # 3. Detectar si es pregunta general (fecha/saludo/presentación) → sin RAG
+        # 4. Separar pregunta REAL para retrieval (¡CRÍTICO!)
         pregunta_retrieval = question  # SIN contaminar con historial/fecha
-        
-        # 4. Obtener respuesta del RAG
+        # 5. Obtener respuesta del RAG
         response = self.rag_system.process_query(pregunta_retrieval)
-        
-        # 5. Enriquecer con contexto temporal
+        # 6. Enriquecer con contexto temporal
         response = self._mejorar_respuesta_con_fecha(response, question)
-        
-        # 6. Guardar en memoria
+        # 7. Guardar en memoria local
         self.memory.save_context({"input": question}, {"output": response})
-        
+        # 8. Persistir en MongoDB en BACKGROUND (asyncio.create_task, no bloquea)
+        await self._schedule_save(...)
         return response
 2. Endpoints Disponibles
 Endpoint	Método	Propósito
-/chat	POST	Principal: LangChain + memoria + conciencia temporal + placeholders
+/chat	POST	Principal: LangChain + memoria + conciencia temporal + placeholders + MongoDB (acepta `question` o `message`)
 /chat/v2	POST	LangChain + memoria (versión alternativa)
 /chat/clear_memory	POST	Limpiar memoria por session_id
+/feedback	POST	Registrar feedback (persistido en MongoDB; acepta `user_rating` o `is_helpful`)
+/analytics	GET	Estadísticas combinadas MongoDB: conversaciones, salud del sistema y feedback
 /api/docs	GET	Documentación Swagger/OpenAPI
 3. Estructura de Archivos
 text
 langchain_layer/
 ├── __init__.py          # Versión 0.2.0
 ├── config.py            # Configuración (max_tokens, TTL, timezone)
-└── wrappers.py          # Wrapper con memoria + conciencia temporal
+└── wrappers.py          # Wrapper async con memoria + conciencia temporal + MongoDB
 
 ⏰ Conciencia Temporal
 Fecha de Implementación: 16 de Junio de 2026
@@ -611,8 +644,9 @@ Chatbot-RAG-Fuente-Base/
 │       ├── test-deploy.yml              # CI/CD: Test & Deploy
 │       └── monitor.yml                  # 📡 Monitoreo continuo (cada 10 min)
 ├── api/
-│   ├── endpoints.py                # Rutas API (/documents)
-│   └── main.py                     # FastAPI app principal
+│   ├── endpoints.py                # Rutas API (/documents) + mongodb_router (/chat, /feedback, /analytics)
+│   ├── main.py                     # FastAPI app principal (endpoints con MongoDB)
+│   └── models.py                   # 🆕 Schemas Pydantic compatibles (question/message, user_rating/is_helpful)
 ├── config/
 │   ├── models.py                   # Pydantic models
 │   └── settings.py                 # Configuración con pydantic-settings
@@ -631,11 +665,27 @@ Chatbot-RAG-Fuente-Base/
 ├── langchain_layer/                # Orquestación LangChain
 │   ├── __init__.py                 # Versión 0.2.0
 │   ├── config.py                   # Configuración (memoria, timezone)
-│   └── wrappers.py                 # Wrapper con memoria + conciencia temporal
+│   └── wrappers.py                 # Wrapper async con memoria + MongoDB
 ├── models/
 │   ├── groq_wrapper.py             # Principal (GPT OSS 120B)
 │   ├── gemini_wrapper.py           # DEPRECATED (fallback)
 │   └── ollama_wrapper.py
+├── mongodb/                        # 🆕 Persistencia MongoDB Atlas
+│   ├── __init__.py                 # Exports: conexión, modelos, repositorio, servicios
+│   ├── connection.py               # MongoDBConnection — singleton async (motor)
+│   ├── models.py                   # MessageRole, ConversationCreate, MetricCreate, FeedbackCreate
+│   ├── middleware/
+│   │   ├── __init__.py
+│   │   └── logging_middleware.py   # 🆕 LoggingMiddleware — registra solicitudes HTTP en colección logs
+│   ├── repositories/
+│   │   ├── __init__.py
+│   │   └── base_repository.py      # BaseRepository[T] — CRUD genérico
+│   └── services/
+│       ├── __init__.py             # Exports: clases y funciones de servicio
+│       ├── conversation_service.py # ConversationService — conversaciones + stats + daily + search
+│       ├── metrics_service.py      # MetricsService — métricas por endpoint + salud del sistema
+│       ├── feedback_service.py     # FeedbackService — feedback + stats
+│       └── cache_service.py        # 🆕 RAGCacheService — caché MD5 + TTL + hit_count
 ├── rag/
 │   ├── core.py                     # RAGSystem principal
 │   ├── embeddings.py
@@ -644,7 +694,13 @@ Chatbot-RAG-Fuente-Base/
 │   └── retriever.py                # 🆕 Función resolver_placeholders()
 ├── scripts/
 │   ├── extract_dates.py            # Extractor automático de fechas
-│   └── load_chunks_to_rag.py
+│   ├── load_chunks_to_rag.py
+│   ├── test_mongodb_connection.py  # 🆕 Probar conexión a Atlas
+│   ├── test_services.py            # 🆕 Probar repositorios y servicios
+│   ├── test_integration.py         # 🆕 Prueba de integración (API + MongoDB con StubRAG)
+│   ├── test_cache.py               # 🆕 Prueba del RAGCacheService
+│   ├── retention_policy.py         # 🆕 Política de retención (limpieza por días)
+│   └── generate_dashboard_report.py # 🆕 Reporte de dashboard (JSON)
 ├── security/                       # 🆕 Sistema de seguridad
 │   ├── __init__.py                 # Exports: InputSanitizer, SecurityMonitor
 │   ├── sanitizer.py                # InputSanitizer — 3 categorías de detección
@@ -658,6 +714,7 @@ Chatbot-RAG-Fuente-Base/
 │   └── log_capture.py
 ├── .env                             # Variables de entorno
 ├── AGENTS.md                        # Este archivo
+├── MONGODB_GUIDE.md                 # 📖 Guía del equipo: MongoDB, consultas, dashboard y mantenimiento
 ├── app.py                           # Entry point alternativo
 ├── Dockerfile
 ├── requirements.txt
@@ -679,6 +736,10 @@ Endpoint /chat/v2	✅ Con memoria	Alternativo
 Endpoint clear_memory	✅ Activo	Limpieza por sesión
 Documentación API	✅ Swagger	/api/docs
 Monitoreo Continuo	✅ Activo	Health check c/10 min + alertas Telegram
+Persistencia MongoDB	✅ Activo	Conversaciones, métricas y feedback en Atlas
+Caché de respuestas	✅ Activo	RAGCacheService (MD5 + TTL 24h + hit_count)
+Logging HTTP	✅ Activo	LoggingMiddleware → colección logs
+Retención de datos	✅ Activo	retention_policy.py + /admin/cleanup
 Seguridad (Sanitización)	✅ Activo	InputSanitizer — 3 categorías
 Seguridad (Monitoreo)	✅ Activo	SecurityMonitor — deque 1000 en RAM
 Seguridad (Alertas)	✅ Activo	Telegram para severidad high/critical
@@ -797,6 +858,137 @@ El system prompt de Groq en `models/groq_wrapper.py` se actualizó con:
 
 ---
 
+## 🍃 Persistencia MongoDB
+
+Implementado el 4 de Agosto de 2026 — Persistencia de conversaciones, métricas y feedback en MongoDB Atlas.
+
+### Componentes
+
+| Componente | Archivo | Propósito |
+|---|---|---|
+| `MongoDBConnection` | `mongodb/connection.py` | Singleton async (motor) — conexión + índices |
+| `BaseRepository[T]` | `mongodb/repositories/base_repository.py` | CRUD genérico por colección |
+| `ConversationService` | `mongodb/services/conversation_service.py` | Conversaciones + stats + daily + search |
+| `MetricsService` | `mongodb/services/metrics_service.py` | Métricas por endpoint + salud del sistema |
+| `FeedbackService` | `mongodb/services/feedback_service.py` | Feedback + stats |
+| Schemas Pydantic | `api/models.py` | `ChatRequest`/`ChatResponse`/`FeedbackRequest` (backward compat) |
+
+### Colecciones e Índices
+
+| Colección | Índices (creados en `connect()`) |
+|---|---|
+| `conversations` | `conversation_id` (único), `session_id`, `user_id` |
+| `metrics` | `request_timestamp` (desc), `session_id`, `endpoint` |
+| `feedback` | `conversation_id`, `session_id` |
+| `users`, `sessions`, `rag_cache`, `logs` | Índices según configuración |
+
+### Flujo de Persistencia en /chat
+
+1. `LangChainRAGWrapper.query_with_memory()` es **async** (`langchain_layer/wrappers.py`)
+2. `_load_history()` carga historial previo desde MongoDB (fallback a memoria local si falla)
+3. La respuesta se genera primero; luego `_schedule_save()` persiste **en background** con `asyncio.create_task()`, sin bloquear la respuesta al usuario
+4. Guarda `ConversationCreate` + `MetricCreate` (con tokens estimados `len(text)//4` y `latency_ms`)
+
+### Configuración (config/settings.py)
+
+```python
+MONGODB_URI: str = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+MONGODB_DB_NAME: str = os.getenv("MONGODB_DB_NAME", "chatbot_rag_db")
+MONGODB_ENABLE_LOGGING: bool = True
+MONGODB_MAX_POOL_SIZE: int = 50
+MONGODB_TIMEOUT_MS: int = 5000
+```
+
+### Endpoints con MongoDB
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/chat` | Acepta `question` o `message` (legacy); persiste conversación + métrica |
+| POST | `/feedback` | Acepta `user_rating`/`message_index` o `is_helpful`/`message_id` (legacy) |
+| GET | `/analytics?session_id=&days=` | Conversaciones + salud del sistema + feedback |
+
+### Compatibilidad Backward
+
+- `api/models.py` mapea `message` → `question` vía `model_validator`
+- `/feedback` deriva `user_rating` desde `is_helpful` si el campo nuevo no viene
+- `mongodb_router` en `api/endpoints.py` implementa el schema limpio (usado por `test_integration.py`); los endpoints de producción están en `api/main.py`
+
+### Scripts de Prueba
+
+```bash
+python -m scripts.test_mongodb_connection   # Conexión a Atlas
+python -m scripts.test_services             # Repositorios y servicios
+python -m scripts.test_integration          # Integración completa (StubRAG, httpx ASGI)
+```
+
+- `test_integration.py` usa `StubRAG` (evita FAISS/Groq), monta `mongodb_router` en un FastAPI temporal y limpia sus datos al final.
+
+📖 **Guía para el equipo**: consultar `MONGODB_GUIDE.md` para entender MongoDB (qué es y por qué se usa), la estructura de colecciones, cómo consultar la base desde Python, ejemplos de consultas comunes, cómo interpretar el dashboard y la guía de mantenimiento/troubleshooting.
+
+📌 **Convenciones MongoDB**
+- SIEMPRE usar el singleton `MongoDBConnection()` para conectarse
+- NUNCA bloquear la respuesta con el guardado → usar `_schedule_save()` (background)
+- SIEMPRE degradar con graceful si MongoDB falla (la respuesta al usuario no debe romperse)
+- Los servicios exponen clases (`ConversationService`, etc.) y funciones; usar clases en los endpoints
+
+---
+
+## ⚡ Caché, Logging y Retención
+
+Implementado el 4 de Agosto de 2026 — Caché de respuestas RAG, logging HTTP y política de retención.
+
+### RAGCacheService (`mongodb/services/cache_service.py`)
+
+| Método | Descripción |
+|---|---|
+| `_query_hash(query, context)` | Hash MD5 de consulta + contexto (normaliza minúsculas/espacios) |
+| `get_cached_response(query, context)` | Retorna entrada si existe y no expiró; incrementa `hit_count` |
+| `cache_response(query, response, sources, confidence, context)` | Guarda con `expires_at = now + TTL` |
+| `get_stats()` | Totales de entradas y hits |
+| `cleanup_expired()` | Elimina entradas expiradas |
+
+- TTL configurable vía `RAG_CACHE_TTL_HOURS` (default 24h); desactivable con `RAG_CACHE_ENABLED=false`
+- MongoDB devuelve datetimes **naive** (UTC implícito): normalizar con `_ensure_utc()` antes de comparar con `datetime.now(timezone.utc)`
+- Guardado con `replace_one(..., upsert=True)` para evitar duplicados por `query_hash`
+
+### LoggingMiddleware (`mongodb/middleware/logging_middleware.py`)
+
+- Registrado en `api/main.py` vía `app.add_middleware(LoggingMiddleware)`
+- Persiste en colección `logs`: timestamp, method, path, client_ip, user_agent, status_code, response_time_ms, body (máx 1000 chars)
+- Extrae `session_id` de header `X-Session-ID`, query param o body (fallback `"unknown"`)
+- **No bloquea la respuesta**: falla de MongoDB solo loguea `logger.debug`
+- Captura body con `await request.body()` (no consume el stream para el endpoint)
+
+### Política de Retención (`scripts/retention_policy.py`)
+
+| Colección | Campo timestamp | Días |
+|---|---|---|
+| `conversations` | `created_at` | 90 (`RETENTION_CONVERSATIONS_DAYS`) |
+| `metrics` | `request_timestamp` | 30 (`RETENTION_METRICS_DAYS`) |
+| `logs` | `timestamp` | 14 (`RETENTION_LOGS_DAYS`) |
+| `feedback` | `created_at` | 180 (`RETENTION_FEEDBACK_DAYS`) |
+
+- `run_retention(dry_run=True)` es importable y retorna resumen por colección
+- CLI: `python scripts/retention_policy.py [--dry-run]`
+- Endpoint: `POST /admin/cleanup?dry_run=true` (protegido por `X-Admin-Key` o `admin_key` si `ADMIN_API_KEY` está configurada)
+
+### Reporte Dashboard (`scripts/generate_dashboard_report.py`)
+
+- `generate_report(days=7)` genera estadísticas diarias (7 días), salud del sistema, feedback, cache y resumen ejecutivo
+- Guarda en `data/dashboard_report.json`
+- Endpoint: `GET /admin/dashboard-report?days=7`
+
+### Endpoints de Administración (`api/main.py`)
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/admin/cleanup?dry_run=` | Ejecuta retención (protegido por API key opcional) |
+| GET | `/admin/dashboard-report?days=` | Genera reporte JSON |
+
+`_check_admin_key()` valida header `X-Admin-Key` o query `admin_key` contra `ADMIN_API_KEY`; si la key no está configurada, el endpoint es abierto.
+
+---
+
 📌 Notas Finales
 Convenciones Importantes
 NUNCA modificar el RAG system para inyectar memoria o fechas
@@ -827,8 +1019,8 @@ Drive (Control Escolar): https://drive.google.com/drive/folders/1F-4jh_OQKukr5QF
 
 Drive (Documentación general): https://drive.google.com/drive/folders/1dL29njdNFeeLCTo5BpSj5k9IwS9j-DNC
 
-Última actualización: 18 de Julio de 2026
-Versión del AGENTS.md: 3.3.0
+Última actualización: 4 de Agosto de 2026
+Versión del AGENTS.md: 3.6.0
 
 ## Learned User Preferences
 - Prefer silent graceful degradation (debug logging, no user-facing errors) for non-critical features like Telegram notifications
@@ -851,3 +1043,20 @@ Versión del AGENTS.md: 3.3.0
 - `SecurityMonitor` in `security/monitor.py` uses `deque(maxlen=1000)` — purely in-memory, no disk I/O, singleton via `get_monitor()`
 - Telegram alerts for security fire only on severity `high` or `critical`, reuse existing `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` env vars, 0 Groq tokens consumed
 - System prompt in `models/groq_wrapper.py` prohibits revealing internal instructions and has fixed jailbreak response
+- MongoDB persistence uses `MongoDBConnection()` singleton (motor async); `_create_indexes()` runs only once per process via `_indexes_ready` flag
+- `LangChainRAGWrapper.query_with_memory()` is `async def (question, session_id="default", user_id=None, conversation_id=None)`; saving to MongoDB goes through `_schedule_save()` → `asyncio.create_task()` so it never blocks the HTTP response
+- `_load_history()` reads prior conversations from MongoDB (`get_conversations_by_session`) and falls back to in-memory `_session_memories` if MongoDB fails
+- `_estimate_tokens()` approximates tokens as `max(1, len(text)//4)`; `MetricCreate` stores `latency_ms` and estimated `tokens_used`
+- `api/models.py` provides backward compat: `ChatRequest` maps `message`→`question` via `model_validator`, `FeedbackRequest` derives `user_rating` from `is_helpful`
+- `mongodb_router` in `api/endpoints.py` (clean `question`/`user_rating` schema) is NOT mounted in `api/main.py` — mounting would conflict with the existing `/chat`, `/feedback`, `/analytics` routes already defined there; it's the test target for `scripts/test_integration.py`
+- `scripts/test_integration.py` uses a `StubRAG` (avoids FAISS/Groq) with httpx `ASGITransport` and a temporary FastAPI app, then deletes its test data (`itest-session-*`) at the end
+- Local `import api.main` is blocked by a corrupted leftover TensorFlow 2.18.0 install (not in `requirements.txt`, so production/CI is unaffected); verify API changes via `scripts/test_integration.py` instead
+- Run Python scripts with `PYTHONIOENCODING=utf-8` on Windows to avoid `UnicodeEncodeError` (cp1252) when printing emoji (✅)
+- `RAGCacheService` stores entries in the `rag_cache` collection with `query_hash` = MD5 of normalized query (+ JSON context); `get_cached_response()` increments `hit_count` and returns None if the entry is expired (and deletes it)
+- MongoDB returns naive datetimes (implicit UTC): always normalize with `_ensure_utc()` (or `.replace(tzinfo=timezone.utc)`) before comparing with `datetime.now(timezone.utc)`
+- `LoggingMiddleware` (added in `api/main.py` via `app.add_middleware`) persists HTTP requests to the `logs` collection — body captured up to 1000 chars with `await request.body()`, never blocks the response, fails silently (logger.debug)
+- Retention rules in `scripts/retention_policy.py` (`RETENTION_RULES`): conversations 90d / metrics 30d / logs 14d / feedback 180d, driven by `RETENTION_*_DAYS` env vars; `run_retention(dry_run=True)` is importable for the `/admin/cleanup` endpoint
+- `/admin/cleanup` and `/admin/dashboard-report` are protected by `ADMIN_API_KEY` (optional): `_check_admin_key()` reads `X-Admin-Key` header or `admin_key` query param; empty key = endpoint open
+- `scripts/generate_dashboard_report.py` → `save_report(days)` writes `data/dashboard_report.json`; `generate_report()` and `save_report()` are importable for the admin endpoint
+- Keep a generated `data/dashboard_report.json` in the repo after running the report script (it's an expected artifact)
+- `MONGODB_GUIDE.md` is the team-facing reference (in Spanish) for MongoDB: what it is, collection structure, Python query examples, dashboard interpretation, and maintenance/troubleshooting; link to it from AGENTS.md whenever MongoDB topics are referenced

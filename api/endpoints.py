@@ -9,18 +9,29 @@ from langchain_layer.wrappers import LangChainRAGWrapper
 from pydantic import BaseModel
 from typing import Optional
 
-from rag.core import RAGSystem
 from config.models import Document
+from api import models as api_models
+from mongodb.models import FeedbackCreate
+from mongodb.services import ConversationService, MetricsService, FeedbackService
 
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = "default"
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+mongodb_router = APIRouter(tags=["mongodb"])
 logger = logging.getLogger(__name__)
 
-# Instancia global del sistema RAG
-rag_system = RAGSystem()
+# Instancia global del sistema RAG (carga diferida para no bloquear el import)
+_rag_system = None
+
+def get_rag_system():
+    """Retorna el sistema RAG (lazy)"""
+    global _rag_system
+    if _rag_system is None:
+        from rag.core import RAGSystem
+        _rag_system = RAGSystem()
+    return _rag_system
 
 @router.post("/upload")
 async def upload_document(file: UploadFile = File(...)):
@@ -39,7 +50,7 @@ async def upload_document(file: UploadFile = File(...)):
         }
         
         # Procesar documento
-        rag_system.add_document(text_content, metadata)
+        get_rag_system().add_document(text_content, metadata)
         
         return {
             "status": "success",
@@ -58,7 +69,7 @@ async def upload_json_documents(documents: List[Document]):
         processed_count = 0
         
         for doc in documents:
-            rag_system.add_document(doc.content, doc.metadata)
+            get_rag_system().add_document(doc.content, doc.metadata)
             processed_count += 1
         
         return {
@@ -105,26 +116,22 @@ async def search_documents(query: str, top_k: int = 5):
         logger.error(f"Error buscando documentos: {e}")
         raise HTTPException(status_code=500, detail="Error buscando documentos")
 
-# Inicialización del wrapper LangChain
-_rag_instance = None
+# Inicialización del wrapper LangChain (lazy)
 _langchain_wrapper = None
 
 def get_langchain_wrapper():
-    global _rag_instance, _langchain_wrapper
-    if _rag_instance is None:
-        from rag.core import RAGSystem
-        _rag_instance = RAGSystem()
+    global _langchain_wrapper
     if _langchain_wrapper is None:
-        _langchain_wrapper = LangChainRAGWrapper(_rag_instance, memory_enabled=False)
+        _langchain_wrapper = LangChainRAGWrapper(get_rag_system(), memory_enabled=False, mongodb_enabled=True)
     return _langchain_wrapper
 
 @router.post("/chat/v2")
 async def chat_v2(request: ChatRequest):
     """
-    Nuevo endpoint con LangChain (memoria en desarrollo)
+    Nuevo endpoint con LangChain (memoria en desarrollo + persistencia MongoDB)
     """
     wrapper = get_langchain_wrapper()
-    result = wrapper.query_with_memory(request.message, request.session_id)
+    result = await wrapper.query_with_memory(request.message, request.session_id or "default")
     
     return {
         "response": result["response"],
@@ -132,6 +139,7 @@ async def chat_v2(request: ChatRequest):
         "is_rag_response": result.get("is_rag_response", True),
         "confidence": result.get("confidence", 0.0),
         "session_id": request.session_id,
+        "conversation_id": result.get("conversation_id"),
         "langchain_version": True
     }
 
@@ -142,3 +150,74 @@ async def clear_memory(session_id: str = "default"):
     """
     wrapper = get_langchain_wrapper()
     return wrapper.clear_memory(session_id)
+
+# ============================================================
+# ENDPOINTS MONGODB (rutas /chat, /feedback, /analytics)
+# ============================================================
+
+@mongodb_router.post("/chat", response_model=api_models.ChatResponse)
+async def chat_mongodb(request: api_models.ChatRequest):
+    """Chat con persistencia en MongoDB (schema `question`, async wrapper)."""
+    wrapper = get_langchain_wrapper()
+    result = await wrapper.query_with_memory(
+        question=request.question,
+        session_id=request.session_id,
+        user_id=request.user_id,
+        conversation_id=request.conversation_id,
+    )
+    return api_models.ChatResponse(
+        response=result["response"],
+        sources=result.get("sources", []),
+        is_rag_response=result.get("is_rag_response", True),
+        confidence=result.get("confidence", 0.0),
+        conversation_id=result.get("conversation_id"),
+        session_id=request.session_id,
+    )
+
+
+@mongodb_router.post("/feedback")
+async def feedback_mongodb(request: api_models.FeedbackRequest):
+    """Registrar feedback en MongoDB."""
+    user_rating = request.user_rating
+    is_correct = request.is_correct
+    if user_rating is None and request.is_helpful is not None:
+        user_rating = 5 if request.is_helpful else 1
+        is_correct = request.is_helpful
+
+    feedback_service = FeedbackService()
+    feedback_id = await feedback_service.record_feedback(FeedbackCreate(
+        session_id=request.session_id,
+        conversation_id=request.conversation_id,
+        message_index=request.message_index or 0,
+        user_rating=user_rating,
+        user_comment=request.user_comment or request.feedback_text,
+        is_correct=is_correct,
+    ))
+    return {"status": "success", "feedback_id": feedback_id}
+
+
+@mongodb_router.get("/analytics")
+async def analytics_mongodb(session_id: Optional[str] = None, days: int = 7):
+    """Analíticas combinadas (conversaciones, salud del sistema, feedback)."""
+    conv_service = ConversationService()
+    metrics_service = MetricsService()
+    feedback_service = FeedbackService()
+
+    conversation_stats = None
+    if session_id:
+        conversation_stats = await conv_service.get_conversation_stats(session_id)
+
+    daily_stats = await conv_service.get_daily_stats(days=days)
+    system_health = await metrics_service.get_system_health()
+    feedback_stats = await feedback_service.get_feedback_stats(days=days)
+
+    return {
+        "status": "success",
+        "analytics": {
+            "conversation_stats": conversation_stats,
+            "daily_stats": daily_stats,
+            "system_health": system_health,
+            "feedback_stats": feedback_stats,
+        },
+        "timestamp": datetime.now().isoformat(),
+    }

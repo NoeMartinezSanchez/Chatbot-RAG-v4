@@ -313,6 +313,42 @@ Chatbot-RAG-Fuente-Base/
 └── requirements.txt         # Dependencias Python
 ```
 
+## 🔧 Configuración de Variables de Entorno
+
+El sistema se configura mediante variables de entorno (o archivo `.env` en la raíz). Usa `.env.example` como plantilla: `cp .env.example .env`.
+
+### Variables Obligatorias
+
+| Variable | Descripción |
+|----------|-------------|
+| `GROQ_API_KEY` | API key para Groq (GPT OSS 120B) |
+| `MONGODB_URI` | URI de conexión a MongoDB Atlas |
+
+### Variables Recomendadas
+
+| Variable | Descripción | Default |
+|----------|-------------|---------|
+| `MONGODB_DB_NAME` | Nombre de la base de datos | `chatbot_rag_db` |
+| `ADMIN_API_KEY` | Clave para endpoints `/admin/*` | (vacía = sin protección) |
+| `TIMEZONE` | Zona horaria para fechas | `America/Mexico_City` |
+
+### Variables Opcionales
+
+| Variable | Descripción | Default |
+|----------|-------------|---------|
+| `RAG_CACHE_TTL_HOURS` | TTL del cache de respuestas | `24` |
+| `RAG_CACHE_ENABLED` | Habilitar cache | `true` |
+| `RETENTION_CONVERSATIONS_DAYS` | Días de retención de conversaciones | `90` |
+| `RETENTION_METRICS_DAYS` | Días de retención de métricas | `30` |
+| `RETENTION_LOGS_DAYS` | Días de retención de logs | `14` |
+| `RETENTION_FEEDBACK_DAYS` | Días de retención de feedback | `180` |
+| `MONGODB_ENABLE_LOGGING` | Habilitar LoggingMiddleware | `true` |
+| `ENVIRONMENT` | Entorno (`development`, `staging`, `production`) | `development` |
+| `LOG_LEVEL` | Nivel de logging | `INFO` |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Alertas Telegram (monitoreo/seguridad) | — |
+
+> 📌 En **Hugging Face Spaces** configurar las variables en **Settings → Variables and secrets**, nunca como archivo `.env`. Verificar con `python scripts/verify_hf_spaces.py`.
+
 ## 🚀 Instalación Local
 
 ```bash
@@ -329,8 +365,9 @@ source venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
 
 # 4. Configurar variables de entorno (crear archivo .env)
+cp .env.example .env
 # Obtén tu API Key en https://console.groq.com/keys
-echo "GROQ_API_KEY=tu_api_key_aqui" > .env
+# Edita .env y completa GROQ_API_KEY y MONGODB_URI
 
 # 5. Cargar documentos al vector store
 python scripts/load_chunks_to_rag.py

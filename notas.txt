@@ -184,16 +184,6 @@ git add .gitignore
 git commit -m "🗑️ Remove notas.txt from GitHub (keep locally)"
 git push github main
 
---------trabajo en Oracle cloud------------------
-
-Conexion a la nube por ssh
-
-ssh -i C:\Users\mecat\.ssh\oci_key ubuntu@140.84.189.188
-
-Verificar que el servicio este corriendo
-
-sudo systemctl status chatbot
-
 
 ------------dashBoard de resultados de la evaluacion automatizada-----------
 

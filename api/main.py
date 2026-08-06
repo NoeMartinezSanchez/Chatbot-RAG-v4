@@ -22,7 +22,7 @@ if project_root not in sys.path:
 
 
 from config.settings import settings, print_config_summary
-from config.models import ChatRequest, ChatResponse, FeedbackRequest
+from api.models import ChatRequest, ChatResponse, FeedbackRequest
 from rag.core import RAGSystem
 from data.build_menu_json import load_menu_json
 from evaluation.performance_logger import log_latency
@@ -31,6 +31,10 @@ from evaluation.show_results import show_results
 from langchain_layer.wrappers import LangChainRAGWrapper
 from security.sanitizer import InputSanitizer
 from security.monitor import get_monitor
+from mongodb.connection import MongoDBConnection
+from mongodb.models import FeedbackCreate
+from mongodb.services import ConversationService, MetricsService, FeedbackService
+from mongodb.middleware import LoggingMiddleware
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -104,6 +108,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Middleware de logging HTTP (persiste solicitudes en MongoDB, no bloquea)
+app.add_middleware(LoggingMiddleware)
+
 # Inicializar sistema RAG
 rag_system = RAGSystem()
 langchain_wrapper = LangChainRAGWrapper(rag_system, memory_enabled=True)
@@ -150,6 +157,13 @@ async def startup_event():
     """Inicializar sistema al arrancar"""
     try:
         print_config_summary()
+
+        # Conectar a MongoDB (no crítico si falla)
+        try:
+            await MongoDBConnection().connect()
+            logger.info("✅ MongoDB conectado en el arranque")
+        except Exception as e:
+            logger.warning(f"⚠️ MongoDB no disponible al arrancar: {e}")
         
         # Cargar intents
         rag_system.load_intents("data/intents.json")
@@ -247,6 +261,16 @@ async def startup_event():
         app.state.menu = {}
 
 
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cerrar conexiones al apagar la aplicación"""
+    try:
+        await MongoDBConnection().disconnect()
+        logger.info("🔌 MongoDB desconectado al apagar")
+    except Exception as e:
+        logger.warning(f"⚠️ Error cerrando MongoDB: {e}")
+
+
 @app.get("/")
 async def root():
     """Servir la interfaz web principal"""
@@ -302,10 +326,11 @@ async def chat(chat_request: ChatRequest, fastapi_request: Request):
             )
         # ===== FIN RATE LIMITING =====
         
-        logger.info(f"📩 Mensaje recibido: {chat_request.message[:50]}...")
+        pregunta = chat_request.question or ""
+        logger.info(f"📩 Mensaje recibido: {pregunta[:50]}...")
         
         # ===== SANITIZACIÓN DE SEGURIDAD =====
-        sanitized = InputSanitizer.sanitize(chat_request.message)
+        sanitized = InputSanitizer.sanitize(pregunta)
         if not sanitized.is_safe:
             monitor = get_monitor()
             for t in sanitized.threats:
@@ -314,9 +339,9 @@ async def chat(chat_request: ChatRequest, fastapi_request: Request):
                     severity=t.severity,
                     snippet=t.snippet[:120],
                     session_id=chat_request.session_id or "default",
-                    details={"pattern": t.pattern, "position": t.position, "original_message": chat_request.message[:100]},
+                    details={"pattern": t.pattern, "position": t.position, "original_message": pregunta[:100]},
                 )
-            logger.warning(f"🔒 Bloqueada consulta maliciosa (severidad: {sanitized.severity}): {chat_request.message[:80]}")
+            logger.warning(f"🔒 Bloqueada consulta maliciosa (severidad: {sanitized.severity}): {pregunta[:80]}")
             return JSONResponse(
                 content={
                     "response": "⚠️ No puedo procesar esa solicitud.",
@@ -337,15 +362,18 @@ async def chat(chat_request: ChatRequest, fastapi_request: Request):
         user_id = chat_request.user_id or str(uuid.uuid4())
         conversation_id = chat_request.conversation_id or str(uuid.uuid4())
         
-        # Usar LangChain wrapper (detecta saludos, fecha, memoria, RAG)
-        wrapper_result = langchain_wrapper.query_with_memory(
-            question=chat_request.message,
-            session_id=chat_request.session_id or "default"
+        # Usar LangChain wrapper (detecta saludos, fecha, memoria, RAG + guarda en MongoDB)
+        wrapper_result = await langchain_wrapper.query_with_memory(
+            question=pregunta,
+            session_id=chat_request.session_id or "default",
+            user_id=user_id,
+            conversation_id=conversation_id,
         )
         response_text = wrapper_result["response"]
         is_rag = wrapper_result["is_rag_response"]
         confidence = wrapper_result["confidence"]
         sources = wrapper_result.get("sources", [])
+        conversation_id = wrapper_result.get("conversation_id", conversation_id)
         retrieval_time = 0
         generation_time = 0
 
@@ -360,7 +388,9 @@ async def chat(chat_request: ChatRequest, fastapi_request: Request):
             response=response_text,
             sources=sources,
             is_rag_response=is_rag,
-            confidence=conf_value
+            confidence=conf_value,
+            conversation_id=conversation_id,
+            session_id=chat_request.session_id or "default",
         )
         
         # Almacenar conversación
@@ -370,7 +400,7 @@ async def chat(chat_request: ChatRequest, fastapi_request: Request):
         
         conversation_store[conversation_id].append({
             "message_id": message_id,
-            "user_message": chat_request.message,
+            "user_message": pregunta,
             "assistant_response": response_text,
             "timestamp": datetime.now().isoformat(),
             "is_rag": is_rag,
@@ -395,14 +425,14 @@ async def chat(chat_request: ChatRequest, fastapi_request: Request):
             generation_time_ms=generation_time,
             total_time_ms=total_time,
             tokens_generated=tokens_generated,
-            question=chat_request.message
+            question=pregunta
         )
         
         # Guardar interacción de usuario para dashboard dinámico
         try:
             interaction = {
                 "timestamp": datetime.now().isoformat(),
-                "pregunta": chat_request.message,
+                "pregunta": pregunta,
                 "respuesta": response_text,
                 "tiempo_total_ms": round(total_time, 2),
                 "tiempo_retrieval_ms": round(retrieval_time, 2),
@@ -432,26 +462,153 @@ async def chat(chat_request: ChatRequest, fastapi_request: Request):
 
 @app.post("/feedback")
 async def submit_feedback(request: FeedbackRequest):
-    """Endpoint para recibir feedback"""
+    """Endpoint para recibir feedback (persistido en MongoDB)"""
     try:
-        feedback_store[request.message_id] = {
+        # Backward compat: derivar rating desde is_helpful si user_rating no viene
+        user_rating = request.user_rating
+        is_correct = request.is_correct
+        if user_rating is None and request.is_helpful is not None:
+            user_rating = 5 if request.is_helpful else 1
+            is_correct = request.is_helpful
+
+        feedback_data = FeedbackCreate(
+            session_id=request.session_id,
+            conversation_id=request.conversation_id,
+            message_index=request.message_index or 0,
+            user_rating=user_rating,
+            user_comment=request.user_comment or request.feedback_text,
+            is_correct=is_correct,
+        )
+
+        feedback_service = FeedbackService()
+        feedback_id = await feedback_service.record_feedback(feedback_data)
+
+        # Mantener store en memoria para /stats (backward compat)
+        feedback_store[request.message_id or feedback_id] = {
             "conversation_id": request.conversation_id,
             "is_helpful": request.is_helpful,
             "feedback_text": request.feedback_text,
+            "feedback_id": feedback_id,
             "timestamp": datetime.now().isoformat()
         }
         
-        logger.info(f"📝 Feedback recibido: {request.message_id} - Útil: {request.is_helpful}")
+        logger.info(f"📝 Feedback recibido: {request.conversation_id} - Rating: {user_rating}")
         
         return {
             "status": "success",
             "message": "Feedback registrado",
-            "message_id": request.message_id
+            "message_id": request.message_id,
+            "feedback_id": feedback_id
         }
         
     except Exception as e:
-        logger.error(f"❌ Error guardando feedback: {e}")
+        logger.error(f"❌ Error guardando feedback: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error guardando feedback")
+
+
+@app.get("/analytics")
+async def get_analytics(session_id: str = None, days: int = 7):
+    """Analíticas combinadas de conversaciones, salud del sistema y feedback (MongoDB)"""
+    try:
+        conv_service = ConversationService()
+        metrics_service = MetricsService()
+        feedback_service = FeedbackService()
+
+        conversation_stats = None
+        if session_id:
+            conversation_stats = await conv_service.get_conversation_stats(session_id)
+
+        daily_stats = await conv_service.get_daily_stats(days=days)
+        system_health = await metrics_service.get_system_health()
+        feedback_stats = await feedback_service.get_feedback_stats(days=days)
+
+        return {
+            "status": "success",
+            "analytics": {
+                "conversation_stats": conversation_stats,
+                "daily_stats": daily_stats,
+                "system_health": system_health,
+                "feedback_stats": feedback_stats,
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"❌ Error obteniendo analíticas: {e}", exc_info=True)
+        return {
+            "status": "error",
+            "detail": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+# ============================================================
+# ENDPOINTS DE ADMINISTRACIÓN
+# ============================================================
+
+def _check_admin_key(request: Request) -> Optional[str]:
+    """Valida la API key opcional para endpoints /admin.
+
+    Args:
+        request: Solicitud HTTP.
+
+    Returns:
+        Mensaje de error si la key es inválida, o ``None`` si es válida.
+    """
+    if not settings.ADMIN_API_KEY:
+        return None
+    provided = request.headers.get("X-Admin-Key") or request.query_params.get("admin_key")
+    if provided != settings.ADMIN_API_KEY:
+        return "API key de administración inválida o ausente"
+    return None
+
+@app.post("/admin/cleanup")
+async def admin_cleanup(request: Request, dry_run: bool = False):
+    """Ejecuta la política de retención (limpieza de datos viejos).
+
+    Args:
+        dry_run: Si True, solo cuenta sin eliminar.
+    """
+    error = _check_admin_key(request)
+    if error:
+        raise HTTPException(status_code=401, detail=error)
+
+    try:
+        from scripts.retention_policy import run_retention
+        results = await run_retention(dry_run=dry_run)
+        return {
+            "status": "success",
+            "dry_run": dry_run,
+            "collections": results["collections"],
+            "total_deleted": results["total_deleted"],
+            "timestamp": datetime.now().isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"❌ Error en /admin/cleanup: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/dashboard-report")
+async def admin_dashboard_report(request: Request, days: int = 7):
+    """Genera y retorna el reporte de dashboard (JSON).
+
+    Args:
+        days: Ventana de días para las estadísticas (default: 7).
+    """
+    error = _check_admin_key(request)
+    if error:
+        raise HTTPException(status_code=401, detail=error)
+
+    try:
+        from scripts.generate_dashboard_report import save_report
+        report = await save_report(days=days)
+        return {
+            "status": "success",
+            "report": report,
+            "timestamp": datetime.now().isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"❌ Error en /admin/dashboard-report: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/stats")
 async def get_stats():
