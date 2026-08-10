@@ -962,11 +962,17 @@
         }
 
         // Enviar mensaje
+        console.log('✅ sendMessage() definida correctamente');
         async function sendMessage() {
             const input = document.getElementById('messageInput');
             const message = input.value.trim();
 
-            if (!message) return;
+            if (!message) {
+                console.warn('⚠️ Mensaje vacío, no se envía');
+                return;
+            }
+
+            console.log('📤 Enviando mensaje:', message);
 
             addMessage(message, 'user');
             input.value = '';
@@ -975,6 +981,7 @@
             showTypingIndicator();
 
             try {
+                console.log('🌐 POST a:', `${API_URL}/chat`);
                 const response = await fetch(`${API_URL}/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -985,14 +992,21 @@
                     })
                 });
 
-                if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
+                console.log('📥 Status:', response.status);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ Error HTTP:', response.status, errorText);
+                    throw new Error(`HTTP ${response.status}: ${errorText || 'Respuesta vacía'}`);
+                }
 
                 const data = await response.json();
+                console.log('✅ Respuesta:', data);
                 removeTypingIndicator();
                 addBotMessage(data);
                 updateStats(data);
             } catch (error) {
-                console.error('Error:', error);
+                console.error('❌ Error de red o del servidor:', error);
                 removeTypingIndicator();
                 addErrorMessage('Error al conectar con el servidor. Asegúrate de que la API esté corriendo.');
             }
