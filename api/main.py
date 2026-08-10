@@ -149,11 +149,6 @@ app.state.menu = {}
 # Montar archivos estáticos
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-print("✅ Endpoints registrados hasta ahora:")
-for route in app.routes:
-    if hasattr(route, 'path') and hasattr(route, 'methods'):
-        print(f"   {list(route.methods)[0] if route.methods else 'GET'} {route.path}")
-
 @app.on_event("startup")
 async def startup_event():
     """Inicializar sistema al arrancar"""
@@ -823,6 +818,14 @@ async def get_logs(level: str = None, limit: int = 200, since: str = None):
     total = len(logs)
     return {"logs": logs[:limit], "total": total, "available_levels": ["INFO", "WARNING", "ERROR", "DEBUG"]}
 
+
+# Listado final de endpoints (después de registrar todos los decoradores)
+print("=" * 50)
+print("✅ ENDPOINTS REGISTRADOS (LISTA FINAL):")
+print("=" * 50)
+for route in app.routes:
+    if hasattr(route, 'path') and hasattr(route, 'methods'):
+        print(f"   {sorted(route.methods)[0]} {route.path}")
 
 if __name__ == "__main__":
     import uvicorn
