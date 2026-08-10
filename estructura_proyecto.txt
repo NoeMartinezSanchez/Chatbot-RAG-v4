@@ -4,7 +4,8 @@
 │       └── 📁 continual-learning/
 ├── 📁 api/
 │   ├── 📄 endpoints.py
-│   └── 📄 main.py
+│   ├── 📄 main.py
+│   └── 📄 models.py
 ├── 📁 config/
 │   ├── 📄 models.py
 │   └── 📄 settings.py
@@ -23,6 +24,7 @@
 │   │   └── 📄 metadata.pkl
 │   ├── 📄 Navegación Jerárquica_FER.xlsx
 │   ├── 📄 create_prepa_excel.py
+│   ├── 📄 dashboard_report.json
 │   ├── 📄 intents.json
 │   ├── 📄 mapeo_fechas_categorizadas.json
 │   ├── 📄 mapeo_fechas_completo.json
@@ -58,6 +60,22 @@
 │   ├── 📄 groq_wrapper.py
 │   ├── 📄 ollama_wrapper.py
 │   └── 📄 tinyllama_wrapper.py
+├── 📁 mongodb/
+│   ├── 📁 middleware/
+│   │   ├── 📄 __init__.py
+│   │   └── 📄 logging_middleware.py
+│   ├── 📁 repositories/
+│   │   ├── 📄 __init__.py
+│   │   └── 📄 base_repository.py
+│   ├── 📁 services/
+│   │   ├── 📄 __init__.py
+│   │   ├── 📄 cache_service.py
+│   │   ├── 📄 conversation_service.py
+│   │   ├── 📄 feedback_service.py
+│   │   └── 📄 metrics_service.py
+│   ├── 📄 __init__.py
+│   ├── 📄 connection.py
+│   └── 📄 models.py
 ├── 📁 rag/
 │   ├── 📄 __init__.py
 │   ├── 📄 core.py
@@ -68,10 +86,22 @@
 │   └── 📄 retriever.py
 ├── 📁 scripts/
 │   ├── 📄 debug_rag_loader.py
+│   ├── 📄 deploy_checklist.md
 │   ├── 📄 extract_dates.py
+│   ├── 📄 generate_dashboard_report.py
 │   ├── 📄 load_chunks_to_rag.py
+│   ├── 📄 retention_policy.py
 │   ├── 📄 setup_local.py
-│   └── 📄 upload_documents.py
+│   ├── 📄 test_cache.py
+│   ├── 📄 test_integration.py
+│   ├── 📄 test_mongodb_connection.py
+│   ├── 📄 test_services.py
+│   ├── 📄 upload_documents.py
+│   └── 📄 verify_hf_spaces.py
+├── 📁 security/
+│   ├── 📄 __init__.py
+│   ├── 📄 monitor.py
+│   └── 📄 sanitizer.py
 ├── 📁 static/
 │   └── 📄 index.html
 ├── 📁 tests/
@@ -124,18 +154,19 @@
 ├── 📄 .cursorrules
 ├── 📄 .dockerignore
 ├── 📄 .env
+├── 📄 .env.example
 ├── 📄 AGENTS.md
 ├── 📄 Dockerfile
 ├── 📄 GENERAR_MENU.md
+├── 📄 MONGODB_GUIDE.md
 ├── 📄 Navegación Jerárquica_FER.xlsx
 ├── 📄 README.md
 ├── 📄 app.py
+├── 📄 clean_for_ecotec.py
 ├── 📄 estructura_proyecto.txt
 ├── 📄 generate_tree.py
-├── 📄 informe.html
 ├── 📄 notas.txt
 ├── 📄 packages.txt
-├── 📄 reporte.html
 ├── 📄 requirements.txt
 ├── 📄 reset_faiss.py
 ├── 📄 skills-lock.json
