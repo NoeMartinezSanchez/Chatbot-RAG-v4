@@ -306,6 +306,8 @@ async def chat(chat_request: ChatRequest, fastapi_request: Request):
     """Endpoint principal para chat"""
     start_time = time.time()
     retrieval_start = start_time
+
+    print(f"📥 Solicitud POST /chat recibida: {chat_request.message or chat_request.question}")
     
     try:
         # ===== RATE LIMITING =====
