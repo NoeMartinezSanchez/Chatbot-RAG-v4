@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
+from starlette.types import Message
 
 from config.settings import settings
 from mongodb.connection import MongoDBConnection
@@ -33,6 +34,12 @@ async def _capture_body(request: Request) -> Optional[str]:
         if request.method in ("GET", "HEAD"):
             return None
         body = await request.body()
+        # Reinyectar el body para que el endpoint pueda leerlo de nuevo.
+        # Bug de FastAPI/Starlette < 0.28: leer el body en un BaseHTTPMiddleware
+        # consume el stream y cuelga el endpoint (issues fastapi#394, #8187).
+        async def receive() -> Message:
+            return {"type": "http.request", "body": body, "more_body": False}
+        request._receive = receive
         text = body.decode("utf-8", errors="replace")
         if len(text) > MAX_BODY_LENGTH:
             text = text[:MAX_BODY_LENGTH] + "...[truncado]"
