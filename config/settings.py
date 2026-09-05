@@ -126,6 +126,12 @@ class Settings(BaseSettings):
     # API key opcional para endpoints /admin (vacío = sin protección)
     ADMIN_API_KEY: Optional[str] = os.getenv("ADMIN_API_KEY")
 
+    # ===== USER DASHBOARD CONFIGURATION =====
+    # Dashboard /user-dashboard usa MongoDB (conversaciones + métricas) con
+    # fallback a los archivos JSONL locales si MongoDB no está disponible.
+    DASHBOARD_USE_MONGODB: bool = os.getenv("DASHBOARD_USE_MONGODB", "true").lower() == "true"
+    DASHBOARD_MONGODB_INTERACTIONS_LIMIT: int = int(os.getenv("DASHBOARD_MONGODB_INTERACTIONS_LIMIT", "2000"))
+
     # ===== AWS (FUTURO) =====
     AWS_ACCESS_KEY_ID: Optional[str] = None
     AWS_SECRET_ACCESS_KEY: Optional[str] = None

@@ -247,8 +247,8 @@ async def startup_event():
         
         # Generar dashboard de usuarios automáticamente
         try:
-            from evaluation.generate_user_dashboard import generate_user_dashboard
-            generate_user_dashboard()
+            from evaluation.generate_user_dashboard import generate_user_dashboard_async
+            await generate_user_dashboard_async()
             logger.info("✅ Dashboard de usuarios generado automáticamente")
         except Exception as e:
             logger.error(f"❌ Error generando dashboard de usuarios: {e}")
@@ -771,10 +771,10 @@ async def get_user_dashboard():
 async def refresh_user_dashboard():
     """Regenerar el dashboard de interacciones de usuarios"""
     try:
-        from evaluation.generate_user_dashboard import generate_user_dashboard
+        from evaluation.generate_user_dashboard import generate_user_dashboard_async
         
         dashboard_path = "/data/user_dashboard.html"
-        generate_user_dashboard(output_path=dashboard_path)
+        await generate_user_dashboard_async(output_path=dashboard_path)
         
         return {"status": "success", "message": "Dashboard de usuarios regenerado"}
     except Exception as e:
@@ -801,17 +801,47 @@ async def debug_user_logs():
 
 
 @app.get("/api/logs")
-async def get_logs(level: str = None, limit: int = 200, since: str = None):
+async def get_logs(level: Optional[str] = None, limit: int = 200, since: Optional[str] = None):
     from pathlib import Path
     logs = []
-    log_file = Path("data/system_logs.jsonl")
-    if log_file.exists():
-        with open(log_file, "r") as f:
-            for line in f:
-                try:
-                    logs.append(json.loads(line))
-                except:
-                    continue
+
+    # 1) Intentar leer desde MongoDB (colección logs del middleware)
+    try:
+        from mongodb.connection import MongoDBConnection
+        db = await MongoDBConnection().connect()
+        cursor = db[settings.MONGODB_COLL_LOGS].find().sort("timestamp", -1).limit(min(limit * 3, 1000))
+        docs = await cursor.to_list(length=None)
+        for d in docs:
+            ts = d.get("timestamp")
+            ts_str = ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
+            status = d.get("status_code") or 0
+            lvl = "ERROR" if status >= 500 else ("WARNING" if status >= 400 else "INFO")
+            rt = d.get("response_time_ms") or 0
+            msg = (f"{d.get('method', '')} {d.get('path', '')} → {status} "
+                   f"({rt:.0f}ms) session={d.get('session_id', '-')}")
+            logs.append({
+                "timestamp": ts_str,
+                "level": lvl,
+                "module": "mongodb.middleware",
+                "message": msg,
+                "line": None,
+            })
+        if logs:
+            logger.debug("✅ /api/logs: %d registros desde MongoDB", len(logs))
+    except Exception as e:
+        logger.debug("MongoDB no disponible para /api/logs, usando archivo: %s", e)
+
+    # 2) Fallback: archivo system_logs.jsonl (DashboardLogHandler)
+    if not logs:
+        log_file = Path("data/system_logs.jsonl")
+        if log_file.exists():
+            with open(log_file, "r") as f:
+                for line in f:
+                    try:
+                        logs.append(json.loads(line))
+                    except:
+                        continue
+
     logs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     if level:
         logs = [l for l in logs if l.get("level") == level.upper()]

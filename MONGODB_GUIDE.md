@@ -379,7 +379,20 @@ await db["conversations"].delete_many({"session_id": "itest-session-abc"})
 
 ## 📊 Cómo interpretar el dashboard
 
-El dashboard se compone de un **reporte JSON** (`data/dashboard_report.json`) y el **dashboard HTML** servido en `/dashboard`.
+El dashboard de usuarios (`/user-dashboard`) se genera desde **MongoDB** (colecciones `conversations` y `metrics`), con fallback automático a los archivos JSONL del Space si la base no responde. Además del reporte JSON (`data/dashboard_report.json`) hay un **dashboard HTML** en `/user-dashboard`.
+
+### Fuentes de datos del `/user-dashboard`
+
+| Sección del dashboard | Fuente |
+|---|---|
+| Tarjetas de métricas (interacciones, tiempos, RAG, confianza, usuarios) | `conversations` |
+| Tokens hoy / promedio / por hora | `metrics` |
+| Historial reciente | `conversations` (mensajes user→assistant) |
+| Logs del sistema | `logs` (con fallback a `data/system_logs.jsonl`) |
+
+> 💡 Si MongoDB está caído, el dashboard se regenera con `user_interactions.jsonl` y no se muestra ningún error al usuario (degradación silenciosa).
+
+Regenerar desde la API: `GET /user-dashboard/refresh`.
 
 ### Generar el reporte
 

@@ -111,6 +111,10 @@ jobs:
           assert rag is not None
           print('✅ RAGSystem inicializado correctamente')
           "
+      
+      - name: 🧪 Test user dashboard (MongoDB sources)
+        run: |
+          python scripts/test_dashboard_mongodb.py
 
   deploy:
     name: 🚀 Deploy to Hugging Face

@@ -182,6 +182,24 @@ async def get_daily_stats(days: int = 7) -> List[Dict[str, Any]]:
     return [{"date": r["_id"], "count": r["count"]} for r in results]
 
 
+async def get_recent_conversations(limit: int = 200) -> List[ConversationDocument]:
+    """Recupera las conversaciones más recientes de todas las sesiones.
+
+    Args:
+        limit: Número máximo de resultados (default: 200).
+
+    Returns:
+        Lista de conversaciones ordenadas por fecha de creación (desc).
+    """
+    collection = await _get_collection()
+    repo: BaseRepository[ConversationDocument] = BaseRepository(collection, ConversationDocument)
+    return await repo.find_many(
+        {},
+        limit=limit,
+        sort=[("created_at", DESCENDING)],
+    )
+
+
 async def search_conversations(query: str, limit: int = 10) -> List[ConversationDocument]:
     """Busca conversaciones cuyo contenido de mensajes contenga el texto.
 
@@ -225,6 +243,10 @@ class ConversationService:
     async def get_conversation_stats(self, session_id: str) -> Dict[str, Any]:
         """Calcula estadísticas agregadas de una sesión."""
         return await get_conversation_stats(session_id)
+
+    async def get_recent_conversations(self, limit: int = 200) -> List[ConversationDocument]:
+        """Recupera las conversaciones más recientes de todas las sesiones."""
+        return await get_recent_conversations(limit)
 
     async def get_daily_stats(self, days: int = 7) -> List[Dict[str, Any]]:
         """Agrupa conversaciones por día para los últimos ``days`` días."""

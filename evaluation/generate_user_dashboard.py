@@ -1,16 +1,203 @@
 """
 Generate User Dashboard - Analiza interacciones reales de usuarios con el chatbot.
 """
+import asyncio
 import json
 import os
 import logging
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import Counter, defaultdict
 from typing import Dict, List, Any, Optional
 import re
 
+from config.settings import settings
+
 logger = logging.getLogger(__name__)
+
+
+def _ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """Normaliza un datetime naive (UTC implícito) a timezone-aware UTC.
+
+    Args:
+        dt: Datetime (posiblemente naive) proveniente de MongoDB.
+
+    Returns:
+        Datetime aware en UTC o None si la entrada es None.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _iso_format(dt: Optional[datetime]) -> str:
+    """Serializa un datetime a ISO 8601 (sufijo Z, UTC).
+
+    Args:
+        dt: Datetime a serializar.
+
+    Returns:
+        String ISO 8601 o cadena vacía si la entrada es None.
+    """
+    dt = _ensure_utc(dt)
+    if dt is None:
+        return ""
+    return dt.isoformat()
+
+
+async def fetch_mongodb_interactions(limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    """Lee interacciones reales desde MongoDB (colección conversations).
+
+    Convierte cada conversación en interacciones con el mismo formato que
+    ``user_interactions.jsonl`` para reutilizar ``calculate_metrics``.
+
+    Args:
+        limit: Número máximo de conversaciones a recuperar
+            (default: settings.DASHBOARD_MONGODB_INTERACTIONS_LIMIT).
+
+    Returns:
+        Lista de interacciones o lista vacía si MongoDB no está disponible.
+    """
+    try:
+        from mongodb.connection import MongoDBConnection
+        from mongodb.models import MessageRole
+        from mongodb.services import ConversationService
+
+        if limit is None:
+            limit = settings.DASHBOARD_MONGODB_INTERACTIONS_LIMIT
+
+        convs = await ConversationService().get_recent_conversations(limit=limit)
+
+        interactions: List[Dict[str, Any]] = []
+        for conv in convs:
+            messages = getattr(conv, "messages", None) or []
+            latency = conv.latency_ms or 0
+            confianza = conv.confidence_score or 0
+            es_rag = bool(conv.is_rag_response)
+            tokens_total = conv.total_tokens or 0
+            fuentes = []
+            for s in (conv.sources_used or []):
+                src = s.get("metadata", {}).get("source_file", "unknown") if isinstance(s, dict) else "unknown"
+                if src:
+                    fuentes.append(src)
+            fuentes = list(set(fuentes))
+            created = _iso_format(conv.created_at)
+
+            i = 0
+            while i < len(messages):
+                msg = messages[i]
+                if msg.role != MessageRole.USER:
+                    i += 1
+                    continue
+                respuesta = ""
+                resp_msg = None
+                if i + 1 < len(messages) and messages[i + 1].role == MessageRole.ASSISTANT:
+                    resp_msg = messages[i + 1]
+                    respuesta = resp_msg.content or ""
+                    i += 2
+                else:
+                    i += 1
+
+                tokens_used = 0
+                if resp_msg is not None and resp_msg.tokens is not None:
+                    tokens_used = resp_msg.tokens
+                elif msg.tokens is not None:
+                    tokens_used = msg.tokens
+                else:
+                    tokens_used = tokens_total
+
+                interactions.append({
+                    "timestamp": _iso_format(msg.timestamp) or created,
+                    "conversation_id": conv.conversation_id,
+                    "session_id": conv.session_id or conv.conversation_id,
+                    "pregunta": msg.content or "",
+                    "respuesta": respuesta,
+                    "tiempo_total_ms": latency,
+                    "tiempo_retrieval_ms": 0.0,
+                    "tiempo_generacion_ms": 0.0,
+                    "confianza": round(float(confianza), 4),
+                    "fuentes_usadas": fuentes,
+                    "es_rag": es_rag,
+                    "tokens_generados": tokens_total,
+                    "tokens_used": tokens_used,
+                })
+        return interactions
+    except Exception as e:
+        logger.debug("MongoDB no disponible para interacciones del dashboard: %s", e)
+        return []
+
+
+async def fetch_mongodb_token_stats() -> Optional[Dict[str, Any]]:
+    """Calcula el consumo de tokens del día con MongoDB (colección metrics).
+
+    Returns:
+        Diccionario compatible con ``get_token_stats`` o None si MongoDB no
+        está disponible.
+    """
+    try:
+        from mongodb.connection import MongoDBConnection
+        collection = (await MongoDBConnection().connect())[settings.MONGODB_COLL_METRICS]
+        start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        pipeline = [
+            {"$match": {"endpoint": "/chat", "request_timestamp": {"$gte": start}}},
+            {
+                "$group": {
+                    "_id": None,
+                    "tokens_hoy": {"$sum": {"$ifNull": ["$tokens_used", 0]}},
+                    "count": {"$sum": 1},
+                    "promedio": {"$avg": {"$ifNull": ["$tokens_used", 0]}},
+                }
+            },
+        ]
+        results = await collection.aggregate(pipeline).to_list(length=1)
+        if not results:
+            return None
+        r = results[0]
+        tokens_hoy = int(r.get("tokens_hoy", 0))
+        limite = 100000
+        stats = {
+            "tokens_hoy": tokens_hoy,
+            "limite": limite,
+            "porcentaje": round((tokens_hoy / limite) * 100, 1),
+            "promedio_tokens": round(r.get("promedio", 0)),
+            "total_consultas": int(r.get("count", 0)),
+        }
+        return stats
+    except Exception as e:
+        logger.debug("MongoDB no disponible para token stats del dashboard: %s", e)
+        return None
+
+
+async def fetch_mongodb_tokens_por_hora(hours: int = 24) -> Optional[Dict[int, int]]:
+    """Consumo de tokens agrupado por hora desde MongoDB (colección metrics).
+
+    Args:
+        hours: Ventana temporal hacia atrás en horas (default: 24).
+
+    Returns:
+        Dict {hora: tokens} o None si MongoDB no está disponible.
+    """
+    try:
+        from mongodb.connection import MongoDBConnection
+        collection = (await MongoDBConnection().connect())[settings.MONGODB_COLL_METRICS]
+        start = datetime.now(timezone.utc) - timedelta(hours=hours)
+        pipeline = [
+            {"$match": {"endpoint": "/chat", "request_timestamp": {"$gte": start}}},
+            {
+                "$group": {
+                    "_id": {"$hour": "$request_timestamp"},
+                    "total": {"$sum": {"$ifNull": ["$tokens_used", 0]}},
+                }
+            },
+            {"$sort": {"_id": 1}},
+        ]
+        results = await collection.aggregate(pipeline).to_list(length=None)
+        return {int(r["_id"]): int(r["total"]) for r in results}
+    except Exception as e:
+        logger.debug("MongoDB no disponible para tokens por hora: %s", e)
+        return None
 
 
 def read_interactions(log_path: str = "/data/user_interactions.jsonl") -> List[Dict[str, Any]]:
@@ -78,7 +265,7 @@ def get_token_stats() -> Dict[str, Any]:
     stats = {
         "tokens_hoy": 0,
         "limite": 100000,
-        "porcentaje": 0,
+        "porcentaje": 0.0,
         "promedio_tokens": 0,
         "total_consultas": 0,
     }
@@ -155,8 +342,17 @@ def calculate_tokens_por_hora() -> Dict[int, int]:
     return dict(tokens_por_hora)
 
 
-def calculate_metrics(interactions: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Calcula las métricas de las interacciones."""
+def calculate_metrics(
+    interactions: List[Dict[str, Any]],
+    tokens_por_hora: Optional[Dict[int, int]] = None,
+) -> Dict[str, Any]:
+    """Calcula las métricas de las interacciones.
+
+    Args:
+        interactions: Lista de interacciones (desde JSONL o MongoDB).
+        tokens_por_hora: Consumo de tokens por hora (opcional). Si se omite,
+            se calcula desde ``token_usage_per_query.jsonl``.
+    """
     if not interactions:
         return {
             "total_interacciones": 0,
@@ -247,7 +443,8 @@ def calculate_metrics(interactions: List[Dict[str, Any]]) -> Dict[str, Any]:
     tasa_exito = (respuestas_utiles / total_rag * 100) if total_rag > 0 else 0
     
     # Tokens por hora
-    tokens_por_hora = calculate_tokens_por_hora()
+    if tokens_por_hora is None:
+        tokens_por_hora = calculate_tokens_por_hora()
     max_tokens_por_hora = max(tokens_por_hora.values()) if tokens_por_hora else 0
     avg_tokens_por_hora = round(sum(tokens_por_hora.values()) / len(tokens_por_hora)) if tokens_por_hora else 0
     
@@ -416,8 +613,19 @@ def formatear_fecha(timestamp_str):
         return timestamp_str[:16] if len(timestamp_str) > 16 else "-"
 
 
-def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str, Any]] = []) -> str:
-    """Genera el HTML del dashboard interactivo."""
+def generate_dashboard_html(
+    metrics: Dict[str, Any],
+    interactions: List[Dict[str, Any]] = [],
+    token_stats_override: Optional[Dict[str, Any]] = None,
+) -> str:
+    """Genera el HTML del dashboard interactivo.
+
+    Args:
+        metrics: Métricas calculadas de las interacciones.
+        interactions: Interacciones reales para la tabla de historial.
+        token_stats_override: Estadísticas de tokens (MongoDB). Si se omite,
+            se calculan desde los archivos locales.
+    """
     import html
     
     if interactions is None:
@@ -462,7 +670,7 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
         historial_html = '<tr><td colspan="6" class="no-data">No hay interacciones registradas</td></tr>'
 
     # Token stats for cards
-    token_stats = get_token_stats()
+    token_stats = token_stats_override or get_token_stats()
     tokens_hoy = token_stats["tokens_hoy"]
     limite = token_stats["limite"]
     porcentaje = token_stats["porcentaje"]
@@ -1078,28 +1286,85 @@ def generate_dashboard_html(metrics: Dict[str, Any], interactions: List[Dict[str
 </html>'''
 
 
-def generate_user_dashboard(
+async def generate_user_dashboard_async(
     log_path: str = "/data/user_interactions.jsonl",
-    output_path: str = "/data/user_dashboard.html"
+    output_path: str = "/data/user_dashboard.html",
+    use_mongodb: Optional[bool] = None,
 ) -> str:
-    """Genera el dashboard de interacciones de usuarios."""
+    """Genera el dashboard de interacciones de usuarios desde MongoDB.
+
+    Si ``use_mongodb`` está habilitado, las interacciones (colección
+    ``conversations``) y el consumo de tokens (colección ``metrics``) se leen
+    de MongoDB. Si MongoDB falla o no tiene datos, se usa el archivo JSONL
+    como respaldo (degradación graceful).
+
+    Args:
+        log_path: Ruta al JSONL de interacciones (fallback).
+        output_path: Ruta donde se guarda el HTML generado.
+        use_mongodb: Si es None, usa ``settings.DASHBOARD_USE_MONGODB``.
+
+    Returns:
+        Ruta del HTML generado.
+    """
+    if use_mongodb is None:
+        use_mongodb = settings.DASHBOARD_USE_MONGODB
+
+    source = "JSONL"
     interactions = read_interactions(log_path)
-    metrics = calculate_metrics(interactions)
-    html = generate_dashboard_html(metrics, interactions)
-    
+
+    # Intentar leer interacciones desde MongoDB (conversations)
+    if use_mongodb:
+        try:
+            mongo_interactions = await fetch_mongodb_interactions(
+                limit=settings.DASHBOARD_MONGODB_INTERACTIONS_LIMIT
+            )
+        except Exception as e:
+            logger.debug("⚠️ Error leyendo interacciones de MongoDB: %s", e)
+            mongo_interactions = []
+        if mongo_interactions:
+            interactions = mongo_interactions
+            source = "MongoDB"
+            logger.info("📊 Dashboard: %d interacciones desde MongoDB", len(mongo_interactions))
+        else:
+            logger.debug("⚠️ MongoDB sin interacciones; usando JSONL")
+
+    # Consumo de tokens por hora desde MongoDB (métricas); None = usar archivos
+    tokens_por_hora = None
+    if use_mongodb:
+        try:
+            tokens_por_hora = await fetch_mongodb_tokens_por_hora()
+        except Exception as e:
+            logger.debug("⚠️ Error leyendo tokens por hora de MongoDB: %s", e)
+            tokens_por_hora = None
+
+    metrics = calculate_metrics(interactions, tokens_por_hora=tokens_por_hora)
+
+    # Estadísticas de tokens del día desde MongoDB; None = usar archivos
+    token_stats_override = None
+    if use_mongodb:
+        try:
+            token_stats_override = await fetch_mongodb_token_stats()
+            if token_stats_override is not None:
+                source = "MongoDB"
+                logger.info("📊 Dashboard: consumo de tokens desde MongoDB")
+        except Exception as e:
+            logger.debug("⚠️ Error leyendo token stats de MongoDB: %s", e)
+            token_stats_override = None
+
+    html = generate_dashboard_html(metrics, interactions, token_stats_override=token_stats_override)
+
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html)
-    
-    print(f"[OK] Dashboard generado: {output_path}")
-    print(f"     Interacciones procesadas: {metrics['total_interacciones']}")
-    
-    token_porcentaje = get_token_stats()["porcentaje"]
+
+    token_porcentaje = (token_stats_override or get_token_stats())["porcentaje"]
     sla_data = calculate_sla_metrics({**metrics, "token_porcentaje": token_porcentaje})
     roi_data = calculate_roi(metrics)
+    print(f"[OK] Dashboard generado: {output_path} (fuente: {source})")
+    print(f"     Interacciones procesadas: {metrics['total_interacciones']}")
     print(f"     SLA General: {sla_data['overall_status'].upper()} ({sla_data['overall_pct']:.0f}%)")
     print(f"     Ahorro Total: ${roi_data['total_savings']:,.2f} | Mensual: ${roi_data['monthly_savings']:,.2f}")
-    
+
     # Alertas críticas vía Telegram
     if sla_data["overall_status"] == "red":
         msg = (
@@ -1112,15 +1377,29 @@ def generate_user_dashboard(
             msg += f"{icon} {item['label']}: {item['value']}\n"
         msg += f"\n📊 Dashboard: {output_path}"
         send_telegram_alert(msg)
-    
+
     if metrics.get("tasa_no_encontrado", 0) > 25:
         send_telegram_alert(
             f"⚠️ *Alerta de Calidad - {datetime.now().strftime('%d/%m/%Y')}*\n"
             f"Tasa de 'No encontrado' elevada: {metrics['tasa_no_encontrado']:.1f}%\n"
             f"Por encima del umbral del 25%"
         )
-    
+
     return output_path
+
+
+def generate_user_dashboard(
+    log_path: str = "/data/user_interactions.jsonl",
+    output_path: str = "/data/user_dashboard.html"
+) -> str:
+    """Genera el dashboard de interacciones (wrapper síncrono).
+
+    Usa ``asyncio.run`` para ejecutar la versión async; apto para CLI y
+    compatibilidad con llamadas síncronas.
+    """
+    return asyncio.run(
+        generate_user_dashboard_async(log_path=log_path, output_path=output_path)
+    )
 
 
 if __name__ == "__main__":

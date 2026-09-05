@@ -15,6 +15,7 @@ from mongodb.services.conversation_service import (
     get_conversations_by_user,
     get_conversation_stats,
     get_daily_stats,
+    get_recent_conversations,
     search_conversations,
 )
 from mongodb.services.metrics_service import (
@@ -43,6 +44,7 @@ __all__ = [
     "get_conversations_by_user",
     "get_conversation_stats",
     "get_daily_stats",
+    "get_recent_conversations",
     "search_conversations",
     "MetricsService",
     "record_metric",
