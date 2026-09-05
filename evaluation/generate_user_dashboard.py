@@ -47,6 +47,25 @@ def _iso_format(dt: Optional[datetime]) -> str:
     return dt.isoformat()
 
 
+def _interaction_sort_key(interaction: Dict[str, Any]) -> datetime:
+    """Clave de orden para interacciones (por timestamp normalizado a UTC).
+
+    Args:
+        interaction: Interacción con campo ``timestamp`` ISO 8601.
+
+    Returns:
+        Datetime aware en UTC usado para ordenar; datetime mínimo si no es
+        parseable para que no rompa el orden.
+    """
+    raw = interaction.get("timestamp", "") or ""
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        dt = _ensure_utc(dt)
+        return dt or datetime.min.replace(tzinfo=timezone.utc)
+    except Exception:
+        return datetime.min.replace(tzinfo=timezone.utc)
+
+
 async def fetch_mongodb_interactions(limit: Optional[int] = None) -> List[Dict[str, Any]]:
     """Lee interacciones reales desde MongoDB (colección conversations).
 
@@ -100,6 +119,20 @@ async def fetch_mongodb_interactions(limit: Optional[int] = None) -> List[Dict[s
                 else:
                     i += 1
 
+                # Preferir métricas por turno (guardadas en el mensaje assistant);
+                # fallback a los resúmenes de la conversación.
+                msg_latency = resp_msg.latency_ms if resp_msg is not None and getattr(resp_msg, "latency_ms", None) is not None else latency
+                msg_conf = resp_msg.confidence_score if resp_msg is not None and getattr(resp_msg, "confidence_score", None) is not None else confianza
+                msg_is_rag = resp_msg.is_rag if resp_msg is not None and getattr(resp_msg, "is_rag", None) is not None else es_rag
+
+                per_turn_fuentes = []
+                if resp_msg is not None and getattr(resp_msg, "sources_used", None):
+                    for s in resp_msg.sources_used:
+                        src = s.get("metadata", {}).get("source_file", "unknown") if isinstance(s, dict) else "unknown"
+                        if src:
+                            per_turn_fuentes.append(src)
+                fuentes_turno = list(set(per_turn_fuentes)) if per_turn_fuentes else fuentes
+
                 tokens_used = 0
                 if resp_msg is not None and resp_msg.tokens is not None:
                     tokens_used = resp_msg.tokens
@@ -107,6 +140,7 @@ async def fetch_mongodb_interactions(limit: Optional[int] = None) -> List[Dict[s
                     tokens_used = msg.tokens
                 else:
                     tokens_used = tokens_total
+                tokens_turno = tokens_used or tokens_total
 
                 interactions.append({
                     "timestamp": _iso_format(msg.timestamp) or created,
@@ -114,15 +148,16 @@ async def fetch_mongodb_interactions(limit: Optional[int] = None) -> List[Dict[s
                     "session_id": conv.session_id or conv.conversation_id,
                     "pregunta": msg.content or "",
                     "respuesta": respuesta,
-                    "tiempo_total_ms": latency,
+                    "tiempo_total_ms": msg_latency,
                     "tiempo_retrieval_ms": 0.0,
                     "tiempo_generacion_ms": 0.0,
-                    "confianza": round(float(confianza), 4),
-                    "fuentes_usadas": fuentes,
-                    "es_rag": es_rag,
-                    "tokens_generados": tokens_total,
+                    "confianza": round(float(msg_conf), 4),
+                    "fuentes_usadas": fuentes_turno,
+                    "es_rag": bool(msg_is_rag),
+                    "tokens_generados": tokens_turno,
                     "tokens_used": tokens_used,
                 })
+        interactions.sort(key=_interaction_sort_key)
         return interactions
     except Exception as e:
         logger.debug("MongoDB no disponible para interacciones del dashboard: %s", e)

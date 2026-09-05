@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 from langchain.memory import ConversationBufferMemory
 from collections import defaultdict
+from langchain_layer.config import langchain_config
 from models.groq_wrapper import GroqWrapper
 from scripts.extract_dates import DateExtractor
 from security.sanitizer import InputSanitizer
@@ -96,12 +97,27 @@ class LangChainRAGWrapper:
             conversations = await self.conv_service.get_conversations_by_session(session_id, limit=limit)
             if not conversations:
                 return ""
-            lines: List[str] = []
+            # Recolectar mensajes del más reciente al más antiguo (las
+            # conversaciones ya vienen ordenadas por created_at desc).
+            newest_first: List[str] = []
             for conv in conversations:
-                for msg in conv.messages:
+                for msg in reversed(conv.messages):
                     role = "usuario" if msg.role == MessageRole.USER else "asistente"
-                    lines.append(f"- {role}: {msg.content}")
-            return "\n".join(lines)
+                    newest_first.append(f"- {role}: {msg.content}")
+
+            # Recortar al presupuesto de historial (MAX_HISTORY_TOKENS) para
+            # no inflar el prompt con toda la sesión acumulada.
+            max_chars = langchain_config.MAX_HISTORY_TOKENS * 4
+            selected: List[str] = []
+            used = 0
+            for line in newest_first:
+                if used + len(line) > max_chars:
+                    break
+                selected.append(line)
+                used += len(line)
+
+            # Restaurar orden cronológico para el prompt
+            return "\n".join(reversed(selected))
         except Exception as e:
             logger.debug("Historial MongoDB no disponible, usando memoria local: %s", e)
             memory = _session_memories[session_id]
@@ -145,7 +161,15 @@ class LangChainRAGWrapper:
 
             messages = [
                 ConversationMessage(role=MessageRole.USER, content=question, tokens=user_tokens),
-                ConversationMessage(role=MessageRole.ASSISTANT, content=response_text, tokens=assistant_tokens),
+                ConversationMessage(
+                    role=MessageRole.ASSISTANT,
+                    content=response_text,
+                    tokens=assistant_tokens,
+                    latency_ms=latency_ms,
+                    confidence_score=confidence_value,
+                    is_rag=bool(is_rag),
+                    sources_used=list(sources) if isinstance(sources, list) else None,
+                ),
             ]
 
             conv_data = ConversationCreate(

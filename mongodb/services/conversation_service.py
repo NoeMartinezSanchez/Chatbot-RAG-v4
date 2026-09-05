@@ -24,10 +24,23 @@ async def _get_collection() -> AsyncIOMotorCollection:
 
 
 async def save_conversation(conv_data: ConversationCreate) -> ConversationDocument:
-    """Guarda (inserta o actualiza) una conversación.
+    """Guarda (inserta o acumula) una conversación.
 
     Si ya existe una conversación con el mismo ``conversation_id`` se
-    actualiza; en caso contrario se inserta.
+    **agregan** los mensajes nuevos al array existente, de modo que el
+    historial completo de la sesión se conserva en lugar de sobrescribirse con
+    el último turno.
+
+    La acumulación es atómica e idempotente: se usa un único ``update_one``
+    con filtro ``messages.timestamp $nin <timestamps nuevos>``. Si los
+    timestamps del turno ya existen (reintento en background o carrera entre
+    guardados en paralelo), la actualización no hace match y NO se duplican
+    mensajes; si son nuevos, el array acumula sin perderse entre turnos
+    concurrentes (MongoDB serializa las operaciones por documento).
+
+    Los campos de resumen (``total_tokens``, ``latency_ms``,
+    ``is_rag_response``, ``confidence_score``, ``sources_used``) reflejan el
+    último turno guardado.
 
     Args:
         conv_data: Datos de la conversación a guardar.
@@ -41,15 +54,23 @@ async def save_conversation(conv_data: ConversationCreate) -> ConversationDocume
     collection = await _get_collection()
     data = conv_data.model_dump()
     now = datetime.now(timezone.utc)
-    existing = await collection.find_one({"conversation_id": conv_data.conversation_id})
+    new_messages = data.get("messages", []) or []
 
+    # Campos de resumen (último turno, sin el array messages)
+    summary_fields = {k: v for k, v in data.items() if k != "messages"}
+    summary_fields["updated_at"] = now
+
+    existing = await collection.find_one({"conversation_id": conv_data.conversation_id})
     if existing is not None:
-        await collection.update_one(
-            {"conversation_id": conv_data.conversation_id},
-            {"$set": {**data, "updated_at": now}},
-            upsert=True,
-        )
-        logger.info("🔄 Conversación actualizada: %s", conv_data.conversation_id)
+        ts_list = [m.get("timestamp") for m in new_messages if m.get("timestamp") is not None]
+        update: Dict[str, Any] = {"$set": summary_fields}
+        query: Dict[str, Any] = {"conversation_id": conv_data.conversation_id}
+        if new_messages:
+            update["$push"] = {"messages": {"$each": new_messages}}
+            if ts_list:
+                query["messages.timestamp"] = {"$nin": ts_list}
+        await collection.update_one(query, update)
+        logger.info("🔄 Conversación actualizada: %s (turno acumulado)", conv_data.conversation_id)
     else:
         await collection.insert_one({**data, "updated_at": now})
         logger.info("📝 Conversación guardada: %s", conv_data.conversation_id)

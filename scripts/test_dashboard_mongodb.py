@@ -116,7 +116,9 @@ async def _test_mongodb_sources() -> None:
         messages=[
             ConversationMessage(role=MessageRole.USER, content="¿Cuándo es la convocatoria?", tokens=12),
             ConversationMessage(role=MessageRole.ASSISTANT,
-                                content="El registro es del 10 al 20 de Agosto de 2026.", tokens=40),
+                                content="El registro es del 10 al 20 de Agosto de 2026.", tokens=40,
+                                latency_ms=2010.5, confidence_score=0.93, is_rag=True,
+                                sources_used=[{"metadata": {"source_file": "Convocatoria.xlsx"}}]),
         ],
         sources_used=[{"metadata": {"source_file": "Convocatoria.xlsx"}}],
         total_tokens=52,
@@ -125,6 +127,42 @@ async def _test_mongodb_sources() -> None:
         confidence_score=0.93,
     )
     await ConversationService().save_conversation(conv)
+
+    # Segundo turno sobre el MISMO conversation_id → debe ACUMULARSE
+    turn2_msgs = [
+        ConversationMessage(role=MessageRole.USER, content="¿Qué documentos necesito?", tokens=10),
+        ConversationMessage(role=MessageRole.ASSISTANT,
+                            content="Necesitas tu acta de nacimiento.", tokens=25,
+                            latency_ms=1500.0, confidence_score=0.88, is_rag=True,
+                            sources_used=[{"metadata": {"source_file": "Control_Escolar.xlsx"}}]),
+    ]
+    conv2 = ConversationCreate(
+        conversation_id=conversation_id,
+        session_id=test_session,
+        user_id="dash-itest-user",
+        messages=turn2_msgs,
+        sources_used=[{"metadata": {"source_file": "Control_Escolar.xlsx"}}],
+        total_tokens=35,
+        latency_ms=1500.0,
+        is_rag_response=True,
+        confidence_score=0.88,
+    )
+    await ConversationService().save_conversation(conv2)
+
+    # Repetir el MISMO turno (mismos mensajes/timestamps, como un reintento en
+    # background) → NO debe duplicarse (idempotencia atómica)
+    conv3 = ConversationCreate(
+        conversation_id=conversation_id,
+        session_id=test_session,
+        user_id="dash-itest-user",
+        messages=turn2_msgs,
+        total_tokens=35,
+        latency_ms=1500.0,
+        is_rag_response=True,
+        confidence_score=0.88,
+    )
+    await ConversationService().save_conversation(conv3)
+
     await MetricsService().record_metric(MetricCreate(
         session_id=test_session,
         endpoint="/chat",
@@ -135,6 +173,14 @@ async def _test_mongodb_sources() -> None:
         cache_hit=False,
     ))
 
+    # Verificar que la conversación acumuló 4 mensajes (2 turnos), sin duplicados
+    stored = await ConversationService().get_conversation(conversation_id)
+    assert stored is not None, "La conversación no existe en MongoDB"
+    assert stored.messages, "La conversación no tiene mensajes"
+    assert len(stored.messages) == 4, f"Esperaba 4 mensajes acumulados, hay {len(stored.messages)}"
+    logger.info("   ✅ Acumulación idempotente OK (%d mensajes en %d turnos)",
+                len(stored.messages), len(stored.messages) // 2)
+
     from evaluation.generate_user_dashboard import (
         fetch_mongodb_interactions,
         fetch_mongodb_token_stats,
@@ -143,12 +189,18 @@ async def _test_mongodb_sources() -> None:
 
     interactions = await fetch_mongodb_interactions(limit=500)
     mine = [i for i in interactions if i.get("conversation_id") == conversation_id]
-    assert mine, "La conversación de prueba no fue mapeada"
+    assert len(mine) == 2, f"Esperaba 2 interacciones del dashboard, hay {len(mine)}"
     mi = mine[0]
     assert mi["pregunta"] == "¿Cuándo es la convocatoria?"
     assert "Convocatoria.xlsx" in mi["fuentes_usadas"]
     assert mi["es_rag"] is True
     assert mi["tiempo_total_ms"] == 2010.5
+    # El segundo turno conserva sus propias métricas
+    mi2 = mine[1]
+    assert mi2["pregunta"] == "¿Qué documentos necesito?"
+    assert mi2["tiempo_total_ms"] == 1500.0
+    assert mi2["confianza"] == 0.88
+    assert "Control_Escolar.xlsx" in mi2["fuentes_usadas"]
 
     token_stats = await fetch_mongodb_token_stats()
     if token_stats is not None:

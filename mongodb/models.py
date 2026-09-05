@@ -25,6 +25,10 @@ class ConversationMessage(BaseModel):
     content: str
     timestamp: datetime = Field(default_factory=_utcnow)
     tokens: Optional[int] = None
+    latency_ms: Optional[float] = None
+    confidence_score: Optional[float] = None
+    is_rag: Optional[bool] = None
+    sources_used: Optional[List[Dict[str, Any]]] = None
 
 
 class ConversationCreate(BaseModel):

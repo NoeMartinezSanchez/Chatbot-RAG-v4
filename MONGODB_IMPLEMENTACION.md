@@ -129,7 +129,7 @@ class BaseRepository(Generic[T]):   # T = modelo Pydantic
 
 | Función | Descripción |
 |---|---|
-| `save_conversation(conv_data)` | **Upsert** por `conversation_id`: si existe, actualiza con `updated_at`; si no, inserta |
+| `save_conversation(conv_data)` | **Upsert + acumulación por `conversation_id`**: inserta si no existe; si existe, hace un `update_one` **atómico** que **agrega** los mensajes nuevos al array (`$push $each`) siempre que sus `timestamp` no existan (`messages.timestamp $nin [...]`). Esto evita duplicados por reintento en background y no pierde turnos concurrentes sin carrera de lectura-modificación-escritura. Los resúmenes (`total_tokens`, `latency_ms`, `confidence_score`, `sources_used`) reflejan el último turno |
 | `get_conversation(conversation_id)` | Recupera por ID |
 | `get_conversations_by_session(session_id, limit)` | Más recientes de una sesión (orden desc) |
 | `get_conversations_by_user(user_id, limit)` | Más recientes de un usuario |
@@ -278,6 +278,8 @@ El dashboard de interacciones reales usa **MongoDB como fuente principal** de da
 3. `fetch_mongodb_token_stats()` → tokens acumulados desde medianoche UTC.
 4. Si MongoDB falla o no tiene datos → **degradación graceful**: se usan los JSONL (solo `logger.debug`, sin romper el dashboard).
 5. El HTML se escribe en `/data/user_dashboard.html`.
+
+> 💡 **Interacciones completas**: como `save_conversation` **acumula** mensajes en el mismo `conversation_id` (p. ej. `web_interface`), una sola conversación contiene TODOS los turnos de la sesión y el dashboard los lista todos. Cada mensaje `assistant` guarda sus propias métricas por turno (`latency_ms`, `confidence_score`, `is_rag`, `sources_used`); el dashboard prefiere esas por interacción y cae a los resúmenes de la conversación si no existen (mensajes antiguos).
 
 ### Async-aware
 
