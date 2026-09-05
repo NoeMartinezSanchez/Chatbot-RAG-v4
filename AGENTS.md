@@ -266,9 +266,15 @@ Tasa de Éxito
 
 Modelos Alternativos
 Modelo	Velocidad	Caso de uso
-gpt-oss-120b	~420 tok/seg	Default, alta calidad
-llama-3.3-70b-versatile	~394 tok/seg	Fallback, compatible
-llama-3.1-8b-instant	~840 tok/seg	Preguntas simples, mayor velocidad
+openai/gpt-oss-120b	~420 tok/seg	Default, alta calidad
+openai/gpt-oss-20b	~1000 tok/seg	Preguntas simples, mayor velocidad
+qwen/qwen3.6-27b	—	Alternativa al 70B deprecado
+
+> ⚠️ **Migración Groq (Sep 2026)**: `llama-3.3-70b-versatile` y `llama-3.1-8b-instant`
+> se retiraron de GroqCloud el 2026-08-16 (deprecación confirmada por correo/email
+> "Compound/LLama deprecation"). NO usar estos IDs en llamadas a Groq — devuelven
+> HTTP 404. Migrar a `openai/gpt-oss-120b` (recomendado) o `openai/gpt-oss-20b`. El
+> CI (`sync-to-hf.yml`) ya usa `openai/gpt-oss-120b`.
 
 🔗 LangChain y Orquestación
 Versión Actual: 0.2.0
