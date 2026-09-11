@@ -873,10 +873,20 @@ def generate_dashboard_html(
         .log-error {{ color: #dc3545; }}
         
         /* Consulta (MongoDB) */
-        .consulta-presets {{ display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }}
-        .consulta-presets-label {{ font-size: 13px; font-weight: 600; color: var(--azul-principal); }}
-        .consulta-preset {{ background: var(--grisclaro); border: 1px solid #ddd; padding: 6px 14px; border-radius: 16px; cursor: pointer; font-size: 13px; color: var(--azul-principal); transition: all 0.2s; }}
-        .consulta-preset:hover {{ background: var(--azul-secundario); color: var(--blanco); }}
+        .consulta-block {{ margin-bottom: 16px; }}
+        .consulta-label {{ display: block; font-size: 13px; font-weight: 600; color: var(--azul-principal); margin-bottom: 6px; }}
+        .consulta-block select, .consulta-block input[type="text"] {{ width: 100%; max-width: 420px; padding: 9px 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 13px; background: var(--blanco); }}
+        .consulta-op {{ display: flex; gap: 10px; flex-wrap: wrap; }}
+        .consulta-op-item {{ display: flex; align-items: center; gap: 6px; background: var(--blanco); border: 1px solid #ddd; border-radius: 8px; padding: 9px 14px; cursor: pointer; font-size: 13px; color: var(--azul-principal); transition: all 0.2s; user-select: none; }}
+        .consulta-op-item:hover {{ background: var(--grisclaro); }}
+        .consulta-op-item input {{ accent-color: var(--azul-secundario); margin: 0; }}
+        .consulta-op-item:has(input:checked) {{ background: var(--azul-secundario); color: var(--blanco); border-color: var(--azul-secundario); }}
+        .consulta-date {{ display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }}
+        .consulta-date-opt {{ font-size: 13px; color: var(--gristexto); }}
+        .consulta-date input[type="date"] {{ padding: 8px 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 13px; background: var(--blanco); }}
+        .consulta-date-hint {{ font-size: 12px; color: var(--gristexto); }}
+        .consulta-actions {{ display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }}
+        .consulta-actions .btn {{ margin: 0; }}
         .consulta-advanced-toggle {{ font-size: 13px; font-weight: 600; color: var(--azul-secundario); cursor: pointer; margin-bottom: 10px; user-select: none; }}
         .consulta-advanced {{ background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 14px; margin-bottom: 16px; }}
         .consulta-field {{ margin-bottom: 10px; }}
@@ -1195,48 +1205,64 @@ def generate_dashboard_html(
     </div>
 
     <div id="consulta-tab" class="tab-content" style="display:none;">
-        <div class="logs-controls">
+        <div class="consulta-block">
+            <label class="consulta-label" for="consulta-collection">🗃️ Colección</label>
             <select id="consulta-collection" onchange="onCollectionChange()"></select>
-            <select id="consulta-operation" onchange="onOperationChange()">
-                <option value="find">📄 Buscar (find)</option>
-                <option value="count">🔢 Contar (count)</option>
-                <option value="distinct">🏷️ Distintos (distinct)</option>
-            </select>
-            <input id="consulta-limit" type="number" value="50" min="1" max="500" style="width:80px;" title="Límite (máx 500)">
-            <button onclick="runConsulta()" class="btn" style="padding:8px 16px;">▶ Ejecutar</button>
-            <button id="consulta-csv-btn" onclick="exportConsultaCSV()" class="btn" style="padding:8px 16px;" disabled>⬇️ Descargar CSV</button>
+        </div>
+
+        <div class="consulta-block">
+            <label class="consulta-label">🔎 Tipo de resultado</label>
+            <div class="consulta-op">
+                <label class="consulta-op-item">
+                    <input type="radio" name="consulta-op" value="find" checked onchange="onResultTypeChange()">
+                    <span>👁️ Ver registros</span>
+                </label>
+                <label class="consulta-op-item">
+                    <input type="radio" name="consulta-op" value="count" onchange="onResultTypeChange()">
+                    <span>🔢 Solo contar cuántos</span>
+                </label>
+                <label class="consulta-op-item">
+                    <input type="radio" name="consulta-op" value="distinct" onchange="onResultTypeChange()">
+                    <span>🏷️ Campos diferentes</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="consulta-block" id="consulta-distinct-row" style="display:none;">
+            <label class="consulta-label" for="consulta-distinct-field">🏷️ Campo a listar</label>
+            <input id="consulta-distinct-field" type="text" placeholder="endpoint">
+        </div>
+
+        <div class="consulta-block">
+            <label class="consulta-label">📅 Filtrar por fecha</label>
+            <div class="consulta-date">
+                <span class="consulta-date-opt">Desde</span>
+                <input id="consulta-date-from" type="date">
+                <span class="consulta-date-opt">Hasta</span>
+                <input id="consulta-date-to" type="date">
+                <span id="consulta-date-hint" class="consulta-date-hint"></span>
+            </div>
+        </div>
+
+        <div class="consulta-actions">
+            <button onclick="runConsulta()" class="btn">▶ Ejecutar</button>
+            <button id="consulta-csv-btn" onclick="exportConsultaCSV()" class="btn" disabled>⬇️ Descargar CSV</button>
             <span id="consulta-info" class="log-count"></span>
         </div>
 
-        <div class="consulta-presets">
-            <span class="consulta-presets-label">⚡ Consultas rápidas:</span>
-            <button onclick="presetConsulta('ultimas')" class="consulta-preset">🕒 Últimas</button>
-            <button onclick="presetConsulta('hoy')" class="consulta-preset">📆 Hoy</button>
-            <button onclick="presetConsulta('contar')" class="consulta-preset">🔢 Contar todo</button>
-            <button onclick="presetConsulta('distinct')" class="consulta-preset">🏷️ Distintos</button>
-        </div>
-
-        <div class="consulta-presets" id="consulta-date-row" style="display:none;">
-            <select id="consulta-date-field"></select>
-            <input id="consulta-date-from" type="date" title="Desde">
-            <span style="color:var(--gristexto);">a</span>
-            <input id="consulta-date-to" type="date" title="Hasta">
-            <span id="consulta-date-hint" class="consulta-presets-label" style="font-weight:400;">(rango por fecha)</span>
-        </div>
-
-        <div id="consulta-advanced-toggle" class="consulta-advanced-toggle" onclick="toggleConsultaAdvanced()">📝 JSON avanzado (filtro / orden) ▾</div>
+        <div id="consulta-advanced-toggle" class="consulta-advanced-toggle" onclick="toggleConsultaAdvanced()">📝 Opciones avanzadas (filtro / orden / límite) ▾</div>
         <div id="consulta-advanced" class="consulta-advanced" style="display:none;">
             <div class="consulta-field">
-                <label for="consulta-filter">Filtro (JSON Mongo):</label>
+                <label for="consulta-filter">Filtro adicional (JSON Mongo):</label>
                 <textarea id="consulta-filter" rows="2" placeholder='{{"endpoint": "/chat"}}'></textarea>
             </div>
             <div class="consulta-field">
                 <label for="consulta-sort">Orden (JSON):</label>
                 <textarea id="consulta-sort" rows="1" placeholder='{{"created_at": -1}}'></textarea>
             </div>
-            <div class="consulta-field" id="consulta-distinct-field-wrap" style="display:none;">
-                <label for="consulta-distinct-field">Campo para distinct:</label>
-                <input id="consulta-distinct-field" type="text" placeholder="endpoint">
+            <div class="consulta-field">
+                <label for="consulta-limit">Máximo de registros a mostrar (máx 500):</label>
+                <input id="consulta-limit" type="number" value="50" min="1" max="500">
             </div>
         </div>
 
@@ -1378,33 +1404,31 @@ def generate_dashboard_html(
 
         function onCollectionChange() {{
             const col = document.getElementById('consulta-collection').value;
-            const fieldWrap = document.getElementById('consulta-distinct-field-wrap');
-            const field = document.getElementById('consulta-distinct-field');
-            const dateSelect = document.getElementById('consulta-date-field');
+            const distinctField = document.getElementById('consulta-distinct-field');
+            const fromInput = document.getElementById('consulta-date-from');
+            const toInput = document.getElementById('consulta-date-to');
+            const hint = document.getElementById('consulta-date-hint');
             if (!col) return;
-            const dateField = consultaDateFields[col] || '_id';
-            const suggestions = {{
-                'conversations': ['session_id', 'user_id', 'is_rag_response', 'created_at'],
-                'metrics': ['endpoint', 'session_id', 'is_rag_response', 'cache_hit'],
-                'feedback': ['session_id', 'user_rating', 'is_correct'],
-                'rag_cache': ['hit_count', 'query'],
-                'logs': ['method', 'path', 'status_code', 'session_id'],
-                'users': ['user_id'],
-                'sessions': ['session_id']
-            }};
-            const opts = (suggestions[col] || ['_id']).map(s => `<option value="${{s}}">${{s}}</option>`).join('');
-            dateSelect.innerHTML = opts;
+            // Campo de fecha automático por colección
+            const dateField = consultaDateFields[col];
+            const noDateCols = ['users', 'sessions'];
+            if (!dateField || noDateCols.indexOf(col) !== -1) {{
+                fromInput.disabled = true;
+                toInput.disabled = true;
+                hint.textContent = '✨ Esta colección no tiene campo de fecha';
+            }} else {{
+                fromInput.disabled = false;
+                toInput.disabled = false;
+                hint.textContent = '✨ Campo de fecha: ' + dateField;
+            }}
             // Campo por defecto para distinct según colección
             const distinctDefaults = {{'metrics': 'endpoint', 'feedback': 'user_rating', 'logs': 'method', 'rag_cache': 'query', 'conversations': 'user_id'}};
-            field.value = distinctDefaults[col] || '';
+            distinctField.value = distinctDefaults[col] || '';
         }}
 
-        function onOperationChange() {{
-            const op = document.getElementById('consulta-operation').value;
-            document.getElementById('consulta-distinct-field-wrap').style.display = op === 'distinct' ? 'block' : 'none';
-            document.getElementById('consulta-date-row').style.display = 'none';
-            if (op === 'distinct' || op === 'count') return;
-            // find con JSON avanzado visible
+        function onResultTypeChange() {{
+            const op = document.querySelector('input[name="consulta-op"]:checked').value;
+            document.getElementById('consulta-distinct-row').style.display = op === 'distinct' ? 'block' : 'none';
         }}
 
         function toggleConsultaAdvanced() {{
@@ -1412,32 +1436,12 @@ def generate_dashboard_html(
             const toggler = document.getElementById('consulta-advanced-toggle');
             const show = adv.style.display === 'none';
             adv.style.display = show ? 'block' : 'none';
-            toggler.textContent = show ? '📝 JSON avanzado (filtro / orden) ▴' : '📝 JSON avanzado (filtro / orden) ▾';
+            toggler.textContent = show ? '📝 Opciones avanzadas (filtro / orden / límite) ▴' : '📝 Opciones avanzadas (filtro / orden / límite) ▾';
         }}
 
-        function presetConsulta(type) {{
-            const sel = document.getElementById('consulta-operation');
-            const dateRow = document.getElementById('consulta-date-row');
-            const info = document.getElementById('consulta-info');
-            dateRow.style.display = 'none';
-            if (type === 'ultimas') {{
-                sel.value = 'find';
-                document.getElementById('consulta-sort').value = '{{"_id": -1}}';
-            }} else if (type === 'contar') {{
-                sel.value = 'count';
-            }} else if (type === 'hoy') {{
-                sel.value = 'find';
-                const today = new Date().toISOString().slice(0, 10);
-                document.getElementById('consulta-date-from').value = today;
-                document.getElementById('consulta-date-to').value = today;
-            }} else if (type === 'distinct') {{
-                sel.value = 'distinct';
-            }}
-            onOperationChange();
-            if (type === 'hoy') {{
-                dateRow.style.display = 'flex';
-            }}
-            runConsulta();
+        function getSelectedOperation() {{
+            const el = document.querySelector('input[name="consulta-op"]:checked');
+            return el ? el.value : 'find';
         }}
 
         async function runConsulta() {{
@@ -1451,7 +1455,7 @@ def generate_dashboard_html(
                 info.textContent = '❌ Selecciona una colección';
                 return;
             }}
-            const op = document.getElementById('consulta-operation').value;
+            const op = getSelectedOperation();
             const body = {{
                 collection: col,
                 operation: op,
@@ -1460,13 +1464,16 @@ def generate_dashboard_html(
             if (op === 'distinct') {{
                 body.distinct_field = document.getElementById('consulta-distinct-field').value.trim() || '_id';
             }}
-            // Filtro por fecha si la fila de fecha está activa
-            if (document.getElementById('consulta-date-row').style.display !== 'none') {{
-                body.date_field = document.getElementById('consulta-date-field').value;
+            // Filtro por fecha (campo automático por colección)
+            const dateField = consultaDateFields[col];
+            if (dateField) {{
                 const from = document.getElementById('consulta-date-from').value;
                 const to = document.getElementById('consulta-date-to').value;
-                if (from) body.date_from = from + 'T00:00:00-06:00';
-                if (to) body.date_to = to + 'T23:59:59-06:00';
+                if (from || to) {{
+                    body.date_field = dateField;
+                    if (from) body.date_from = from + 'T00:00:00-06:00';
+                    if (to) body.date_to = to + 'T23:59:59-06:00';
+                }}
             }}
             // JSON avanzado
             const filterVal = document.getElementById('consulta-filter').value.trim();
