@@ -14,6 +14,7 @@ from security.sanitizer import InputSanitizer
 from security.monitor import get_monitor
 from mongodb.models import MessageRole, ConversationMessage, ConversationCreate, MetricCreate
 from mongodb.services import ConversationService, MetricsService
+from utils.timezones import now_local
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ class LangChainRAGWrapper:
         fechas = self.date_extractor.extract_dates(respuesta)
         if not fechas:
             return respuesta
-        fecha_actual = datetime.now().date()
+        fecha_actual = now_local().date()
         for f in fechas:
             if f.get('tipo') == 'rango' and 'fecha_inicio' in f and 'fecha_fin' in f:
                 fecha_inicio = datetime.fromisoformat(f['fecha_inicio']).date()
@@ -66,7 +67,7 @@ class LangChainRAGWrapper:
             "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
         ]
         dias_semana = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
-        now = datetime.now()
+        now = now_local()
         return f"{dias_semana[now.weekday()]} {now.day} de {meses[now.month - 1]} de {now.year}"
 
     @staticmethod

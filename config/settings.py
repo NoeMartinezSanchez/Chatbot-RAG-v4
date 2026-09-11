@@ -12,6 +12,16 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"  # development, staging, production
     DEBUG: bool = True
     LOG_LEVEL: str = "INFO"
+
+    # ===== TIMEZONE =====
+    """Zona horaria oficial del sistema (CDMX). Se usa para:
+    - Fechas que muestra/usa el chatbot (conciencia temporal)
+    - Reinicio diario del contador de tokens de Groq
+    - Dashboard (tokens hoy, tokens por hora, fechas mostradas)
+    El almacenamiento en MongoDB permanece en UTC; solo la presentación
+    y los conteos por día se convierten a esta zona.
+    """
+    TIMEZONE: str = os.getenv("TIMEZONE", "America/Mexico_City")
     
     # ===== API CONFIGURATION =====
     API_HOST: str = "0.0.0.0"

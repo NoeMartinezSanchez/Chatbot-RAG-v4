@@ -12,6 +12,7 @@ from typing import Dict, List, Any, Optional
 import re
 
 from config.settings import settings
+from utils.timezones import now_local, today_local, start_of_today_utc, format_local, to_local
 
 logger = logging.getLogger(__name__)
 
@@ -174,7 +175,7 @@ async def fetch_mongodb_token_stats() -> Optional[Dict[str, Any]]:
     try:
         from mongodb.connection import MongoDBConnection
         collection = (await MongoDBConnection().connect())[settings.MONGODB_COLL_METRICS]
-        start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        start = start_of_today_utc()
         pipeline = [
             {"$match": {"endpoint": "/chat", "request_timestamp": {"$gte": start}}},
             {
@@ -222,7 +223,7 @@ async def fetch_mongodb_tokens_por_hora(hours: int = 24) -> Optional[Dict[int, i
             {"$match": {"endpoint": "/chat", "request_timestamp": {"$gte": start}}},
             {
                 "$group": {
-                    "_id": {"$hour": "$request_timestamp"},
+                    "_id": {"$hour": {"date": "$request_timestamp", "timezone": settings.TIMEZONE or "America/Mexico_City"}},
                     "total": {"$sum": {"$ifNull": ["$tokens_used", 0]}},
                 }
             },
@@ -310,7 +311,7 @@ def get_token_stats() -> Dict[str, Any]:
         try:
             with open(token_file, "r") as f:
                 data = json.load(f)
-                today = datetime.now().strftime("%Y-%m-%d")
+                today = today_local().strftime("%Y-%m-%d")
                 if data.get("date") == today:
                     stats["tokens_hoy"] = data.get("tokens", 0)
         except:
@@ -328,7 +329,7 @@ def get_token_stats() -> Dict[str, Any]:
                     try:
                         entry = json.loads(line.strip())
                         entry_date = entry.get("timestamp", "")[:10]
-                        if entry_date == datetime.now().strftime("%Y-%m-%d"):
+                        if entry_date == today_local().strftime("%Y-%m-%d"):
                             token_list.append(entry.get("tokens", 0))
                     except:
                         continue
@@ -460,8 +461,11 @@ def calculate_metrics(
         if ts:
             try:
                 dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                dia = dt.strftime("%Y-%m-%d")
-                hora = dt.hour
+                local_dt = to_local(dt)
+                if local_dt is None:
+                    continue
+                dia = local_dt.strftime("%Y-%m-%d")
+                hora = local_dt.hour
                 distribucion_dia[dia] += 1
                 distribucion_hora[hora] += 1
             except (ValueError, TypeError):
@@ -589,7 +593,7 @@ def calculate_roi(metrics: Dict[str, Any]) -> Dict[str, Any]:
     cost_bot = 0.0
     total_savings = cost_human - cost_bot
 
-    active_days = max(1, (datetime.now() - datetime.strptime("2026-01-01", "%Y-%m-%d")).days)
+    active_days = max(1, (now_local().replace(tzinfo=None) - datetime.strptime("2026-01-01", "%Y-%m-%d")).days)
     monthly_savings = (total_savings / active_days) * WORKING_DAYS_PER_MONTH
     yearly_savings = monthly_savings * 12
 
@@ -638,12 +642,12 @@ def send_telegram_alert(message: str) -> bool:
 
 
 def formatear_fecha(timestamp_str):
-    """Formatea timestamp ISO a DD/MM/YYYY HH:MM."""
+    """Formatea timestamp ISO a DD/MM/YYYY HH:MM en la zona horaria configurada (CDMX)."""
     if not timestamp_str:
         return "-"
     try:
         fecha_obj = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-        return fecha_obj.strftime("%d/%m/%Y %H:%M")
+        return format_local(fecha_obj)
     except:
         return timestamp_str[:16] if len(timestamp_str) > 16 else "-"
 
@@ -676,7 +680,7 @@ def generate_dashboard_html(
                     try:
                         entry = json.loads(line.strip())
                         entry_date = entry.get("timestamp", "")[:10]
-                        if entry_date == datetime.now().strftime("%Y-%m-%d"):
+                        if entry_date == today_local().strftime("%Y-%m-%d"):
                             token_map[entry.get("timestamp", "")] = entry.get("tokens", 0)
                     except:
                         continue
@@ -1403,7 +1407,7 @@ async def generate_user_dashboard_async(
     # Alertas críticas vía Telegram
     if sla_data["overall_status"] == "red":
         msg = (
-            f"🚨 *ALERTA SLA - Dashboard {datetime.now().strftime('%d/%m/%Y')}*\n"
+            f"🚨 *ALERTA SLA - Dashboard {now_local().strftime('%d/%m/%Y')}*\n"
             f"Estado general del servicio: 🔴 CRÍTICO\n"
             f"Cumplimiento: {sla_data['overall_pct']:.0f}%\n\n"
         )
@@ -1415,7 +1419,7 @@ async def generate_user_dashboard_async(
 
     if metrics.get("tasa_no_encontrado", 0) > 25:
         send_telegram_alert(
-            f"⚠️ *Alerta de Calidad - {datetime.now().strftime('%d/%m/%Y')}*\n"
+            f"⚠️ *Alerta de Calidad - {now_local().strftime('%d/%m/%Y')}*\n"
             f"Tasa de 'No encontrado' elevada: {metrics['tasa_no_encontrado']:.1f}%\n"
             f"Por encima del umbral del 25%"
         )

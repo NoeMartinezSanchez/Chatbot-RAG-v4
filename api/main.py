@@ -6,12 +6,13 @@ from fastapi.staticfiles import StaticFiles
 import logging
 import json
 import uuid
-from datetime import datetime
 from collections import defaultdict
 import os
 import sys
 import time
 from typing import Optional, List, Dict, Any, Union
+
+from utils.timezones import now_local
 
 
 # AÑADIR ESTAS LÍNEAS PARA PRODUCCIÓN
@@ -296,7 +297,7 @@ async def health():
     """Health check para Render"""
     return {
         "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": now_local().isoformat(),
         "service": "chatbot-rag-api",
         "version": "2.0.0"
     }
@@ -401,7 +402,7 @@ async def chat(chat_request: ChatRequest, fastapi_request: Request):
             "message_id": message_id,
             "user_message": pregunta,
             "assistant_response": response_text,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": now_local().isoformat(),
             "is_rag": is_rag,
             "confidence": confidence,
             "sources": sources
@@ -430,7 +431,7 @@ async def chat(chat_request: ChatRequest, fastapi_request: Request):
         # Guardar interacción de usuario para dashboard dinámico
         try:
             interaction = {
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": now_local().isoformat(),
                 "pregunta": pregunta,
                 "respuesta": response_text,
                 "tiempo_total_ms": round(total_time, 2),
@@ -488,7 +489,7 @@ async def submit_feedback(request: FeedbackRequest):
             "is_helpful": request.is_helpful,
             "feedback_text": request.feedback_text,
             "feedback_id": feedback_id,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": now_local().isoformat()
         }
         
         logger.info(f"📝 Feedback recibido: {request.conversation_id} - Rating: {user_rating}")
@@ -529,14 +530,14 @@ async def get_analytics(session_id: str = None, days: int = 7):
                 "system_health": system_health,
                 "feedback_stats": feedback_stats,
             },
-            "timestamp": datetime.now().isoformat()
+            "timestamp": now_local().isoformat()
         }
     except Exception as e:
         logger.error(f"❌ Error obteniendo analíticas: {e}", exc_info=True)
         return {
             "status": "error",
             "detail": str(e),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": now_local().isoformat()
         }
 
 # ============================================================
@@ -578,7 +579,7 @@ async def admin_cleanup(request: Request, dry_run: bool = False):
             "dry_run": dry_run,
             "collections": results["collections"],
             "total_deleted": results["total_deleted"],
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": now_local().isoformat(),
         }
     except Exception as e:
         logger.error(f"❌ Error en /admin/cleanup: {e}", exc_info=True)
@@ -602,7 +603,7 @@ async def admin_dashboard_report(request: Request, days: int = 7):
         return {
             "status": "success",
             "report": report,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": now_local().isoformat(),
         }
     except Exception as e:
         logger.error(f"❌ Error en /admin/dashboard-report: {e}", exc_info=True)
@@ -620,7 +621,7 @@ async def get_stats():
             "system": {
                 "status": "operational",
                 "version": "2.0.0",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": now_local().isoformat()
             },
             "rag_system": rag_stats,
             "conversations": {
@@ -664,7 +665,7 @@ async def get_security_stats():
     return {
         "status": "success",
         "data": monitor.get_stats(),
-        "timestamp": datetime.now().isoformat()
+        "timestamp": now_local().isoformat()
     }
 
 @app.get("/security/incidents")
@@ -677,7 +678,7 @@ async def get_security_incidents(limit: int = 50, min_severity: str = "low"):
         "status": "success",
         "incidents": incidents,
         "count": len(incidents),
-        "timestamp": datetime.now().isoformat()
+        "timestamp": now_local().isoformat()
     }
 
 @app.post("/security/validate")

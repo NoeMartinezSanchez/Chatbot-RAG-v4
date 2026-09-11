@@ -3,8 +3,8 @@ import os
 import json
 import time
 import logging
-from datetime import datetime
 from groq import Groq
+from utils.timezones import today_local, now_local
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class GroqWrapper:
         try:
             with open(self.token_file, 'r') as f:
                 data = json.load(f)
-                if data.get('date') == datetime.now().strftime('%Y-%m-%d'):
+                if data.get('date') == today_local().strftime('%Y-%m-%d'):
                     self.token_counter = data.get('tokens', 0)
         except:
             pass
@@ -96,14 +96,14 @@ Responde clara y amigable: {question}"""
                 
                 with open(self.token_file, 'w') as f:
                     json.dump({
-                        'date': datetime.now().strftime('%Y-%m-%d'),
+                        'date': today_local().strftime('%Y-%m-%d'),
                         'tokens': self.token_counter
                     }, f)
                 
                 # Guardar por consulta para el dashboard
                 with open("token_usage_per_query.jsonl", "a") as f:
                     f.write(json.dumps({
-                        "timestamp": datetime.now().isoformat(),
+                        "timestamp": now_local().isoformat(),
                         "tokens": total_tokens,
                         "prompt_tokens": response.usage.prompt_tokens,
                         "completion_tokens": response.usage.completion_tokens,

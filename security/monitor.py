@@ -6,6 +6,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 
+from utils.timezones import get_tz
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -119,7 +121,7 @@ class SecurityMonitor:
 
             import requests
 
-            fecha = datetime.fromtimestamp(incident.timestamp).strftime("%d/%m/%Y %H:%M:%S")
+            fecha = datetime.fromtimestamp(incident.timestamp, tz=get_tz()).strftime("%d/%m/%Y %H:%M:%S")
             message = (
                 f"🚨 *ALERTA DE SEGURIDAD*\n"
                 f"• Tipo: `{incident.threat_type}`\n"
