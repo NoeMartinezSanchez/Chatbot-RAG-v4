@@ -24,6 +24,10 @@ from mongodb.services.metrics_service import (
     get_endpoint_metrics,
     get_system_health,
 )
+from mongodb.services.collection_query_service import (
+    CollectionQueryService,
+    collection_query_service,
+)
 from mongodb.services.feedback_service import (
     FeedbackService,
     record_feedback,
@@ -53,4 +57,6 @@ __all__ = [
     "FeedbackService",
     "record_feedback",
     "get_feedback_stats",
+    "CollectionQueryService",
+    "collection_query_service",
 ]

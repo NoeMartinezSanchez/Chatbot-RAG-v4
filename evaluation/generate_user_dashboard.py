@@ -872,6 +872,23 @@ def generate_dashboard_html(
         .log-empty, .log-error, .log-loading {{ text-align: center; padding: 40px; color: var(--gristexto); }}
         .log-error {{ color: #dc3545; }}
         
+        /* Consulta (MongoDB) */
+        .consulta-presets {{ display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }}
+        .consulta-presets-label {{ font-size: 13px; font-weight: 600; color: var(--azul-principal); }}
+        .consulta-preset {{ background: var(--grisclaro); border: 1px solid #ddd; padding: 6px 14px; border-radius: 16px; cursor: pointer; font-size: 13px; color: var(--azul-principal); transition: all 0.2s; }}
+        .consulta-preset:hover {{ background: var(--azul-secundario); color: var(--blanco); }}
+        .consulta-advanced-toggle {{ font-size: 13px; font-weight: 600; color: var(--azul-secundario); cursor: pointer; margin-bottom: 10px; user-select: none; }}
+        .consulta-advanced {{ background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 14px; margin-bottom: 16px; }}
+        .consulta-field {{ margin-bottom: 10px; }}
+        .consulta-field label {{ display: block; font-size: 12px; color: var(--gristexto); margin-bottom: 4px; font-weight: 600; }}
+        .consulta-field textarea {{ width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #ddd; font-family: 'Courier New', monospace; font-size: 12px; resize: vertical; background: var(--blanco); }}
+        .consulta-field input {{ width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #ddd; font-family: 'Courier New', monospace; font-size: 12px; background: var(--blanco); }}
+        .consulta-info {{ font-size: 13px; color: var(--gristexto); margin-bottom: 10px; }}
+        #consulta-results {{ max-height: 600px; overflow: auto; }}
+        .consulta-table-wrap {{ background: var(--blanco); border-radius: 10px; box-shadow: 0 2px 8px var(--sombra); overflow: hidden; }}
+        .consulta-table-wrap table {{ box-shadow: none; }}
+        .consulta-cell {{ max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+        
         /* SLA */
         .sla-overview {{ display: flex; gap: 24px; flex-wrap: wrap; }}
         .sla-overall {{ flex: 1; min-width: 220px; text-align: center; padding: 24px; border-radius: 12px; }}
@@ -909,6 +926,7 @@ def generate_dashboard_html(
             .tab-content {{ display: block !important; }}
             .tab-content#logs-tab {{ display: none !important; }}
             .tab-content#history-tab {{ display: none !important; }}
+            .tab-content#consulta-tab {{ display: none !important; }}
             .card, .chart-container {{ break-inside: avoid; box-shadow: none; border: 1px solid #ddd; }}
         }}
         
@@ -947,6 +965,7 @@ def generate_dashboard_html(
             <button class="tab-btn" onclick="showTab('roi')">💰 ROI</button>
             <button class="tab-btn" onclick="showTab('logs')">📋 Logs del Sistema</button>
             <button class="tab-btn" onclick="showTab('history')">📜 Historial</button>
+            <button class="tab-btn" onclick="showTab('consulta')">🗄️ Consulta</button>
         </div>
         
         <div id="metrics-tab" class="tab-content">
@@ -1174,6 +1193,55 @@ def generate_dashboard_html(
             <div class="log-loading">📋 Cargando logs...</div>
         </div>
     </div>
+
+    <div id="consulta-tab" class="tab-content" style="display:none;">
+        <div class="logs-controls">
+            <select id="consulta-collection" onchange="onCollectionChange()"></select>
+            <select id="consulta-operation" onchange="onOperationChange()">
+                <option value="find">📄 Buscar (find)</option>
+                <option value="count">🔢 Contar (count)</option>
+                <option value="distinct">🏷️ Distintos (distinct)</option>
+            </select>
+            <input id="consulta-limit" type="number" value="50" min="1" max="500" style="width:80px;" title="Límite (máx 500)">
+            <button onclick="runConsulta()" class="btn" style="padding:8px 16px;">▶ Ejecutar</button>
+            <button id="consulta-csv-btn" onclick="exportConsultaCSV()" class="btn" style="padding:8px 16px;" disabled>⬇️ Descargar CSV</button>
+            <span id="consulta-info" class="log-count"></span>
+        </div>
+
+        <div class="consulta-presets">
+            <span class="consulta-presets-label">⚡ Consultas rápidas:</span>
+            <button onclick="presetConsulta('ultimas')" class="consulta-preset">🕒 Últimas</button>
+            <button onclick="presetConsulta('hoy')" class="consulta-preset">📆 Hoy</button>
+            <button onclick="presetConsulta('contar')" class="consulta-preset">🔢 Contar todo</button>
+            <button onclick="presetConsulta('distinct')" class="consulta-preset">🏷️ Distintos</button>
+        </div>
+
+        <div class="consulta-presets" id="consulta-date-row" style="display:none;">
+            <select id="consulta-date-field"></select>
+            <input id="consulta-date-from" type="date" title="Desde">
+            <span style="color:var(--gristexto);">a</span>
+            <input id="consulta-date-to" type="date" title="Hasta">
+            <span id="consulta-date-hint" class="consulta-presets-label" style="font-weight:400;">(rango por fecha)</span>
+        </div>
+
+        <div id="consulta-advanced-toggle" class="consulta-advanced-toggle" onclick="toggleConsultaAdvanced()">📝 JSON avanzado (filtro / orden) ▾</div>
+        <div id="consulta-advanced" class="consulta-advanced" style="display:none;">
+            <div class="consulta-field">
+                <label for="consulta-filter">Filtro (JSON Mongo):</label>
+                <textarea id="consulta-filter" rows="2" placeholder='{{"endpoint": "/chat"}}'></textarea>
+            </div>
+            <div class="consulta-field">
+                <label for="consulta-sort">Orden (JSON):</label>
+                <textarea id="consulta-sort" rows="1" placeholder='{{"created_at": -1}}'></textarea>
+            </div>
+            <div class="consulta-field" id="consulta-distinct-field-wrap" style="display:none;">
+                <label for="consulta-distinct-field">Campo para distinct:</label>
+                <input id="consulta-distinct-field" type="text" placeholder="endpoint">
+            </div>
+        </div>
+
+        <div id="consulta-results"></div>
+    </div>
     </div>
     
     <script>
@@ -1238,6 +1306,7 @@ def generate_dashboard_html(
             document.getElementById(name + '-tab').style.display = 'block';
             document.querySelector(`.tab-btn[onclick*="'${{name}}'"]`).classList.add('active');
             if (name === 'logs') refreshLogs();
+            if (name === 'consulta') loadCollections();
         }}
         
         function escapeHtml(text) {{
@@ -1278,6 +1347,211 @@ def generate_dashboard_html(
                 logInterval = null;
             }}
         }});
+
+        // ============ Pestaña Consulta (MongoDB) ============
+        const consultaDateFields = {{
+            'conversations': 'created_at',
+            'metrics': 'request_timestamp',
+            'feedback': 'created_at',
+            'rag_cache': 'created_at',
+            'logs': 'timestamp',
+            'users': 'created_at',
+            'sessions': 'created_at'
+        }};
+        let consultaLastDocs = [];
+        let consultaLastFields = [];
+
+        async function loadCollections() {{
+            const select = document.getElementById('consulta-collection');
+            try {{
+                const r = await fetch('/api/collections');
+                const data = await r.json();
+                select.innerHTML = data.collections.map(c => {{
+                    const count = c.doc_count == null ? '?' : Number(c.doc_count).toLocaleString('es-MX');
+                    return `<option value="${{c.name}}">${{c.label}} (${{count}})</option>`;
+                }}).join('');
+                onCollectionChange();
+            }} catch(e) {{
+                select.innerHTML = '<option value="">No disponible (revisa MongoDB)</option>';
+            }}
+        }}
+
+        function onCollectionChange() {{
+            const col = document.getElementById('consulta-collection').value;
+            const fieldWrap = document.getElementById('consulta-distinct-field-wrap');
+            const field = document.getElementById('consulta-distinct-field');
+            const dateSelect = document.getElementById('consulta-date-field');
+            if (!col) return;
+            const dateField = consultaDateFields[col] || '_id';
+            const suggestions = {{
+                'conversations': ['session_id', 'user_id', 'is_rag_response', 'created_at'],
+                'metrics': ['endpoint', 'session_id', 'is_rag_response', 'cache_hit'],
+                'feedback': ['session_id', 'user_rating', 'is_correct'],
+                'rag_cache': ['hit_count', 'query'],
+                'logs': ['method', 'path', 'status_code', 'session_id'],
+                'users': ['user_id'],
+                'sessions': ['session_id']
+            }};
+            const opts = (suggestions[col] || ['_id']).map(s => `<option value="${{s}}">${{s}}</option>`).join('');
+            dateSelect.innerHTML = opts;
+            // Campo por defecto para distinct según colección
+            const distinctDefaults = {{'metrics': 'endpoint', 'feedback': 'user_rating', 'logs': 'method', 'rag_cache': 'query', 'conversations': 'user_id'}};
+            field.value = distinctDefaults[col] || '';
+        }}
+
+        function onOperationChange() {{
+            const op = document.getElementById('consulta-operation').value;
+            document.getElementById('consulta-distinct-field-wrap').style.display = op === 'distinct' ? 'block' : 'none';
+            document.getElementById('consulta-date-row').style.display = 'none';
+            if (op === 'distinct' || op === 'count') return;
+            // find con JSON avanzado visible
+        }}
+
+        function toggleConsultaAdvanced() {{
+            const adv = document.getElementById('consulta-advanced');
+            const toggler = document.getElementById('consulta-advanced-toggle');
+            const show = adv.style.display === 'none';
+            adv.style.display = show ? 'block' : 'none';
+            toggler.textContent = show ? '📝 JSON avanzado (filtro / orden) ▴' : '📝 JSON avanzado (filtro / orden) ▾';
+        }}
+
+        function presetConsulta(type) {{
+            const sel = document.getElementById('consulta-operation');
+            const dateRow = document.getElementById('consulta-date-row');
+            const info = document.getElementById('consulta-info');
+            dateRow.style.display = 'none';
+            if (type === 'ultimas') {{
+                sel.value = 'find';
+                document.getElementById('consulta-sort').value = '{{"_id": -1}}';
+            }} else if (type === 'contar') {{
+                sel.value = 'count';
+            }} else if (type === 'hoy') {{
+                sel.value = 'find';
+                const today = new Date().toISOString().slice(0, 10);
+                document.getElementById('consulta-date-from').value = today;
+                document.getElementById('consulta-date-to').value = today;
+            }} else if (type === 'distinct') {{
+                sel.value = 'distinct';
+            }}
+            onOperationChange();
+            if (type === 'hoy') {{
+                dateRow.style.display = 'flex';
+            }}
+            runConsulta();
+        }}
+
+        async function runConsulta() {{
+            const info = document.getElementById('consulta-info');
+            const results = document.getElementById('consulta-results');
+            const csvBtn = document.getElementById('consulta-csv-btn');
+            csvBtn.disabled = true;
+            info.textContent = '⏳ Consultando...';
+            const col = document.getElementById('consulta-collection').value;
+            if (!col) {{
+                info.textContent = '❌ Selecciona una colección';
+                return;
+            }}
+            const op = document.getElementById('consulta-operation').value;
+            const body = {{
+                collection: col,
+                operation: op,
+                limit: parseInt(document.getElementById('consulta-limit').value) || 50
+            }};
+            if (op === 'distinct') {{
+                body.distinct_field = document.getElementById('consulta-distinct-field').value.trim() || '_id';
+            }}
+            // Filtro por fecha si la fila de fecha está activa
+            if (document.getElementById('consulta-date-row').style.display !== 'none') {{
+                body.date_field = document.getElementById('consulta-date-field').value;
+                const from = document.getElementById('consulta-date-from').value;
+                const to = document.getElementById('consulta-date-to').value;
+                if (from) body.date_from = from + 'T00:00:00-06:00';
+                if (to) body.date_to = to + 'T23:59:59-06:00';
+            }}
+            // JSON avanzado
+            const filterVal = document.getElementById('consulta-filter').value.trim();
+            const sortVal = document.getElementById('consulta-sort').value.trim();
+            if (filterVal) {{
+                try {{ body.filter = JSON.parse(filterVal); }}
+                catch(e) {{ info.textContent = '❌ Filtro JSON inválido: ' + e.message; return; }}
+            }}
+            if (sortVal) {{
+                try {{ body.sort = JSON.parse(sortVal); }}
+                catch(e) {{ info.textContent = '❌ Orden JSON inválido: ' + e.message; return; }}
+            }}
+            try {{
+                const r = await fetch('/api/collections/query', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify(body)
+                }});
+                const data = await r.json();
+                if (!r.ok) {{
+                    info.textContent = '❌ ' + (data.detail || 'Error en la consulta');
+                    results.innerHTML = '';
+                    return;
+                }}
+                renderConsulta(data);
+                info.textContent = `✅ Total: ${{Number(data.total||0).toLocaleString('es-MX')}} · Devueltos: ${{data.returned||0}} · ${{data.took_ms}}ms (${{data.collection}})`;
+                if (data.returned && data.returned > 0) {{
+                    csvBtn.disabled = false;
+                }}
+            }} catch(e) {{
+                info.textContent = '❌ Error de red: ' + e.message;
+            }}
+        }}
+
+        function csvCell(value) {{
+            if (value == null) return '';
+            const s = typeof value === 'object' ? JSON.stringify(value) : String(value);
+            return '"' + s.replace(/"/g, '""') + '"';
+        }}
+
+        function exportConsultaCSV() {{
+            if (!consultaLastDocs.length) return;
+            const header = consultaLastFields.map(f => csvCell(f)).join(',');
+            const rows = consultaLastDocs.map(d => consultaLastFields.map(f => csvCell(d[f])).join(','));
+            const csv = '\\uFEFF' + header + '\\n' + rows.join('\\n');
+            const col = document.getElementById('consulta-collection').value;
+            const blob = new Blob([csv], {{ type: 'text/csv;charset=utf-8;' }});
+            const a = document.createElement('a');
+            const fecha = new Date().toISOString().slice(0, 10);
+            a.href = URL.createObjectURL(blob);
+            a.download = `consulta-${{col}}-${{fecha}}.csv`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }}
+
+        function cellHtml(value) {{
+            if (value == null) return '<span style="color:#999;">-</span>';
+            if (typeof value === 'object') {{
+                return '<span class="consulta-cell" title="' + escapeHtml(JSON.stringify(value)) + '">' + escapeHtml(JSON.stringify(value).slice(0, 120)) + '</span>';
+            }}
+            const s = escapeHtml(String(value));
+            return '<span class="consulta-cell" title="' + s + '">' + s.slice(0, 120) + '</span>';
+        }}
+
+        function renderConsulta(data) {{
+            const results = document.getElementById('consulta-results');
+            consultaLastDocs = data.docs || [];
+            consultaLastFields = data.fields || [];
+            if (data.operation === 'count' && data.total != null) {{
+                results.innerHTML = `<div class="consulta-info">📊 <strong>Total de documentos</strong>: ${{Number(data.total).toLocaleString('es-MX')}}</div>`;
+                return;
+            }}
+            if (!consultaLastDocs.length) {{
+                results.innerHTML = '<div class="consulta-info">🚫 Sin resultados para esa consulta</div>';
+                return;
+            }}
+            const fields = consultaLastFields.length ? consultaLastFields : Object.keys(consultaLastDocs[0] || {{}});
+            consultaLastFields = fields;
+            const table = '<div class="consulta-table-wrap"><table><thead><tr>' +
+                fields.map(f => `<th>${{escapeHtml(f)}}</th>`).join('') +
+                '</tr></thead><tbody>' +
+                consultaLastDocs.map(d => '<tr>' + fields.map(f => `<td>${{cellHtml(d[f])}}</td>`).join('') + '</tr>').join('') +
+                '</tbody></table></div>';
+            results.innerHTML = table;
+        }}
         
         async function exportPDF() {{
             const btn = event.target || document.querySelector('.btn');

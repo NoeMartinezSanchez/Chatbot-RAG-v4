@@ -852,6 +852,56 @@ async def get_logs(level: Optional[str] = None, limit: int = 200, since: Optiona
     return {"logs": logs[:limit], "total": total, "available_levels": ["INFO", "WARNING", "ERROR", "DEBUG"]}
 
 
+@app.get("/api/collections")
+async def list_collections():
+    """Lista las colecciones consultables en la pestaña "Consulta" del dashboard.
+
+    Returns:
+        Lista de colecciones permitidas con su conteo estimado de documentos.
+    """
+    try:
+        from mongodb.services import collection_query_service
+        return {"collections": await collection_query_service.list_collections(),
+                "timestamp": now_local().isoformat()}
+    except Exception as e:
+        logger.error(f"❌ Error listando colecciones: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error consultando colecciones: {e}")
+
+
+@app.post("/api/collections/query")
+async def query_collection(request: Request):
+    """Ejecuta una consulta de solo lectura sobre una colección MongoDB.
+
+    Body JSON: ``{collection, operation, filter, sort, limit, distinct_field}``
+    donde ``operation`` es ``"count"``, ``"find"`` o ``"distinct"``.
+    Solo lectura: nunca ejecuta insert/update/delete ni agregaciones.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Body JSON inválido")
+
+    from mongodb.services import collection_query_service
+    try:
+        result = await collection_query_service.run_query(
+            collection=body.get("collection", ""),
+            operation=body.get("operation", "find"),
+            filter_doc=body.get("filter"),
+            sort_doc=body.get("sort"),
+            limit=body.get("limit"),
+            distinct_field=body.get("distinct_field"),
+            date_field=body.get("date_field"),
+            date_from=body.get("date_from"),
+            date_to=body.get("date_to"),
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"❌ Error en /api/collections/query: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error ejecutando consulta: {e}")
+
+
 # Listado final de endpoints (después de registrar todos los decoradores)
 print("=" * 50)
 print("✅ ENDPOINTS REGISTRADOS (LISTA FINAL):")
