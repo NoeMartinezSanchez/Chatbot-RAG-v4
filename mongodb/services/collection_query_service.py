@@ -22,6 +22,11 @@ DEFAULT_LIMIT = 50
 # cómputos peligrosos dentro de un find; se bloquean por seguridad.
 BLOCKED_OPERATORS = ("$where", "$function", "$accumulator", "$expr", "$jsonSchema")
 
+# Campos de la vista "tipo historial" para la colección de conversaciones.
+# El texto de pregunta/respuesta se mantiene COMPLETO para el CSV; el
+# recorte visual lo hace la interfaz (cellHtml / tooltip).
+CONVERSATION_FIELDS = ["fecha", "pregunta", "respuesta", "tiempo", "tokens", "rag"]
+
 
 class CollectionQueryService:
     """Consultas de solo lectura sobre colecciones MongoDB."""
@@ -108,6 +113,73 @@ class CollectionQueryService:
             return [CollectionQueryService._jsonable(v) for v in doc]
         # ObjectId y otros tipos BSON: intentar str()
         return str(doc) if not isinstance(doc, (str, int, float, bool)) or doc is None else doc
+
+    @staticmethod
+    def _flatten_conversations(raw_docs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Aplana documentos de ``conversations`` en turnos user→assistant.
+
+        Convierte el arreglo anidado ``messages`` de cada conversación en
+        filas tipo "historial": Fecha | Pregunta | Respuesta | Tiempo |
+        Tokens | RAG. El texto de pregunta/respuesta se conserva completo
+        (el recorte visual lo hace la interfaz; el CSV lo exporta tal cual).
+
+        Args:
+            raw_docs: Documentos crudos de la colección conversations.
+
+        Returns:
+            Lista de dicts con las claves de ``CONVERSATION_FIELDS``.
+        """
+        from utils.timezones import format_local
+
+        rows: List[Dict[str, Any]] = []
+        for conv in raw_docs:
+            messages = conv.get("messages") or []
+            release_based_tokens = conv.get("total_tokens")
+            conv_latency = conv.get("latency_ms")
+            conv_is_rag = bool(conv.get("is_rag_response"))
+            for i in range(0, len(messages) - 1, 2):
+                user_msg = messages[i]
+                if not isinstance(user_msg, dict) or user_msg.get("role") != "user":
+                    continue
+                resp_msg = messages[i + 1] if isinstance(messages[i + 1], dict) else None
+                if resp_msg is not None and resp_msg.get("role") != "assistant":
+                    resp_msg = None
+
+                fecha = format_local(user_msg.get("timestamp"), "%d/%m/%Y %H:%M")
+                pregunta = user_msg.get("content") or ""
+
+                respuesta = ""
+                if resp_msg:
+                    respuesta = resp_msg.get("content") or ""
+
+                # Tiempo: latencia del turno (assistant) o fallback de la conversación
+                tiempo = "-"
+                if resp_msg is not None and resp_msg.get("latency_ms") is not None:
+                    tiempo = f"{resp_msg.get('latency_ms'):.0f}ms"
+                elif conv_latency is not None:
+                    tiempo = f"{conv_latency:.0f}ms"
+
+                # Tokens: del turno (assistant) o fallback total de la conversación
+                tokens = "-"
+                if resp_msg is not None and resp_msg.get("tokens") is not None:
+                    tokens = resp_msg.get("tokens")
+                elif release_based_tokens is not None:
+                    tokens = release_based_tokens
+
+                # RAG: flag del turno o fallback de la conversación
+                rag = "Sí" if conv_is_rag else "No"
+                if resp_msg is not None and resp_msg.get("is_rag") is not None:
+                    rag = "Sí" if resp_msg.get("is_rag") else "No"
+
+                rows.append({
+                    "fecha": fecha,
+                    "pregunta": pregunta,
+                    "respuesta": respuesta,
+                    "tiempo": tiempo,
+                    "tokens": tokens,
+                    "rag": rag,
+                })
+        return rows
 
     async def list_collections(self) -> List[Dict[str, Any]]:
         """Lista las colecciones permitidas con su conteo estimado.
@@ -214,10 +286,19 @@ class CollectionQueryService:
                 cursor = cursor.sort(_sort)
             total = await col.count_documents(filter_doc)
             raw = await cursor.limit(limit).to_list(length=None)
-            docs = [self._jsonable(d) for d in raw]
-            # Columnas: keys del primer documento (o del más reciente)
-            if raw:
-                fields = list(raw[0].keys())
+
+            # Vista "tipo historial" para la colección de conversaciones:
+            # aplana messages en turnos user→assistant. El texto permanece
+            # completo (la UI lo recorta visualmente; el CSV lo exporta íntegro).
+            if name == settings.MONGODB_COLL_CONVERSATIONS:
+                docs = self._flatten_conversations(raw)
+                fields = list(CONVERSATION_FIELDS)
+                total = len(docs)
+            else:
+                docs = [self._jsonable(d) for d in raw]
+                # Columnas: keys del primer documento (o del más reciente)
+                if raw:
+                    fields = list(raw[0].keys())
 
         took_ms = round((time.time() - start) * 1000, 2)
         from utils.timezones import now_local

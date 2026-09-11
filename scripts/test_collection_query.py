@@ -54,9 +54,51 @@ async def _insert_test_metrics(session_id: str, count: int = 5) -> None:
         await col.insert_many(docs)
 
 
+async def _insert_test_conversations(conversation_id: str, session_id: str) -> None:
+    """Inserta una conversación de prueba con 2 turnos user→assistant."""
+    from datetime import datetime, timezone
+    db = await MongoDBConnection().connect()
+    col = db[settings.MONGODB_COLL_CONVERSATIONS]
+
+    def _msg(role: str, content: str, **extra):
+        m = {
+            "role": role,
+            "content": content,
+            "timestamp": datetime(2026, 9, 10, 16, 30, 0, tzinfo=timezone.utc),
+        }
+        m.update(extra)
+        return m
+
+    doc = {
+        "conversation_id": conversation_id,
+        "session_id": session_id,
+        "user_id": "qq-itest-user",
+        "created_at": datetime(2026, 9, 10, 16, 30, 0, tzinfo=timezone.utc),
+        "is_rag_response": True,
+        "total_tokens": 500,
+        "latency_ms": 2000.0,
+        "messages": [
+            _msg("user", "¿Cómo me inscribo al módulo 1?", timestamp=datetime(2026, 9, 10, 16, 30, 0, tzinfo=timezone.utc)),
+            _msg("assistant",
+                 "Debes ingresar a la plataforma con tu usuario y contraseña para inscribirte al módulo 1. "
+                 "El periodo de inscripción queda abierto según la convocatoria vigente.",
+                 timestamp=datetime(2026, 9, 10, 16, 30, 10, tzinfo=timezone.utc),
+                 tokens=120, latency_ms=726.0, is_rag=True),
+            _msg("user", "hola", timestamp=datetime(2026, 9, 10, 16, 31, 0, tzinfo=timezone.utc)),
+            _msg("assistant",
+                 "¡Hola! ¿En qué puedo ayudarte hoy? Recuerda que puedes preguntar sobre trámites, "
+                 "inscripciones y el funcionamiento de Prepa en Línea SEP.",
+                 timestamp=datetime(2026, 9, 10, 16, 31, 5, tzinfo=timezone.utc),
+                 tokens=25, latency_ms=400.0, is_rag=False),
+        ],
+    }
+    await col.insert_one(doc)
+
+
 async def _cleanup(session_id: str) -> None:
     db = MongoDBConnection().get_db()
     await db[settings.MONGODB_COLL_METRICS].delete_many({"session_id": session_id})
+    await db[settings.MONGODB_COLL_CONVERSATIONS].delete_many({"session_id": session_id})
 
 
 async def _test_validation() -> None:
@@ -179,6 +221,39 @@ async def _test_with_mongo() -> None:
             date_to="2026-09-10T17:00:00-06:00")
         assert res["total"] == 0, res
         logger.info("   ✅ Filtro por fecha (rango completo y sub-rango vacío)")
+
+        # ===== Conversaciones: vista "tipo historial" =====
+        conv_id = "qq-conv-" + uuid.uuid4().hex[:6]
+        await _insert_test_conversations(conv_id, session_id)
+
+        res = await svc.run_query(
+            collection=settings.MONGODB_COLL_CONVERSATIONS,
+            operation="find",
+            filter_doc={"session_id": session_id})
+        assert res["fields"] == ["fecha", "pregunta", "respuesta", "tiempo", "tokens", "rag"], res["fields"]
+        assert res["total"] == 2, res  # 2 turnos user→assistant
+        assert res["returned"] == 2, res
+        rows = res["docs"]
+        # El texto de pregunta/respuesta se conserva COMPLETO (no truncado)
+        assert rows[0]["pregunta"] == "¿Cómo me inscribo al módulo 1?", rows[0]
+        assert rows[0]["respuesta"].startswith("Debes ingresar a la plataforma"), rows[0]
+        assert rows[0]["tiempo"] == "726ms", rows[0]
+        assert rows[0]["tokens"] == 120, rows[0]
+        assert rows[0]["rag"] == "Sí", rows[0]
+        assert rows[1]["pregunta"] == "hola", rows[1]
+        assert rows[1]["rag"] == "No", rows[1]
+        assert rows[1]["tiempo"] == "400ms", rows[1]
+        # La fecha usa hora CDMX (16:30 UTC = 10:30 CDMX)
+        assert rows[0]["fecha"].startswith("10/09/2026 10:30"), rows[0]
+        logger.info("   ✅ find conversations aplana turnos (total 2, texto completo)")
+
+        # count sobre conversations NO aplana (sigue contando documentos)
+        res = await svc.run_query(
+            collection=settings.MONGODB_COLL_CONVERSATIONS,
+            operation="count",
+            filter_doc={"session_id": session_id})
+        assert res["total"] == 1, res
+        logger.info("   ✅ count sobre conversations cuenta documentos")
 
         logger.info("5️⃣ Pruebas de consulta PASSED")
     finally:

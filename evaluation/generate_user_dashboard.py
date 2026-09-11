@@ -1552,8 +1552,13 @@ def generate_dashboard_html(
             }}
             const fields = consultaLastFields.length ? consultaLastFields : Object.keys(consultaLastDocs[0] || {{}});
             consultaLastFields = fields;
+            // Encabezados legibles (vista "tipo historial" de conversations)
+            const headers = {{
+                'fecha': 'Fecha', 'pregunta': 'Pregunta', 'respuesta': 'Respuesta',
+                'tiempo': 'Tiempo', 'tokens': 'Tokens', 'rag': 'RAG'
+            }};
             const table = '<div class="consulta-table-wrap"><table><thead><tr>' +
-                fields.map(f => `<th>${{escapeHtml(f)}}</th>`).join('') +
+                fields.map(f => `<th>${{escapeHtml(headers[f] || f)}}</th>`).join('') +
                 '</tr></thead><tbody>' +
                 consultaLastDocs.map(d => '<tr>' + fields.map(f => `<td>${{cellHtml(d[f])}}</td>`).join('') + '</tr>').join('') +
                 '</tbody></table></div>';
