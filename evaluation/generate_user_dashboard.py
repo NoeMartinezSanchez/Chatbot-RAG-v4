@@ -1098,6 +1098,9 @@ def generate_dashboard_html(
         #chartWordCloud {{ width: 100%; max-width: 720px; height: 300px; }}
         
         .sources-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }}
+        .charts-row {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }}
+        .chart-canvas-box {{ position: relative; width: 100%; height: 340px; }}
+        #chartKeywords {{ display: block; width: 100% !important; height: 100% !important; }}
         
         table {{ width: 100%; border-collapse: collapse; font-size: 13px; background: var(--blanco); border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px var(--sombra); }}
         th, td {{ padding: 12px 10px; text-align: left; border-bottom: 1px solid var(--grisclaro); }}
@@ -1223,6 +1226,7 @@ def generate_dashboard_html(
         @media (max-width: 480px) {{
             .grid {{ grid-template-columns: 1fr; }}
             .sources-grid {{ grid-template-columns: 1fr; }}
+            .charts-row {{ grid-template-columns: 1fr; }}
         }}
     </style>
 </head>
@@ -1336,10 +1340,12 @@ def generate_dashboard_html(
             {fuentes_sections_html}
         </div>
         
-        <div class="sources-grid">
+        <div class="charts-row">
             <div class="chart-container">
                 <div class="chart-title">🔑 Palabras Clave (Top {settings.DASHBOARD_KEYWORD_TOP_N})</div>
-                <canvas id="chartKeywords" width="460" height="460"></canvas>
+                <div class="chart-canvas-box">
+                    <canvas id="chartKeywords" width="460" height="340"></canvas>
+                </div>
             </div>
             <div class="chart-container">
                 <div class="chart-title">☁️ Nube de Palabras</div>
@@ -1574,7 +1580,10 @@ def generate_dashboard_html(
                     label: 'Frecuencia',
                     data: keywordsValues,
                     backgroundColor: '#3498db',
-                    borderRadius: 4
+                    borderRadius: 4,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.85,
+                    maxBarThickness: 18
                 }}]
             }},
             options: {{
