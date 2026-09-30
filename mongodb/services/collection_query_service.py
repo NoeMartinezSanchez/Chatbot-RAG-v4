@@ -23,9 +23,20 @@ DEFAULT_LIMIT = 50
 BLOCKED_OPERATORS = ("$where", "$function", "$accumulator", "$expr", "$jsonSchema")
 
 # Campos de la vista "tipo historial" para la colección de conversaciones.
-# El texto de pregunta/respuesta se mantiene COMPLETO para el CSV; el
-# recorte visual lo hace la interfaz (cellHtml / tooltip).
-CONVERSATION_FIELDS = ["fecha", "pregunta", "respuesta", "tiempo", "tokens", "rag"]
+# Las primeras 6 columnas conservan el esquema original (compatibilidad); el
+# resto agrega trazabilidad: conversation_id, message_id, user_id, session_id,
+# fuentes/IDs/tipos consultados, confianza, RAG, intent, placeholders, fecha
+# que el bot creía, modelo, tokens por turno y error. El texto de
+# pregunta/respuesta se mantiene COMPLETO para el CSV; el recorte visual lo
+# hace la interfaz (cellHtml / tooltip).
+CONVERSATION_FIELDS = [
+    "fecha", "pregunta", "respuesta", "tiempo", "tokens", "rag",
+    "conversation_id", "message_id", "user_id", "session_id",
+    "documents_consulted", "chunk_ids", "doc_types", "confidence",
+    "is_rag_response", "intent", "placeholders_resolved",
+    "fecha_actual_sistema", "model_used", "tokens_prompt",
+    "tokens_completion", "error",
+]
 
 
 class CollectionQueryService:
@@ -137,6 +148,14 @@ class CollectionQueryService:
             release_based_tokens = conv.get("total_tokens")
             conv_latency = conv.get("latency_ms")
             conv_is_rag = bool(conv.get("is_rag_response"))
+            conv_docs = conv.get("documents_consulted") or None
+            conv_chunks = conv.get("chunk_ids") or None
+            conv_doc_types = conv.get("doc_types") or None
+            conv_intent = conv.get("intent")
+            conv_placeholders = conv.get("placeholders_resolved")
+            conv_fecha_sistema = conv.get("fecha_actual_sistema")
+            conv_model = conv.get("model_used")
+            conv_error = conv.get("error")
             for i in range(0, len(messages) - 1, 2):
                 user_msg = messages[i]
                 if not isinstance(user_msg, dict) or user_msg.get("role") != "user":
@@ -171,6 +190,20 @@ class CollectionQueryService:
                 if resp_msg is not None and resp_msg.get("is_rag") is not None:
                     rag = "Sí" if resp_msg.get("is_rag") else "No"
 
+                # Trazabilidad ampliada (por turno con fallback a conversación)
+                message_id = resp_msg.get("message_id") if resp_msg else None
+                confidence = resp_msg.get("confidence_score") if resp_msg and resp_msg.get("confidence_score") is not None else conv.get("confidence_score")
+                is_rag_response = resp_msg.get("is_rag") if resp_msg and resp_msg.get("is_rag") is not None else conv_is_rag
+                intent = resp_msg.get("intent") if resp_msg and resp_msg.get("intent") is not None else conv_intent
+                placeholders = resp_msg.get("placeholders_resolved") if resp_msg and resp_msg.get("placeholders_resolved") is not None else conv_placeholders
+                fecha_sistema = resp_msg.get("fecha_actual_sistema") if resp_msg and resp_msg.get("fecha_actual_sistema") is not None else conv_fecha_sistema
+                model_used = resp_msg.get("model_used") if resp_msg and resp_msg.get("model_used") is not None else conv_model
+                tokens_prompt = resp_msg.get("tokens_prompt") if resp_msg else None
+                tokens_completion = resp_msg.get("tokens_completion") if resp_msg else None
+                doc_consulted = resp_msg.get("documents_consulted") if resp_msg and resp_msg.get("documents_consulted") else conv_docs
+                chunk_ids = resp_msg.get("chunk_ids") if resp_msg and resp_msg.get("chunk_ids") else conv_chunks
+                doc_types = resp_msg.get("doc_types") if resp_msg and resp_msg.get("doc_types") else conv_doc_types
+
                 rows.append({
                     "fecha": fecha,
                     "pregunta": pregunta,
@@ -178,6 +211,22 @@ class CollectionQueryService:
                     "tiempo": tiempo,
                     "tokens": tokens,
                     "rag": rag,
+                    "conversation_id": conv.get("conversation_id"),
+                    "message_id": message_id,
+                    "user_id": conv.get("user_id"),
+                    "session_id": conv.get("session_id"),
+                    "documents_consulted": doc_consulted,
+                    "chunk_ids": chunk_ids,
+                    "doc_types": doc_types,
+                    "confidence": confidence,
+                    "is_rag_response": bool(is_rag_response),
+                    "intent": intent,
+                    "placeholders_resolved": placeholders,
+                    "fecha_actual_sistema": fecha_sistema,
+                    "model_used": model_used,
+                    "tokens_prompt": tokens_prompt,
+                    "tokens_completion": tokens_completion,
+                    "error": conv_error,
                 })
         return rows
 

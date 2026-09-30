@@ -13,6 +13,7 @@ import time
 from typing import Optional, List, Dict, Any, Union
 
 from utils.timezones import now_local
+from utils.identifiers import generate_session_id, get_or_generate_user_id, hash_user_id
 
 
 # AÑADIR ESTAS LÍNEAS PARA PRODUCCIÓN
@@ -358,14 +359,20 @@ async def chat(chat_request: ChatRequest, fastapi_request: Request):
             )
         # ===== FIN SANITIZACIÓN =====
         
-        # Generar IDs si no existen
-        user_id = chat_request.user_id or str(uuid.uuid4())
-        conversation_id = chat_request.conversation_id or str(uuid.uuid4())
+        # Generar IDs si no existen (trazabilidad: sesiones/usuarios únicos)
+        # - session_id "default"/vacío = cliente viejo → generar UUID estable por sesión
+        # - user_id vacío → ID anónimo; si parece PII → hash antes de persistir
+        session_id = chat_request.session_id or ""
+        if not session_id or session_id == "default":
+            session_id = generate_session_id()
+        user_id_raw = get_or_generate_user_id(chat_request.user_id)
+        user_id = hash_user_id(user_id_raw)
+        conversation_id = chat_request.conversation_id or f"conv-{uuid.uuid4().hex}"
         
         # Usar LangChain wrapper (detecta saludos, fecha, memoria, RAG + guarda en MongoDB)
         wrapper_result = await langchain_wrapper.query_with_memory(
             question=pregunta,
-            session_id=chat_request.session_id or "default",
+            session_id=session_id,
             user_id=user_id,
             conversation_id=conversation_id,
         )
@@ -374,6 +381,13 @@ async def chat(chat_request: ChatRequest, fastapi_request: Request):
         confidence = wrapper_result["confidence"]
         sources = wrapper_result.get("sources", [])
         conversation_id = wrapper_result.get("conversation_id", conversation_id)
+        wrapper_intent = wrapper_result.get("intent")
+        wrapper_model = wrapper_result.get("model_used")
+        wrapper_docs = wrapper_result.get("documents_consulted", [])
+        wrapper_chunk_ids = wrapper_result.get("chunk_ids", [])
+        wrapper_doc_types = wrapper_result.get("doc_types", [])
+        wrapper_placeholders = wrapper_result.get("placeholders_resolved", {})
+        wrapper_fecha = wrapper_result.get("fecha_actual_sistema", "")
         retrieval_time = 0
         generation_time = 0
 
@@ -390,10 +404,10 @@ async def chat(chat_request: ChatRequest, fastapi_request: Request):
             is_rag_response=is_rag,
             confidence=conf_value,
             conversation_id=conversation_id,
-            session_id=chat_request.session_id or "default",
+            session_id=session_id,
         )
         
-        # Almacenar conversación
+        # Almacenar conversación (en memoria, fallback /stats)
         message_id = str(uuid.uuid4())
         if conversation_id not in conversation_store:
             conversation_store[conversation_id] = []
@@ -405,7 +419,16 @@ async def chat(chat_request: ChatRequest, fastapi_request: Request):
             "timestamp": now_local().isoformat(),
             "is_rag": is_rag,
             "confidence": confidence,
-            "sources": sources
+            "sources": sources,
+            "session_id": session_id,
+            "user_id": user_id,
+            "intent": wrapper_intent,
+            "model_used": wrapper_model,
+            "documents_consulted": wrapper_docs,
+            "chunk_ids": wrapper_chunk_ids,
+            "doc_types": wrapper_doc_types,
+            "placeholders_resolved": wrapper_placeholders,
+            "fecha_actual_sistema": wrapper_fecha,
         })
         
         # Añadir headers con IDs (sin confianza)
@@ -413,6 +436,7 @@ async def chat(chat_request: ChatRequest, fastapi_request: Request):
             "X-User-ID": user_id,
             "X-Conversation-ID": conversation_id,
             "X-Message-ID": message_id,
+            "X-Session-ID": session_id,
             "X-Response-Type": "rag" if is_rag else "intent",
         }
         
@@ -441,7 +465,16 @@ async def chat(chat_request: ChatRequest, fastapi_request: Request):
                 "fuentes_usadas": list(set(s.get("metadata", {}).get("source_file", "unknown") for s in sources)) if sources else [],
                 "es_rag": is_rag,
                 "tokens_generados": tokens_generated,
-                "session_id": conversation_id
+                "session_id": session_id,
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "intent": wrapper_intent,
+                "model_used": wrapper_model,
+                "documents_consulted": wrapper_docs,
+                "chunk_ids": wrapper_chunk_ids,
+                "doc_types": wrapper_doc_types,
+                "placeholders_resolved": wrapper_placeholders,
+                "fecha_actual_sistema": wrapper_fecha,
             }
             
             log_file = "/data/user_interactions.jsonl"

@@ -482,7 +482,41 @@ Workflow: `monitor.yml` — cada 10 minutos
 | ✅ Notificación inmediata | Telegram en tiempo real |
 | ✅ Historial en GitHub Actions | Logs disponibles en cada ejecución |
 
-📝 Guías de Estilo de Código
+## 📊 Dashboard de Monitoreo y Trazabilidad
+
+Implementado el 29 de Septiembre de 2026 — `/user-dashboard` (`evaluation/generate_user_dashboard.py`).
+
+### Fuente de Datos y Gráficas
+- **Fuente**: MongoDB (`conversations` + `metrics`) con fallback a `data/user_interactions.jsonl` (degradación graceful; `DASHBOARD_USE_MONGODB`).
+- **Gráfica Top N de palabras clave** (`DASHBOARD_KEYWORD_TOP_N`, default **15**): Chart.js (vía CDN) con barras horizontales. El Top 5 anterior quedó eliminado.
+- **Nube de palabras**: `wordcloud2.js` (vía CDN). Sin dependencias Python nuevas.
+- **Fuentes más usadas en dos sub-bloques**:
+  - 📄 **Base de conocimientos (7 archivos)**: siempre listada; los archivos sin uso muestran `0 usos` (visibilidad de cobertura). Mapa canónico en `data/source_mapping.json` (incluye derivación de los chunks de *Protocolo* cuyo `source_file` quedó en `unknown`).
+  - 🎫 **Tickets de mesa de servicio**: `source_file` tipo `tkt_mesa_####.txt`; hoy vacío (0 usos) hasta que se carguen los chunks a FAISS.
+  - 🗂️ **Control Escolar**: módulos `.xlsx` conservan trazabilidad por `id_control_escolar` (CE####).
+
+### Conteo de "Usuarios / Sesiones únicas" (bug corregido)
+- **Causa raíz**: el frontend hardcodeaba `conversation_id:"web_interface"` / `user_id:"web_user"` y no enviaba `session_id` (default `"default"`), por lo que todas las interacciones colapsaban a 1 sesión única.
+- **Fix**: identidad por navegador con UUID en `localStorage` (`session_id`/`user_id` estables, `conversation_id` por visita en `sessionStorage`). Backend genera `session_id` si llega vacío/`"default"`, expone header `X-Session-ID` y hashea `user_id` con PII (`utils/identifiers.py`).
+- El dashboard cuenta sesiones únicas por `session_id` (y `usuarios_por_user_id` en paralelo).
+
+### Fuentes más usadas y stopwords
+- `utils/stopwords.py`: stopwords amplio en español + términos del dominio (`hola`, `gracias`, `favor`, `cuando`, `tengo`, etc.) con comparación SIEMPRE normalizada (minúsculas, sin acentos, sin puntuación, ≥3 chars). Corrige el ruido del Top 5 original.
+- `utils/identifiers.py`: `hash_user_id()` (SHA-256 truncado) para PII y generadores de IDs anónimos.
+
+### Esquema ampliado de "conversaciones"
+- `mongodb/models.py` ampliado con campos opcionales: `message_id`, `intent`, `documents_consulted`, `chunk_ids`, `doc_types`, `placeholders_resolved`, `fecha_actual_sistema`, `model_used`, `tokens_prompt`, `tokens_completion`, `error` (en `ConversationMessage` y `ConversationCreate`).
+- `_save_to_mongodb()` (`langchain_layer/wrappers.py`) persiste estos campos; el dashboard y la pestaña **Consulta** (`collection_query_service.py`) los exponen como columnas (compatibles al final).
+- **Filtros rápidos** en Consulta: `user_id`, `session_id`, `is_rag_response`, `doc_type` + filtro por fecha + **exportación CSV** (ya existente).
+- **Privacidad**: `user_id` que parezca PII (correo, CURP, nombre) se hashea antes de persistir.
+
+### Trazabilidad de Tickets (loader)
+- `scripts/load_tickets_to_rag.py` genera `data/ticket_registry.jsonl` (registro versionado con `ticket_id` determinista `TKT-MESA-####`) y `data/vector_store/tickets_chunks.jsonl` (chunks RAG listos). **NO reindexa FAISS**. Para cargar después: `python scripts/load_chunks_to_rag.py --chunks data/vector_store/tickets_chunks.jsonl` y marcar con `--mark-loaded`.
+
+### Dependencias
+- Ninguna nueva en `requirements.txt` (Chart.js y wordcloud2.js son CDN en el HTML).
+
+## 📝 Guías de Estilo de Código
 Imports
 stdlib primero (os, sys, json, logging, time, datetime, pathlib)
 
@@ -701,6 +735,7 @@ Chatbot-RAG-Fuente-Base/
 ├── scripts/
 │   ├── extract_dates.py            # Extractor automático de fechas
 │   ├── load_chunks_to_rag.py
+│   ├── load_tickets_to_rag.py      # 🆕 Registro de tickets (TKT-MESA-####) + chunks listos
 │   ├── test_mongodb_connection.py  # 🆕 Probar conexión a Atlas
 │   ├── test_services.py            # 🆕 Probar repositorios y servicios
 │   ├── test_integration.py         # 🆕 Prueba de integración (API + MongoDB con StubRAG)
@@ -715,9 +750,17 @@ Chatbot-RAG-Fuente-Base/
 │   └── index.html
 ├── tests/
 │   ├── test_api.py
-│   └── test_rag.py
+│   ├── test_rag.py
+│   ├── test_stopwords.py           # 🆕 Filtrado de stopwords/normalización
+│   └── test_traceability.py        # 🆕 Esquema ampliado de conversaciones
 ├── utils/
-│   └── log_capture.py
+│   ├── log_capture.py
+│   ├── stopwords.py                # 🆕 Stopwords ES + normalización (Top 15 / nube)
+│   └── identifiers.py              # 🆕 IDs anónimos + hash de PII
+├── data/
+│   ├── source_mapping.json         # 🆕 Mapa canónico de fuentes (Base/Tickets CE)
+│   ├── ticket_registry.jsonl       # 🆕 Registro de tickets (generado por loader)
+│   └── ...
 ├── .env                             # Variables de entorno
 ├── AGENTS.md                        # Este archivo
 ├── MONGODB_GUIDE.md                 # 📖 Guía del equipo: MongoDB, consultas, dashboard y mantenimiento
@@ -749,6 +792,10 @@ Retención de datos	✅ Activo	retention_policy.py + /admin/cleanup
 Seguridad (Sanitización)	✅ Activo	InputSanitizer — 3 categorías
 Seguridad (Monitoreo)	✅ Activo	SecurityMonitor — deque 1000 en RAM
 Seguridad (Alertas)	✅ Activo	Telegram para severidad high/critical
+Dashboard Usuarios	✅ Activo	/ + user-dashboard (Top 15 + nube + fuentes A/B)
+Sesiones únicas	✅ Corregido	Identidad por localStorage + header X-Session-ID
+Trazabilidad fuentes	✅ Activo	documents_consulted / chunk_ids / doc_types persistidos
+Registro de tickets	✅ Activo	ticket_registry.jsonl (loader sin reindexar)
 Costos mensuales	✅ $0 USD	Capa gratuita Groq
 Métricas de Rendimiento
 Métrica	Valor
@@ -1025,8 +1072,8 @@ Drive (Control Escolar): https://drive.google.com/drive/folders/1F-4jh_OQKukr5QF
 
 Drive (Documentación general): https://drive.google.com/drive/folders/1dL29njdNFeeLCTo5BpSj5k9IwS9j-DNC
 
-Última actualización: 4 de Agosto de 2026
-Versión del AGENTS.md: 3.6.0
+Última actualización: 29 de Septiembre de 2026
+Versión del AGENTS.md: 3.7.0
 
 ## Learned User Preferences
 - Prefer silent graceful degradation (debug logging, no user-facing errors) for non-critical features like Telegram notifications
@@ -1073,5 +1120,11 @@ Versión del AGENTS.md: 3.6.0
 - `ConversationService.get_recent_conversations(limit)` (added) returns latest conversations across all sessions sorted by `created_at` desc; exported in `mongodb/services/__init__.py` and `mongodb/__init__.py`
 - `/api/logs` tries the `logs` collection first (synthesizing level from status_code: >=500 ERROR, >=400 WARNING, else INFO), falls back to `data/system_logs.jsonl`
 - `scripts/test_dashboard_mongodb.py` verifies: metrics math, JSONL fallback generation, and Mongo mapping (inserts + cleans up `dash-itest-*`); skips Mongo checks if `MONGODB_URI` is the default `localhost`; run with `PYTHONIOENCODING=utf-8` on Windows
+- `utils/stopwords.py`: `normalize_keyword()` MUST keep spaces (regex `[^a-z0-9ñ\s]`) otherwise a whole sentence collapses to one token; `filter_keywords()` compares both sides normalized (accents stripped) — this is why `cuando`/`tengo` (old Top 5) are now excluded
+- `utils/identifiers.py`: `hash_user_id()` returns a 16-hex SHA-256 only if `user_id` looks like PII (email/CURP/spaces) or `force=True`; anonymous `ses-*`/`user-*` IDs pass through unchanged
+- `api/main.py` `/chat` now generates `session_id` when empty/`"default"` (bad fallback for old clients), returns header `X-Session-ID`, and the JSONL interaction uses the REAL `session_id` (previously it stored `conversation_id` there)
+- `static/index.html` persists `chatbot_session_id`/`chatbot_user_id` in localStorage and `chatbot_conversation_id` per visit in sessionStorage — this is what fixes "usuarios únicos" counting
+- `scripts/load_tickets_to_rag.py` (NO reindex): reads the `Reportes\Tickets mesa de servicio\*.xlsx`, assigns deterministic `TKT-MESA-####` ids, writes `data/ticket_registry.jsonl` + `data/vector_store/tickets_chunks.jsonl`; `--check` inspects only, `--mark-loaded` flips `en_faiss` after a real FAISS load
+- `data/source_mapping.json` maps FAISS `source_file`/`doc_type` (incl. `doc_type=protocolo` with `source_file="unknown"`) to the 7 canonical `.txt` "Base de conocimientos"; dashboard groups sources via `canonicalize_fuente()`; tickets appear as `tkt_*.txt` with 0 usos until loaded
 - `settings.DASHBOARD_USE_MONGODB` (default true) and `DASHBOARD_MONGODB_INTERACTIONS_LIMIT` (default 2000) control the `/user-dashboard` data source
 - `MONGODB_GUIDE.md` is the team-facing reference (in Spanish) for MongoDB: what it is, collection structure, Python query examples, dashboard interpretation, and maintenance/troubleshooting; link to it from AGENTS.md whenever MongoDB topics are referenced

@@ -142,6 +142,13 @@ class Settings(BaseSettings):
     DASHBOARD_USE_MONGODB: bool = os.getenv("DASHBOARD_USE_MONGODB", "true").lower() == "true"
     DASHBOARD_MONGODB_INTERACTIONS_LIMIT: int = int(os.getenv("DASHBOARD_MONGODB_INTERACTIONS_LIMIT", "2000"))
 
+    # Top N de palabras clave a mostrar en la gráfica de barras del dashboard.
+    DASHBOARD_KEYWORD_TOP_N: int = int(os.getenv("DASHBOARD_KEYWORD_TOP_N", "15"))
+
+    # Mapa canónico de fuentes: source_file (o doc_type) → {display_name, group}
+    # para las secciones "Base de conocimientos" y "Tickets de mesa de servicio".
+    SOURCE_MAPPING_PATH: str = os.getenv("SOURCE_MAPPING_PATH", "./data/source_mapping.json")
+
     # ===== AWS (FUTURO) =====
     AWS_ACCESS_KEY_ID: Optional[str] = None
     AWS_SECRET_ACCESS_KEY: Optional[str] = None

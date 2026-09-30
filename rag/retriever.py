@@ -19,6 +19,21 @@ logger = logging.getLogger(__name__)
 _RESOLVER_URL_MAP: Optional[Dict[str, str]] = None
 _RESOLVER_FECHA_MAP: Optional[Dict[str, Dict[str, str]]] = None
 
+
+def get_placeholder_maps() -> Tuple[Dict[str, str], Dict[str, Dict[str, str]]]:
+    """Retorna los mapas actuales de placeholders (URLs y fechas), solo lectura.
+
+    Devuelve copias de los mapas cacheados usados por ``resolver_placeholders``
+    para permitir auditar la resolución (p. ej. persistir ``placeholders_resolved``)
+    sin modificar el pipeline de retrieval.
+
+    Returns:
+        Tupla ``(mapa_urls, mapa_fechas)``: URL key → valor; fecha key → dict
+        (con la clave ``valor_actual``).
+    """
+    _load_resolver_maps()
+    return (dict(_RESOLVER_URL_MAP or {}), dict(_RESOLVER_FECHA_MAP or {}))
+
 def _load_resolver_maps():
     global _RESOLVER_URL_MAP, _RESOLVER_FECHA_MAP
     if _RESOLVER_URL_MAP is None:

@@ -1,10 +1,11 @@
 """LangChain wrappers with REAL memory injection + temporal awareness + direct responses + MongoDB persistence"""
 import asyncio
 import logging
+import re
 import time
 import uuid
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from langchain.memory import ConversationBufferMemory
 from collections import defaultdict
 from langchain_layer.config import langchain_config
@@ -15,8 +16,12 @@ from security.monitor import get_monitor
 from mongodb.models import MessageRole, ConversationMessage, ConversationCreate, MetricCreate
 from mongodb.services import ConversationService, MetricsService
 from utils.timezones import now_local
+from rag.retriever import get_placeholder_maps
 
 logger = logging.getLogger(__name__)
+
+# Modelo generativo usado (refleja models/groq_wrapper.py) para trazabilidad.
+_MODEL_USED = "openai/gpt-oss-120b"
 
 # Almacenamiento de memorias por sesión
 _session_memories = defaultdict(lambda: ConversationBufferMemory(
@@ -84,6 +89,66 @@ class LangChainRAGWrapper:
             return 0
         return max(1, len(text) // 4)
 
+    @staticmethod
+    def _derive_source_info(sources: Any) -> Tuple[List[str], List[str], List[str]]:
+        """Deriva listas de fuentes consultadas desde los ``sources`` del RAG.
+
+        Args:
+            sources: Lista de fuentes (dicts con ``metadata``) o ``None``.
+
+        Returns:
+            Tupla ``(documents_consulted, chunk_ids, doc_types)``, una entrada
+            por valor único, ordenada alfabéticamente. Los ``source_file``
+            ``"unknown"`` se omiten (ruido sin identificar).
+        """
+        docs, chunk_ids, doc_types = [], [], []
+        for src in (sources or []):
+            meta = src.get("metadata", {}) if isinstance(src, dict) else {}
+            if not isinstance(meta, dict):
+                continue
+            source_file = meta.get("source_file")
+            if source_file and source_file != "unknown":
+                docs.append(str(source_file))
+            chunk_id = meta.get("chunk_id")
+            if chunk_id:
+                chunk_ids.append(str(chunk_id))
+            doc_type = meta.get("doc_type")
+            if doc_type:
+                doc_types.append(str(doc_type))
+        return sorted(set(docs)), sorted(set(chunk_ids)), sorted(set(doc_types))
+
+    @staticmethod
+    def _capture_placeholders(sources: Any) -> Dict[str, str]:
+        """Captura qué placeholders (``urlN``/``fechaN``) aparecen en el contexto.
+
+        Escanea el contenido crudo de las fuentes recuperadas (que conserva
+        los placeholders sin resolver) y los mapea a sus valores actuales.
+
+        Args:
+            sources: Lista de fuentes del RAG (dicts con ``content``).
+
+        Returns:
+            Dict ``{placeholder: valor_actual}`` para cada placeholder presente.
+        """
+        url_map, fecha_map = get_placeholder_maps()
+        found: Dict[str, str] = {}
+        for src in (sources or []):
+            content = src.get("content", "") if isinstance(src, dict) else ""
+            if not content:
+                continue
+            for key in re.findall(r"(?:url|fecha)\d+", content):
+                if key in found:
+                    continue
+                if key in url_map:
+                    found[key] = str(url_map[key])
+                elif key in fecha_map:
+                    entry = fecha_map.get(key) or {}
+                    valor = entry.get("valor_actual") or entry.get("value") or key
+                    found[key] = str(valor)
+                else:
+                    found[key] = key
+        return found
+
     async def _load_history(self, session_id: str, limit: int = 10) -> str:
         """Carga el historial de la sesión desde MongoDB y lo formatea para el prompt.
 
@@ -138,6 +203,14 @@ class LangChainRAGWrapper:
         confidence: Any,
         sources: Any,
         latency_ms: float,
+        message_id: Optional[str] = None,
+        intent: Optional[str] = None,
+        model_used: Optional[str] = None,
+        fecha_actual_sistema: Optional[str] = None,
+        placeholders_resolved: Optional[Dict[str, str]] = None,
+        tokens_prompt: Optional[int] = None,
+        tokens_completion: Optional[int] = None,
+        error: Optional[str] = None,
     ) -> None:
         """Guarda la conversación y sus métricas en MongoDB (tarea de fondo).
 
@@ -151,6 +224,14 @@ class LangChainRAGWrapper:
             confidence: Confianza de la respuesta.
             sources: Fuentes usadas (lista de dicts).
             latency_ms: Latencia total de la consulta.
+            message_id: ID único del mensaje assistant (opcional).
+            intent: Intent detectado (saludo, RAG, etc.) (opcional).
+            model_used: Modelo generativo usado (opcional).
+            fecha_actual_sistema: Fecha que el bot creía que era (opcional).
+            placeholders_resolved: Mapa placeholder→valor (opcional).
+            tokens_prompt: Tokens de entrada estimados (opcional).
+            tokens_completion: Tokens de la respuesta estimados (opcional).
+            error: Mensaje de error si la consulta falló (opcional).
         """
         if not self.mongodb_enabled:
             return
@@ -159,6 +240,9 @@ class LangChainRAGWrapper:
             user_tokens = self._estimate_tokens(question)
             assistant_tokens = self._estimate_tokens(response_text)
             total_tokens = user_tokens + assistant_tokens
+
+            docs, chunk_ids, doc_types = self._derive_source_info(sources)
+            captured = placeholders_resolved if placeholders_resolved is not None else self._capture_placeholders(sources)
 
             messages = [
                 ConversationMessage(role=MessageRole.USER, content=question, tokens=user_tokens),
@@ -170,6 +254,16 @@ class LangChainRAGWrapper:
                     confidence_score=confidence_value,
                     is_rag=bool(is_rag),
                     sources_used=list(sources) if isinstance(sources, list) else None,
+                    message_id=message_id,
+                    intent=intent,
+                    tokens_prompt=tokens_prompt if tokens_prompt is not None else user_tokens,
+                    tokens_completion=tokens_completion if tokens_completion is not None else assistant_tokens,
+                    placeholders_resolved=captured or None,
+                    fecha_actual_sistema=fecha_actual_sistema,
+                    model_used=model_used,
+                    documents_consulted=docs or None,
+                    chunk_ids=chunk_ids or None,
+                    doc_types=doc_types or None,
                 ),
             ]
 
@@ -183,6 +277,16 @@ class LangChainRAGWrapper:
                 latency_ms=latency_ms,
                 is_rag_response=bool(is_rag),
                 confidence_score=confidence_value,
+                documents_consulted=docs or None,
+                chunk_ids=chunk_ids or None,
+                doc_types=doc_types or None,
+                intent=intent,
+                placeholders_resolved=captured or None,
+                fecha_actual_sistema=fecha_actual_sistema,
+                model_used=model_used,
+                tokens_prompt=tokens_prompt if tokens_prompt is not None else user_tokens,
+                tokens_completion=tokens_completion if tokens_completion is not None else assistant_tokens,
+                error=error,
             )
             await self.conv_service.save_conversation(conv_data)
 
@@ -282,6 +386,7 @@ Si saludan, saluda cordialmente."""
             response_text = llm.generate(prompt_directo)
             response_text = self._mejorar_respuesta_con_fecha(response_text, question, fecha_hoy)
             is_rag, confidence, sources = False, 0.0, []
+            intent = "directo"
 
             if self.memory_enabled:
                 memory.save_context({"input": question}, {"output": response_text})
@@ -297,6 +402,12 @@ Si saludan, saluda cordialmente."""
                 confidence=confidence,
                 sources=sources,
                 latency_ms=latency_ms,
+                message_id=str(uuid.uuid4()),
+                intent=intent,
+                model_used=_MODEL_USED,
+                fecha_actual_sistema=fecha_hoy,
+                tokens_prompt=self._estimate_tokens(prompt_directo),
+                tokens_completion=self._estimate_tokens(response_text),
             )
 
             return {
@@ -308,6 +419,9 @@ Si saludan, saluda cordialmente."""
                 "conversation_id": conv_id,
                 "user_id": user_id,
                 "latency_ms": latency_ms,
+                "intent": intent,
+                "model_used": _MODEL_USED,
+                "fecha_actual_sistema": fecha_hoy,
                 "langchain_version": True,
                 "memory_active": self.memory_enabled,
                 "history_length": len(memory.buffer) if hasattr(memory, 'buffer') else 0,
@@ -337,6 +451,15 @@ Responde usando la información del contexto oficial. Si la pregunta involucra f
                 {"output": response_text}
             )
 
+        # Intent detectado para trazabilidad (solo lectura sobre el retriever).
+        intent = "rag"
+        try:
+            intent_info = self.rag_system.optimized_retriever.classify_intent(pregunta_retrieval)
+            if isinstance(intent_info, dict):
+                intent = str(intent_info.get("intent") or "rag")
+        except Exception as e:
+            logger.debug("No se pudo clasificar intent para trazabilidad: %s", e)
+
         latency_ms = round((time.time() - start_time) * 1000, 2)
         await self._schedule_save(
             question=question,
@@ -348,8 +471,15 @@ Responde usando la información del contexto oficial. Si la pregunta involucra f
             confidence=confidence,
             sources=sources,
             latency_ms=latency_ms,
+            message_id=str(uuid.uuid4()),
+            intent=intent,
+            model_used=_MODEL_USED,
+            fecha_actual_sistema=fecha_hoy,
+            tokens_prompt=self._estimate_tokens(prompt_llm),
+            tokens_completion=self._estimate_tokens(response_text),
         )
 
+        documents_consulted, chunk_ids, doc_types = self._derive_source_info(sources)
         return {
             "response": response_text,
             "sources": sources,
@@ -359,6 +489,13 @@ Responde usando la información del contexto oficial. Si la pregunta involucra f
             "conversation_id": conv_id,
             "user_id": user_id,
             "latency_ms": latency_ms,
+            "intent": intent,
+            "model_used": _MODEL_USED,
+            "fecha_actual_sistema": fecha_hoy,
+            "documents_consulted": documents_consulted,
+            "chunk_ids": chunk_ids,
+            "doc_types": doc_types,
+            "placeholders_resolved": self._capture_placeholders(sources),
             "langchain_version": True,
             "memory_active": self.memory_enabled,
             "history_length": len(memory.buffer) if hasattr(memory, 'buffer') else 0,

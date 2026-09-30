@@ -911,6 +911,41 @@
         let ragResponseCount = 0;
         let totalConfidence = 0;
 
+        // ============ IDENTIDAD ANÓNIMA DEL VISITANTE ============
+        // Se generan UUID por navegador (localStorage) para trazabilidad de
+        // usuarios/sesiones en el dashboard sin recolectar datos personales.
+        // - session_id y user_id: estables por navegador (persistentes).
+        // - conversation_id: cambia por "visita" (sessionStorage) para que cada
+        //   sesión de chat abierta agrupe sus propios turnos.
+        function genUuid() {
+            if (window.crypto && crypto.randomUUID) {
+                return crypto.randomUUID();
+            }
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        function getStoredId(key, prefix) {
+            let id = localStorage.getItem(key);
+            if (!id) {
+                id = prefix + '-' + genUuid();
+                localStorage.setItem(key, id);
+            }
+            return id;
+        }
+
+        const CLIENT_SESSION_ID = getStoredId('chatbot_session_id', 'ses');
+        const CLIENT_USER_ID = getStoredId('chatbot_user_id', 'user');
+        let CLIENT_CONVERSATION_ID = sessionStorage.getItem('chatbot_conversation_id');
+        if (!CLIENT_CONVERSATION_ID) {
+            CLIENT_CONVERSATION_ID = 'conv-' + genUuid();
+            sessionStorage.setItem('chatbot_conversation_id', CLIENT_CONVERSATION_ID);
+        }
+        console.log('🆔 Identidad:', { session: CLIENT_SESSION_ID, user: CLIENT_USER_ID, conv: CLIENT_CONVERSATION_ID });
+
         // Estado del menú jerárquico
         let menuData = {};
         let currentCategory = null;
@@ -987,8 +1022,9 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         message: message,
-                        conversation_id: "web_interface",
-                        user_id: "web_user"
+                        session_id: CLIENT_SESSION_ID,
+                        user_id: CLIENT_USER_ID,
+                        conversation_id: CLIENT_CONVERSATION_ID
                     })
                 });
 

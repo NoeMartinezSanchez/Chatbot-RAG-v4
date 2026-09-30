@@ -29,6 +29,17 @@ class ConversationMessage(BaseModel):
     confidence_score: Optional[float] = None
     is_rag: Optional[bool] = None
     sources_used: Optional[List[Dict[str, Any]]] = None
+    # 🆕 Trazabilidad ampliada (por turno)
+    message_id: Optional[str] = None
+    intent: Optional[str] = None
+    tokens_prompt: Optional[int] = None
+    tokens_completion: Optional[int] = None
+    placeholders_resolved: Optional[Dict[str, str]] = None
+    fecha_actual_sistema: Optional[str] = None
+    model_used: Optional[str] = None
+    documents_consulted: Optional[List[str]] = None
+    chunk_ids: Optional[List[str]] = None
+    doc_types: Optional[List[str]] = None
 
 
 class ConversationCreate(BaseModel):
@@ -45,6 +56,17 @@ class ConversationCreate(BaseModel):
     is_rag_response: bool = False
     confidence_score: Optional[float] = None
     created_at: datetime = Field(default_factory=_utcnow)
+    # 🆕 Trazabilidad ampliada (resumen del último turno)
+    documents_consulted: Optional[List[str]] = None
+    chunk_ids: Optional[List[str]] = None
+    doc_types: Optional[List[str]] = None
+    intent: Optional[str] = None
+    placeholders_resolved: Optional[Dict[str, str]] = None
+    fecha_actual_sistema: Optional[str] = None
+    model_used: Optional[str] = None
+    tokens_prompt: Optional[int] = None
+    tokens_completion: Optional[int] = None
+    error: Optional[str] = None
 
 
 class MetricCreate(BaseModel):

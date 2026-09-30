@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "description": "Mapa canónico de fuentes del chatbot. Conecta source_file/doc_type de los chunks FAISS con los archivos .txt de 'Reportes/Base de conocimientos/' y los tickets de mesa de servicio. El doc_type 'protocolo' quedó con source_file='unknown' en FAISS; el dashboard usa doc_type para derivar la fuente canónica sin reindexar.",
+  "base_conocimientos": [
+    {
+      "source_file_faiss": "bases convocatoria_g85.pdf",
+      "doc_type": "convocatoria",
+      "display_name": "Bases y Convocatoria",
+      "report_file": "bases_convocatoria_g85_full.txt"
+    },
+    {
+      "source_file_faiss": "Construyendo comunidades.pdf",
+      "doc_type": "decalogo",
+      "display_name": "Decálogo",
+      "report_file": "Construyendo_comunidades_full.txt"
+    },
+    {
+      "source_file_faiss": "guia_aspirante_g85.pdf",
+      "doc_type": "guia",
+      "display_name": "Guía del Aspirante",
+      "report_file": "guia_aspirante_g85_full.txt"
+    },
+    {
+      "source_file_faiss": "Normas-de-control-escolar-1.pdf",
+      "doc_type": "normativa",
+      "display_name": "Normas de Control Escolar",
+      "report_file": "Normas-de-control-escolar-1_full.txt"
+    },
+    {
+      "source_file_faiss": "Pronunciamiento-cero-tolerancia-SEP_18-05-2023.pdf",
+      "doc_type": "politica_cero_tolerancia",
+      "display_name": "Política Cero Tolerancia",
+      "report_file": "Pronunciamiento-cero-tolerancia-SEP_18-05-2023_full.txt"
+    },
+    {
+      "source_file_faiss": "Reglas-de-comunicacion-virtual-PLS_05-12-2023.pdf",
+      "doc_type": "reglas_comunicacion",
+      "display_name": "Reglas de Comunicación Virtual",
+      "report_file": "Reglas-de-comunicacion-virtual-PLS_05-12-2023_full.txt"
+    },
+    {
+      "source_file_faiss": "unknown",
+      "doc_type": "protocolo",
+      "display_name": "Protocolo para la Convivencia Armónica",
+      "report_file": "Protocolo para la convivencia armonica estudiantado EMS_full.txt"
+    }
+  ],
+  "tickets": {
+    "description": "Tickets de mesa de servicio. Los registros se generan con scripts/load_tickets_to_rag.py y se versionan en data/ticket_registry.jsonl. source_file de un chunk con ticket_id se presenta como tkt_{ticket_id}.txt",
+    "entries": []
+  },
+  "control_escolar": {
+    "description": "Módulos de Control Escolar (derivados de las mismas hojas de preguntas frecuentes que revisó mesa de servicio). Se agrupan en el dashboard como 'Control Escolar' y conservan trazabilidad por id_control_escolar (CE####)."
+  }
+}

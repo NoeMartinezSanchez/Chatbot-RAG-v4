@@ -39,22 +39,26 @@ def _sample_interactions() -> list:
         {
             "timestamp": "2026-08-10T10:00:00+00:00",
             "session_id": "s1",
-            "pregunta": "¿El módulo propedéutico es obligatorio?",
+            "user_id": "u1",
+            "conversation_id": "c1",
+            "pregunta": "¿Cuándo es la convocatoria y qué documentos necesito?",
             "respuesta": "El módulo propedéutico es obligatorio para todos los aspirantes.",
             "tiempo_total_ms": 1500.0,
             "confianza": 0.95,
-            "fuentes_usadas": ["Control_Escolar.xlsx"],
+            "fuentes_usadas": ["bases convocatoria_g85.pdf", "Normas-de-control-escolar-1.pdf"],
             "es_rag": True,
             "tokens_used": 120,
         },
         {
             "timestamp": "2026-08-10T11:00:00+00:00",
             "session_id": "s2",
+            "user_id": "u2",
+            "conversation_id": "c2",
             "pregunta": "¿Cuándo es la convocatoria?",
             "respuesta": "No encontré información sobre la convocatoria.",
             "tiempo_total_ms": 2500.0,
             "confianza": 0.40,
-            "fuentes_usadas": [],
+            "fuentes_usadas": ["Control_Escolar_Estatus_de_mi_registro.xlsx"],
             "es_rag": True,
             "tokens_used": 80,
         },
@@ -67,11 +71,22 @@ async def _test_metrics() -> None:
 
     metrics = calculate_metrics(_sample_interactions(), tokens_por_hora={10: 120, 11: 80})
     assert metrics["total_interacciones"] == 2
-    assert metrics["usuarios_unicos"] == 2
+    assert metrics["usuarios_unicos"] == 2, metrics
+    assert metrics["usuarios_por_user_id"] == 2, metrics
     assert metrics["tasa_no_encontrado"] == 50.0, metrics
     assert metrics["fuentes_top"], "Debe detectar fuentes usadas"
     assert metrics["tokens_por_hora"] == {10: 120, 11: 80}, "Override de tokens por hora"
     assert metrics["max_tokens_por_hora"] == 120
+    # Stopwords: "cuando" NO debe aparecer en el Top de palabras clave
+    palabras = [p["palabra"] for p in metrics["palabras_clave"]]
+    assert "cuando" not in palabras, f"'cuando' no debe estar en palabras clave: {palabras}"
+    # Fuentes agrupadas: base (2 archivos) y control escolar (1)
+    stats = metrics["fuentes_stats"]
+    assert stats["groups"]["base"].get("Bases y Convocatoria") == 1, stats
+    assert stats["groups"]["base"].get("Normas de Control Escolar") == 1, stats
+    assert "Control_Escolar_Estatus_de_mi_registro.xlsx" in stats["groups"]["control_escolar"], stats
+    # Nube de palabras presente
+    assert metrics["palabras_cloud"], "Debe haber nube de palabras"
     logger.info("   ✅ calculate_metrics correcto (%d interacciones, %d usuarios)",
                 metrics["total_interacciones"], metrics["usuarios_unicos"])
 
@@ -101,6 +116,12 @@ async def _test_dashboard_without_mongodb() -> None:
     assert "Dashboard de Interacciones Reales" in html
     assert "Total Interacciones" in html
     assert "2" in html or 'Interactive' in html
+    # Nuevos componentes: gráfica Top 15, nube de palabras y fuentes A/B
+    assert "chartKeywords" in html, "Debe existir el canvas de la gráfica de keywords"
+    assert "chartWordCloud" in html, "Debe existir el canvas de la nube de palabras"
+    assert "wordcloud2.min.js" in html, "Debe cargarse wordcloud2 via CDN"
+    assert "Base de conocimientos" in html, "Debe existir la sección Grupo A"
+    assert "Tickets de mesa de servicio" in html, "Debe existir la sección Grupo B"
     logger.info("   ✅ Dashboard generado sin MongoDB (%d bytes)", out_path.stat().st_size)
 
 

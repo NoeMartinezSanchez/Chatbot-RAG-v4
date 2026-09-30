@@ -230,7 +230,15 @@ async def _test_with_mongo() -> None:
             collection=settings.MONGODB_COLL_CONVERSATIONS,
             operation="find",
             filter_doc={"session_id": session_id})
-        assert res["fields"] == ["fecha", "pregunta", "respuesta", "tiempo", "tokens", "rag"], res["fields"]
+        assert res["fields"][:6] == ["fecha", "pregunta", "respuesta", "tiempo", "tokens", "rag"], res["fields"]
+        # Las primeras 6 columnas se conservan; las nuevas columnas de
+        # trazabilidad se agregan al final (compatibilidad).
+        for extra in ("conversation_id", "message_id", "user_id", "session_id",
+                      "documents_consulted", "chunk_ids", "doc_types", "confidence",
+                      "is_rag_response", "intent", "placeholders_resolved",
+                      "fecha_actual_sistema", "model_used", "tokens_prompt",
+                      "tokens_completion", "error"):
+            assert extra in res["fields"], f"Falta columna {extra}: {res['fields']}"
         assert res["total"] == 2, res  # 2 turnos user→assistant
         assert res["returned"] == 2, res
         rows = res["docs"]

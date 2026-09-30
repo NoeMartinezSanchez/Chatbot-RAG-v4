@@ -9,10 +9,10 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from collections import Counter, defaultdict
 from typing import Dict, List, Any, Optional
-import re
 
 from config.settings import settings
 from utils.timezones import now_local, today_local, start_of_today_utc, format_local, to_local
+from utils.stopwords import filter_keywords, normalize_keyword
 
 logger = logging.getLogger(__name__)
 
@@ -143,10 +143,36 @@ async def fetch_mongodb_interactions(limit: Optional[int] = None) -> List[Dict[s
                     tokens_used = tokens_total
                 tokens_turno = tokens_used or tokens_total
 
+                # Trazabilidad por turno (fuentes/IDs/features) con fallback a conversación
+                per_docs = None
+                if resp_msg is not None and getattr(resp_msg, "documents_consulted", None):
+                    per_docs = list(resp_msg.documents_consulted)
+                elif getattr(conv, "documents_consulted", None):
+                    per_docs = list(conv.documents_consulted)
+
+                per_chunks = None
+                if resp_msg is not None and getattr(resp_msg, "chunk_ids", None):
+                    per_chunks = list(resp_msg.chunk_ids)
+                elif getattr(conv, "chunk_ids", None):
+                    per_chunks = list(conv.chunk_ids)
+
+                per_doc_types = None
+                if resp_msg is not None and getattr(resp_msg, "doc_types", None):
+                    per_doc_types = list(resp_msg.doc_types)
+                elif getattr(conv, "doc_types", None):
+                    per_doc_types = list(conv.doc_types)
+
+                intent = None
+                if resp_msg is not None and getattr(resp_msg, "intent", None):
+                    intent = resp_msg.intent
+                elif getattr(conv, "intent", None):
+                    intent = conv.intent
+
                 interactions.append({
                     "timestamp": _iso_format(msg.timestamp) or created,
                     "conversation_id": conv.conversation_id,
                     "session_id": conv.session_id or conv.conversation_id,
+                    "user_id": conv.user_id,
                     "pregunta": msg.content or "",
                     "respuesta": respuesta,
                     "tiempo_total_ms": msg_latency,
@@ -154,6 +180,10 @@ async def fetch_mongodb_interactions(limit: Optional[int] = None) -> List[Dict[s
                     "tiempo_generacion_ms": 0.0,
                     "confianza": round(float(msg_conf), 4),
                     "fuentes_usadas": fuentes_turno,
+                    "documents_consulted": per_docs or fuentes_turno,
+                    "chunk_ids": per_chunks,
+                    "doc_types": per_doc_types,
+                    "intent": intent,
                     "es_rag": bool(msg_is_rag),
                     "tokens_generados": tokens_turno,
                     "tokens_used": tokens_used,
@@ -262,38 +292,223 @@ def calculate_percentile(values: List[float], percentile: int) -> float:
     return sorted_values[index]
 
 
-def extract_keywords(questions: List[str], top_n: int = 5) -> List[Dict[str, int]]:
-    """Extrae palabras clave más frecuentes de las preguntas."""
-    stopwords = {
-        "de", "la", "el", "en", "y", "a", "que", "es", "por", "con",
-        "los", "las", "un", "una", "se", "su", "para", "mi", "me", "como",
-        "qué", "cómo", "cuándo", "dónde", "cuál", "cuáles", "cuánto", "cuántos",
-        "está", "son", "tiene", "tienen", "hacer", "puedo", "puede", "sí",
-        "no", "pero", "del", "al", "le", "les", "esto", "esta", "este",
-        "todo", "toda", "todos", "todas", "muy", "más", "menos", "tan",
-        "bien", "mal", "solo", "sólo", "ya", "aún", "todavía",
-        "cual", "forma", "manera", "razon", "saber", "haber", "estar", "ser",
-        "hacer", "tener", "decir", "ir", "ver", "dar", "algo", "alguien",
-        "nada", "nadie", "cada", "poco", "mucho", "otro", "mismo"
-    }
-    
-    todas_palabras = []
-    
+def extract_keywords(questions: List[str], top_n: Optional[int] = None) -> List[Dict[str, int]]:
+    """Extrae palabras clave más frecuentes de las preguntas.
+
+    Aplica normalización (minúsculas, sin acentos, sin puntuación) y un
+    filtrado amplio de stopwords en español + términos del dominio del
+    chatbot (ver ``utils/stopwords``). Los resultados se ordenan por
+    frecuencia descendente.
+
+    Args:
+        questions: Lista de preguntas de los usuarios.
+        top_n: Número máximo de palabras a retornar. Si es ``None`` se usa
+            ``settings.DASHBOARD_KEYWORD_TOP_N`` (default: 15).
+
+    Returns:
+        Lista de dicts ``{"palabra": ..., "conteo": ...}`` ordenada desc.
+    """
+    if top_n is None:
+        top_n = settings.DASHBOARD_KEYWORD_TOP_N
+
+    todas_palabras: List[str] = []
     for pregunta in questions:
         if not pregunta:
             continue
-        # Limpiar: minúsculas, eliminar signos de puntuación ynormalizar tildes
-        texto_limpio = pregunta.lower()
-        texto_limpio = re.sub(r'[^\w\sáéíóúüñ]', ' ', texto_limpio)
-        # Normalizar tildes
-        texto_limpio = texto_limpio.replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u')
-        palabras = texto_limpio.split()
-        # Filtrar stop words y palabras muy cortas
-        palabras_filtradas = [p for p in palabras if p not in stopwords and len(p) > 3]
-        todas_palabras.extend(palabras_filtradas)
-    
+        palabras = normalize_keyword(pregunta)
+        if not palabras:
+            continue
+        # split conserva solo [a-z0-9ñ] (ya quitado puntuación/accesos)
+        tokens = palabras.split()
+        todas_palabras.extend(filter_keywords(tokens, min_length=3))
+
     counter = Counter(todas_palabras)
     return [{"palabra": w, "conteo": c} for w, c in counter.most_common(top_n)]
+
+
+def extract_cloud_words(questions: List[str], top_n: int = 40) -> List[Dict[str, int]]:
+    """Extrae palabras para la nube de palabras (más amplio que el Top N).
+
+    Args:
+        questions: Lista de preguntas de los usuarios.
+        top_n: Número de palabras para la nube (default: 40).
+
+    Returns:
+        Lista de dicts ``{"palabra": ..., "conteo": ...}`` ordenada desc.
+    """
+    return extract_keywords(questions, top_n) if top_n else extract_keywords(questions)
+
+
+def load_source_mapping() -> Dict[str, Any]:
+    """Carga el mapa canónico de fuentes (data/source_mapping.json).
+
+    Returns:
+        Dict del mapa o vacío si no se pudo cargar.
+    """
+    path = settings.SOURCE_MAPPING_PATH
+    if not os.path.exists(path):
+        logger.debug("Mapa de fuentes no encontrado: %s", path)
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.debug("Error leyendo mapa de fuentes: %s", e)
+        return {}
+
+
+def canonicalize_fuente(raw: Any, mapping: Dict[str, Any]) -> Dict[str, str]:
+    """Clasifica un ``source_file`` en grupo canónico (base/ticket/control).
+
+    Args:
+        raw: Valor de ``source_file`` del metadata (posiblemente None/'unknown').
+        mapping: Mapa cargado con ``load_source_mapping``.
+
+    Returns:
+        Dict con ``group`` (base|ticket|control_escolar|desconocida),
+        ``display`` (nombre legible) y ``report_file`` (si aplica).
+    """
+    raw_str = str(raw or "unknown").strip()
+    for entry in mapping.get("base_conocimientos", []):
+        if entry.get("source_file_faiss", "").lower() == raw_str.lower():
+            return {
+                "group": "base",
+                "display": entry.get("display_name", raw_str),
+                "report_file": entry.get("report_file", raw_str),
+            }
+    # Los chunks de Protocolo tienen source_file='unknown' en FAISS; se derivan
+    # al archivo canónico sin reindexar (es el único doc_type afectado).
+    if raw_str.lower() == "unknown":
+        for entry in mapping.get("base_conocimientos", []):
+            if entry.get("doc_type") == "protocolo":
+                return {
+                    "group": "base",
+                    "display": entry.get("display_name", raw_str),
+                    "report_file": entry.get("report_file", raw_str),
+                }
+        return {"group": "desconocida", "display": raw_str, "report_file": raw_str}
+    if raw_str.lower().startswith("tkt_"):
+        return {"group": "ticket", "display": raw_str, "report_file": raw_str}
+    if "control_escolar" in raw_str.lower():
+        return {"group": "control_escolar", "display": raw_str, "report_file": raw_str}
+    return {"group": "desconocida", "display": raw_str, "report_file": raw_str}
+
+
+def build_fuentes_stats(interactions: List[Dict[str, Any]], mapping: Dict[str, Any]) -> Dict[str, Any]:
+    """Cuenta frecuencias de las fuentes agrupadas en base/ticket/control.
+
+    Args:
+        interactions: Interacciones (con campo ``fuentes_usadas``).
+        mapping: Mapa canónico de fuentes.
+
+    Returns:
+        Dict con ``groups`` (conteos por grupo), ``total`` y ``totales``.
+    """
+    groups: Dict[str, Counter] = {
+        "base": Counter(),
+        "ticket": Counter(),
+        "control_escolar": Counter(),
+        "desconocida": Counter(),
+    }
+    shown: Dict[str, set] = {k: set() for k in groups}
+    for inter in interactions:
+        for raw in (inter.get("fuentes_usadas") or []):
+            info = canonicalize_fuente(raw, mapping)
+            key = info["display"]
+            # Evitar doble conteo del mismo archivo dentro del mismo turno
+            conv_id = inter.get("conversation_id") or inter.get("session_id") or "?"
+            if key in shown[info["group"]] and info["group"] == "ticket":
+                continue
+            shown[info["group"]].add(key)
+            groups[info["group"]][key] += 1
+
+    total = sum(sum(c.values()) for c in groups.values())
+    return {
+        "groups": {k: dict(c.most_common()) for k, c in groups.items()},
+        "total": total,
+    }
+
+
+def build_fuentes_sections_html(metrics: Dict[str, Any]) -> str:
+    """Genera el HTML de la sección de fuentes (dos sub-bloques A/B).
+
+    Grupo A: 7 bases de conocimiento (siempre listadas; 0 usos si nunca se
+    consultaron — visibilidad de cobertura). Grupo B: tickets de mesa de
+    servicio (colapsado si aún no se cargan a FAISS).
+
+    Args:
+        metrics: Métricas calculadas (debe incluir ``fuentes_stats``).
+
+    Returns:
+        String HTML de la sección.
+    """
+    import html as html_lib
+
+    mapping = load_source_mapping()
+    stats = metrics.get("fuentes_stats", {})
+    groups = stats.get("groups", {}) if stats else {}
+    total = int(stats.get("total", 0)) if stats else 0
+
+    base_counts = groups.get("base", {}) if groups else {}
+    ticket_counts = groups.get("ticket", {}) if groups else {}
+    control_counts = groups.get("control_escolar", {}) if groups else {}
+
+    def pct(count: int) -> str:
+        return f"{count * 100.0 / total:.1f}%" if total else "0%"
+
+    # ---- Grupo A: 7 bases de conocimiento ----
+    base_entries = mapping.get("base_conocimientos", [])
+    base_lines: List[str] = []
+    for entry in base_entries:
+        display = entry.get("display_name", entry.get("report_file", "?"))
+        count = base_counts.get(display, 0)
+        base_lines.append(
+            f'<div class="fuente-row"><span class="fuente-name">📄 {html_lib.escape(display)}</span>'
+            f'<span class="fuente-bar"><span class="fuente-fill" style="width:{pct(count)}"></span></span>'
+            f'<span class="fuente-count">{count} usos · {pct(count)}</span></div>'
+        )
+    if base_lines:
+        grupo_a_html = "".join(base_lines)
+    else:
+        grupo_a_html = '<div class="no-data">Sin archivos mapeados en Base de conocimientos</div>'
+
+    # ---- Grupo B: tickets de mesa de servicio ----
+    if ticket_counts:
+        ticket_lines = []
+        for display, count in sorted(ticket_counts.items(), key=lambda x: -x[1]):
+            ticket_lines.append(
+                f'<div class="fuente-row"><span class="fuente-name">🎫 {html_lib.escape(display)}</span>'
+                f'<span class="fuente-bar"><span class="fuente-fill ticket" style="width:{pct(count)}"></span></span>'
+                f'<span class="fuente-count">{count} usos · {pct(count)}</span></div>'
+            )
+        grupo_b_html = "".join(ticket_lines)
+    else:
+        grupo_b_html = (
+            '<div class="no-data">🎫 Aún no hay tickets cargados en FAISS. '
+            'Genera el registro con <code>scripts/load_tickets_to_rag.py</code> '
+            'para habilitar la trazabilidad por ticket.</div>'
+        )
+
+    control_html = ""
+    if control_counts:
+        control_lines = []
+        for display, count in sorted(control_counts.items(), key=lambda x: -x[1]):
+            control_lines.append(
+                f'<div class="fuente-row"><span class="fuente-name">🗂️ {html_lib.escape(display)}</span>'
+                f'<span class="fuente-bar"><span class="fuente-fill control" style="width:{pct(count)}"></span></span>'
+                f'<span class="fuente-count">{count} usos · {pct(count)}</span></div>'
+            )
+        control_html = f'<div class="chart-title">🗂️ Control Escolar (módulos)</div>{"".join(control_lines)}'
+
+    return f"""
+    <div class="fuentes-container">
+        <div class="chart-title">📄 Base de conocimientos ({len(base_entries)} archivos)</div>
+        {grupo_a_html}
+        <div class="chart-title" style="margin-top:16px;">🎫 Tickets de mesa de servicio</div>
+        {grupo_b_html}
+        {control_html}
+    </div>
+    """
 
 
 def get_token_stats() -> Dict[str, Any]:
@@ -399,8 +614,11 @@ def calculate_metrics(
             "tasa_no_encontrado": 0,
             "confianza_promedio": 0,
             "usuarios_unicos": 0,
+            "usuarios_por_user_id": 0,
             "palabras_clave": [],
+            "palabras_cloud": [],
             "fuentes_top": [],
+            "fuentes_stats": {"groups": {}, "total": 0},
             "distribucion_dia": {},
             "distribucion_hora": {},
             "tasa_exito": 0,
@@ -434,15 +652,27 @@ def calculate_metrics(
     confidencias = [i.get("confianza", 0) for i in interactions if i.get("confianza")]
     confianza_promedio = sum(confidencias) / len(confidencias) if confidencias else 0
     
-    # Usuarios únicos
-    session_ids = set(i.get("session_id", "") for i in interactions if i.get("session_id"))
+    # Usuarios únicos: por session_id (secundario conversation_id) y por user_id
+    session_ids = set(
+        str(i.get("session_id") or i.get("conversation_id") or "")
+        for i in interactions
+        if i.get("session_id") or i.get("conversation_id")
+    )
+    user_ids = set(str(i.get("user_id")) for i in interactions if i.get("user_id"))
     usuarios_unicos = len(session_ids)
-    
-    # Palabras clave
+    usuarios_por_user_id = len(user_ids)
+
+    # Palabras clave (Top N configurable; default 15) + nube amplia.
     preguntas = [i.get("pregunta", "") for i in interactions if i.get("pregunta")]
-    palabras_clave = extract_keywords(preguntas, 5)
+    top_n = settings.DASHBOARD_KEYWORD_TOP_N
+    palabras_clave = extract_keywords(preguntas, top_n)
+    palabras_cloud = extract_cloud_words(preguntas, 40)
+
+    # Fuentes más usadas (agrupadas: Base de conocimientos / Tickets / Control Escolar)
+    mapping = load_source_mapping()
+    fuentes_stats = build_fuentes_stats(interactions, mapping)
     
-    # Fuentes más usadas
+    # Fuentes más usadas (badges históricos, ya canónicos)
     todas_fuentes = []
     for i in interactions:
         fuentes = i.get("fuentes_usadas", [])
@@ -496,8 +726,11 @@ def calculate_metrics(
         "tasa_no_encontrado": round(tasa_no_encontrado, 2),
         "confianza_promedio": round(confianza_promedio, 4),
         "usuarios_unicos": usuarios_unicos,
+        "usuarios_por_user_id": usuarios_por_user_id,
         "palabras_clave": palabras_clave,
+        "palabras_cloud": palabras_cloud,
         "fuentes_top": fuentes_top,
+        "fuentes_stats": fuentes_stats,
         "distribucion_dia": distribucion_dia,
         "distribucion_hora": distribucion_hora,
         "tasa_exito": round(tasa_exito, 1),
@@ -703,10 +936,12 @@ def generate_dashboard_html(
         tokens_val = i.get("tokens_used", token_map.get(token_keys[-(idx+1)] if idx < len(token_keys) else "", "-"))
         tokens_cell = f"{tokens_val:,}" if isinstance(tokens_val, int) else "-"
         rag = "Sí" if i.get("es_rag", False) else "No"
-        historial_html += f"<tr><td>{ts}</td><td>{pregunta}</td><td>{respuesta}</td><td>{tiempo}</td><td>{tokens_cell}</td><td>{rag}</td></tr>"
+        user_cell = html.escape(str(i.get("user_id") or "-"))[:14]
+        sess_cell = html.escape(str(i.get("session_id") or "-"))[:14]
+        historial_html += f"<tr><td>{ts}</td><td>{pregunta}</td><td>{respuesta}</td><td>{tiempo}</td><td>{tokens_cell}</td><td>{rag}</td><td>{user_cell}</td><td>{sess_cell}</td></tr>"
     
     if not historial_html:
-        historial_html = '<tr><td colspan="6" class="no-data">No hay interacciones registradas</td></tr>'
+        historial_html = '<tr><td colspan="8" class="no-data">No hay interacciones registradas</td></tr>'
 
     # Token stats for cards
     token_stats = token_stats_override or get_token_stats()
@@ -769,19 +1004,31 @@ def generate_dashboard_html(
     dias_labels = list(metrics.get("distribucion_dia", {}).keys())[-7:]  # últimos 7 días
     dias_values = [metrics.get("distribucion_dia", {}).get(d, 0) for d in dias_labels]
     
-    # Palabras clave
+    # Palabras clave (Top N) → datos para Chart.js y wordcloud2
     palabras_html = ""
     for p in metrics.get("palabras_clave", []):
         palabras_html += f'<span class="badge">{html.escape(p["palabra"])} ({p["conteo"]})</span>'
-    
+
     if not palabras_html:
         palabras_html = '<div class="no-data">No hay palabras clave</div>'
-    
-    # Fuentes más usadas
+
+    keywords = metrics.get("palabras_clave", [])
+    keywords_labels_js = json.dumps([p["palabra"] for p in keywords], ensure_ascii=False)
+    keywords_values_js = json.dumps([p["conteo"] for p in keywords])
+    cloud_words = metrics.get("palabras_cloud", [])
+    wordcloud_list_js = json.dumps(
+        [[p["palabra"], int(p["conteo"])] for p in cloud_words],
+        ensure_ascii=False,
+    )
+
+    # Fuentes más usadas → dos sub-bloques (Base de conocimientos / Tickets)
+    fuentes_sections_html = build_fuentes_sections_html(metrics)
+
+    # Badges históricos (conservados por compatibilidad en impresión)
     fuentes_html = ""
     for f in metrics.get("fuentes_top", []):
         fuentes_html += f'<span class="badge">{html.escape(f["fuente"])} ({f["conteo"]})</span>'
-    
+
     if not fuentes_html:
         fuentes_html = '<div class="no-data">No hay fuentes registradas</div>'
     
@@ -792,6 +1039,7 @@ def generate_dashboard_html(
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard de Usuarios - Prepa en Línea SEP</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.1.0/wordcloud2.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         /* Paleta de colores del chatbot */
@@ -828,6 +1076,20 @@ def generate_dashboard_html(
         
         .badges {{ display: flex; flex-wrap: wrap; gap: 8px; }}
         .badge {{ background: var(--azul-secundario); color: var(--blanco); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; }}
+        
+        /* Fuentes (Grupo A Base de conocimientos / Grupo B Tickets) */
+        .fuentes-container {{ }}
+        .fuente-row {{ display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13px; }}
+        .fuente-name {{ flex: 1 1 auto; min-width: 200px; color: var(--azul-principal); font-weight: 500; }}
+        .fuente-bar {{ flex: 0 1 180px; background: var(--grisclaro); height: 8px; border-radius: 4px; overflow: hidden; }}
+        .fuente-fill {{ display: block; height: 100%; background: var(--verdeclaro); border-radius: 4px; min-width: 2px; }}
+        .fuente-fill.ticket {{ background: #9b59b6; }}
+        .fuente-fill.control {{ background: var(--azul-secundario); }}
+        .fuente-count {{ flex: 0 0 auto; text-align: right; color: var(--gristexto); font-variant-numeric: tabular-nums; }}
+        
+        /* Nube de palabras */
+        .wordcloud-wrap {{ width: 100%; height: 300px; display: flex; align-items: center; justify-content: center; }}
+        #chartWordCloud {{ width: 100%; max-width: 720px; height: 300px; }}
         
         .sources-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }}
         
@@ -884,6 +1146,8 @@ def generate_dashboard_html(
         .consulta-date {{ display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }}
         .consulta-date-opt {{ font-size: 13px; color: var(--gristexto); }}
         .consulta-date input[type="date"] {{ padding: 8px 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 13px; background: var(--blanco); }}
+        .consulta-quick {{ display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }}
+        .consulta-quick input, .consulta-quick select {{ padding: 8px 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 13px; background: var(--blanco); }}
         .consulta-date-hint {{ font-size: 12px; color: var(--gristexto); }}
         .consulta-actions {{ display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }}
         .consulta-actions .btn {{ margin: 0; }}
@@ -1018,7 +1282,7 @@ def generate_dashboard_html(
             <div class="card">
                 <div class="card-label">Usuarios</div>
                 <div class="card-value">{metrics.get("usuarios_unicos", 0):,}</div>
-                <div class="card-sub">Sesiones únicas</div>
+                <div class="card-sub">Sesiones únicas · {metrics.get("usuarios_por_user_id", 0):,} por user_id</div>
             </div>
             <div class="card">
                 <div class="card-label">Tokens Hoy</div>
@@ -1061,17 +1325,20 @@ def generate_dashboard_html(
             </div>
         </div>
 
+        <div class="chart-container">
+            <div class="chart-title">📄📚 Fuentes Más Usadas (Base de conocimientos / 🎫 Tickets de mesa de servicio)</div>
+            {fuentes_sections_html}
+        </div>
+        
         <div class="sources-grid">
             <div class="chart-container">
-                <div class="chart-title">Fuentes Más Usadas</div>
-                <div class="badges">
-                    {fuentes_html}
-                </div>
+                <div class="chart-title">🔑 Palabras Clave (Top {settings.DASHBOARD_KEYWORD_TOP_N})</div>
+                <canvas id="chartKeywords"></canvas>
             </div>
             <div class="chart-container">
-                <div class="chart-title">Palabras Clave (Top 5)</div>
-                <div class="badges">
-                    {palabras_html}
+                <div class="chart-title">☁️ Nube de Palabras</div>
+                <div class="wordcloud-wrap">
+                    <canvas id="chartWordCloud"></canvas>
                 </div>
             </div>
         </div>
@@ -1179,7 +1446,7 @@ def generate_dashboard_html(
             <div class="chart-title">Historial Reciente</div>
             <table id="tablaHistorial">
                 <thead>
-                    <tr><th>Fecha</th><th>Pregunta</th><th>Respuesta</th><th>Tiempo</th><th>Tokens</th><th>RAG</th></tr>
+                    <tr><th>Fecha</th><th>Pregunta</th><th>Respuesta</th><th>Tiempo</th><th>Tokens</th><th>RAG</th><th>ID Usuario</th><th>Sesión</th></tr>
                 </thead>
                 <tbody>
                     {historial_html}
@@ -1244,6 +1511,20 @@ def generate_dashboard_html(
             </div>
         </div>
 
+        <div class="consulta-block">
+            <label class="consulta-label">🔍 Filtros rápidos (conversaciones)</label>
+            <div class="consulta-quick">
+                <input id="consulta-q-user" type="text" placeholder="user_id (parcial)">
+                <input id="consulta-q-session" type="text" placeholder="session_id (parcial)">
+                <select id="consulta-q-rag">
+                    <option value="">RAG: todos</option>
+                    <option value="true">RAG: solo Sí</option>
+                    <option value="false">RAG: solo No</option>
+                </select>
+                <input id="consulta-q-doctype" type="text" placeholder="doc_type (ej: convocatoria)">
+            </div>
+        </div>
+
         <div class="consulta-actions">
             <button onclick="runConsulta()" class="btn">▶ Ejecutar</button>
             <button id="consulta-csv-btn" onclick="exportConsultaCSV()" class="btn" disabled>⬇️ Descargar CSV</button>
@@ -1275,6 +1556,63 @@ def generate_dashboard_html(
         const horasValues = {horas_values};
         const diasLabels = {dias_labels};
         const diasValues = {dias_values};
+        const keywordsLabels = {keywords_labels_js};
+        const keywordsValues = {keywords_values_js};
+        const wordcloudList = {wordcloud_list_js};
+        
+        new Chart(document.getElementById('chartKeywords'), {{
+            type: 'bar',
+            data: {{
+                labels: keywordsLabels,
+                datasets: [{{
+                    label: 'Frecuencia',
+                    data: keywordsValues,
+                    backgroundColor: '#3498db',
+                    borderRadius: 4
+                }}]
+            }},
+            options: {{
+                responsive: true,
+                indexAxis: 'y',
+                plugins: {{
+                    legend: {{ display: false }},
+                    tooltip: {{ callbacks: {{ label: function(ctx) {{ return ctx.parsed.x + ' usos'; }} }} }}
+                }},
+                scales: {{
+                    x: {{ beginAtZero: true, ticks: {{ precision: 0 }} }},
+                    y: {{ grid: {{ display: false }} }}
+                }}
+            }}
+        }});
+        
+        // Nube de palabras (wordcloud2.js)
+        (function () {{
+            const canvas = document.getElementById('chartWordCloud');
+            if (!canvas || typeof WordCloud !== 'function') {{
+                if (canvas) canvas.parentElement.innerHTML = '<div class="no-data">Nube no disponible</div>';
+                return;
+            }}
+            const list = (Array.isArray(wordcloudList) ? wordcloudList : []).filter(function (w) {{ return w[1] > 0; }});
+            if (!list.length) {{
+                canvas.parentElement.innerHTML = '<div class="no-data">No hay palabras suficientes para la nube</div>';
+                return;
+            }}
+            const max = Math.max.apply(null, list.map(function (w) {{ return w[1]; }}));
+            WordCloud(canvas, {{
+                list: list,
+                gridSize: Math.round(16 * 400 / (canvas.width || 400)),
+                weightFactor: function (w) {{ return Math.max(1, Math.round(400 * w / max)); }},
+                fontFamily: "'Segoe UI', 'Arial', sans-serif",
+                color: function (word, weight) {{
+                    const colors = ['#2c3e50', '#3498db', '#2ecc71', '#e74c3c', '#9b59b6'];
+                    return colors[Math.floor(Math.random() * colors.length)];
+                }},
+                rotateRatio: 0.4,
+                minSize: 10,
+                shuffle: false,
+                backgroundColor: '#ffffff'
+            }});
+        }})();
         
         new Chart(document.getElementById('chartHora'), {{
             type: 'bar',
@@ -1475,11 +1813,26 @@ def generate_dashboard_html(
                     if (to) body.date_to = to + 'T23:59:59-06:00';
                 }}
             }}
+            // Filtros rápidos (conversaciones): se combinan con el filtro JSON si existe
+            if (col === 'conversations') {{
+                const quick = {{}};
+                const qUser = (document.getElementById('consulta-q-user').value || '').trim();
+                const qSession = (document.getElementById('consulta-q-session').value || '').trim();
+                const qRag = document.getElementById('consulta-q-rag').value;
+                const qDocType = (document.getElementById('consulta-q-doctype').value || '').trim();
+                if (qUser) quick['user_id'] = {{ $regex: qUser, $options: 'i' }};
+                if (qSession) quick['session_id'] = {{ $regex: qSession, $options: 'i' }};
+                if (qRag) quick['is_rag_response'] = qRag === 'true';
+                if (qDocType) quick['doc_types'] = {{ $regex: qDocType, $options: 'i' }};
+                if (Object.keys(quick).length) {{
+                    body.filter = Object.assign(quick, body.filter || {{}});
+                }}
+            }}
             // JSON avanzado
             const filterVal = document.getElementById('consulta-filter').value.trim();
             const sortVal = document.getElementById('consulta-sort').value.trim();
             if (filterVal) {{
-                try {{ body.filter = JSON.parse(filterVal); }}
+                try {{ body.filter = Object.assign(JSON.parse(filterVal), body.filter || {{}}); }}
                 catch(e) {{ info.textContent = '❌ Filtro JSON inválido: ' + e.message; return; }}
             }}
             if (sortVal) {{
@@ -1555,7 +1908,15 @@ def generate_dashboard_html(
             // Encabezados legibles (vista "tipo historial" de conversations)
             const headers = {{
                 'fecha': 'Fecha', 'pregunta': 'Pregunta', 'respuesta': 'Respuesta',
-                'tiempo': 'Tiempo', 'tokens': 'Tokens', 'rag': 'RAG'
+                'tiempo': 'Tiempo', 'tokens': 'Tokens', 'rag': 'RAG',
+                'conversation_id': 'Conversación', 'message_id': 'Mensaje',
+                'user_id': 'ID Usuario', 'session_id': 'Sesión',
+                'documents_consulted': 'Documentos', 'chunk_ids': 'Chunks',
+                'doc_types': 'Tipos', 'confidence': 'Confianza',
+                'is_rag_response': 'Es RAG', 'intent': 'Intent',
+                'placeholders_resolved': 'Placeholders', 'fecha_actual_sistema': 'Fecha sistema',
+                'model_used': 'Modelo', 'tokens_prompt': 'Tokens prompt',
+                'tokens_completion': 'Tokens respuesta', 'error': 'Error'
             }};
             const table = '<div class="consulta-table-wrap"><table><thead><tr>' +
                 fields.map(f => `<th>${{escapeHtml(headers[f] || f)}}</th>`).join('') +
