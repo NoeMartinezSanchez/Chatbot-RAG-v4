@@ -1015,9 +1015,15 @@ def generate_dashboard_html(
     keywords = metrics.get("palabras_clave", [])
     keywords_labels_js = json.dumps([p["palabra"] for p in keywords], ensure_ascii=False)
     keywords_values_js = json.dumps([p["conteo"] for p in keywords])
+
+    # Nube de palabras: pesos NORMALIZADOS a un rango pequeño (6–32) para que
+    # wordcloud2.js los use como tamaño de letra "cuerpo a cuerpo". Un rango
+    # grande infla la fuente de la palabra dominante, las colisiones descartan
+    # el resto y la nube termina mostrando una sola palabra (bug reportado).
     cloud_words = metrics.get("palabras_cloud", [])
+    _cloud_max = max((int(p["conteo"]) for p in cloud_words), default=1)
     wordcloud_list_js = json.dumps(
-        [[p["palabra"], int(p["conteo"])] for p in cloud_words],
+        [[p["palabra"], 6 + round(26 * int(p["conteo"]) / _cloud_max)] for p in cloud_words],
         ensure_ascii=False,
     )
 
@@ -1333,12 +1339,12 @@ def generate_dashboard_html(
         <div class="sources-grid">
             <div class="chart-container">
                 <div class="chart-title">🔑 Palabras Clave (Top {settings.DASHBOARD_KEYWORD_TOP_N})</div>
-                <canvas id="chartKeywords"></canvas>
+                <canvas id="chartKeywords" width="460" height="460"></canvas>
             </div>
             <div class="chart-container">
                 <div class="chart-title">☁️ Nube de Palabras</div>
                 <div class="wordcloud-wrap">
-                    <canvas id="chartWordCloud"></canvas>
+                    <canvas id="chartWordCloud" width="620" height="260"></canvas>
                 </div>
             </div>
         </div>
@@ -1573,15 +1579,24 @@ def generate_dashboard_html(
             }},
             options: {{
                 responsive: true,
+                maintainAspectRatio: false,
                 indexAxis: 'y',
                 plugins: {{
                     legend: {{ display: false }},
                     tooltip: {{ callbacks: {{ label: function(ctx) {{ return ctx.parsed.x + ' usos'; }} }} }}
                 }},
                 scales: {{
-                    x: {{ beginAtZero: true, ticks: {{ precision: 0 }} }},
-                    y: {{ grid: {{ display: false }} }}
-                }}
+                    x: {{ beginAtZero: true, ticks: {{ precision: 0, stepSize: 1 }} }},
+                    y: {{
+                        grid: {{ display: false }},
+                        ticks: {{
+                            autoSkip: false,
+                            font: {{ size: 12 }},
+                            color: '#2c3e50'
+                        }}
+                    }}
+                }},
+                layout: {{ padding: {{ top: 4 }} }}
             }}
         }});
         
@@ -1597,18 +1612,17 @@ def generate_dashboard_html(
                 canvas.parentElement.innerHTML = '<div class="no-data">No hay palabras suficientes para la nube</div>';
                 return;
             }}
-            const max = Math.max.apply(null, list.map(function (w) {{ return w[1]; }}));
             WordCloud(canvas, {{
                 list: list,
-                gridSize: Math.round(16 * 400 / (canvas.width || 400)),
-                weightFactor: function (w) {{ return Math.max(1, Math.round(400 * w / max)); }},
+                gridSize: 8,
+                weightFactor: 1,
                 fontFamily: "'Segoe UI', 'Arial', sans-serif",
                 color: function (word, weight) {{
                     const colors = ['#2c3e50', '#3498db', '#2ecc71', '#e74c3c', '#9b59b6'];
                     return colors[Math.floor(Math.random() * colors.length)];
                 }},
                 rotateRatio: 0.4,
-                minSize: 10,
+                minSize: 4,
                 shuffle: false,
                 backgroundColor: '#ffffff'
             }});
