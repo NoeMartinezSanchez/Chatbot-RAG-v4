@@ -9,8 +9,9 @@ import random
 import re
 
 from config.settings import settings
+from utils.respuestas import MENSAJE_FUERA_DOMINIO, limpiar_artefactos_respuesta
 from .embeddings import EmbeddingModel
-from .retriever import VectorStoreFAISS, resolver_placeholders
+from .retriever import VectorStoreFAISS, resolver_placeholders, limpiar_marcadores_residuales
 from .generator import TinyLlamaGenerator
 from .gemma_generator import GemmaGenerator
 from .optimized_retriever import OptimizedRetriever
@@ -164,7 +165,7 @@ class RAGSystem:
             
             # 3. Verificar si hay resultados relevantes
             if not results:
-                return "No encontré información específica sobre eso en los materiales de Prepa en Línea SEP.", False, 0.0, []
+                return MENSAJE_FUERA_DOMINIO, False, 0.0, []
 
             # 4. Extraer contextos y metadatos
             contexts = [r.get("content", r.get("text", "")) for r in results]
@@ -172,7 +173,7 @@ class RAGSystem:
             context_str = " ".join(contexts)
             
             if not context_str.strip():
-                return "No encontré información específica sobre eso en los materiales de Prepa en Línea SEP.", False, 0.0, []
+                return MENSAJE_FUERA_DOMINIO, False, 0.0, []
             
             # Resolver placeholders (urlN, fechaN) en el contexto
             context_str = resolver_placeholders(context_str)
@@ -195,6 +196,12 @@ class RAGSystem:
                 raise
             
             generation_time = (time.time() - generation_start) * 1000
+            
+            # 5b. Red de seguridad: resolver placeholders y limpiar marcadores
+            #     residuales (XX) que pudieran venir en la respuesta del LLM.
+            response = resolver_placeholders(response)
+            response = limpiar_marcadores_residuales(response)
+            response = limpiar_artefactos_respuesta(response)
             
             # Log de latencia
             if _LOGGING_ENABLED and tokens_generated > 0:

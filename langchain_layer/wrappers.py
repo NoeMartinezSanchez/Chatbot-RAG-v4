@@ -13,6 +13,8 @@ from models.groq_wrapper import GroqWrapper
 from scripts.extract_dates import DateExtractor
 from security.sanitizer import InputSanitizer
 from security.monitor import get_monitor
+from security.crisis import detectar_crisis, motivo_crisis
+from utils.respuestas import MENSAJE_CRISIS
 from mongodb.models import MessageRole, ConversationMessage, ConversationCreate, MetricCreate
 from mongodb.services import ConversationService, MetricsService
 from utils.timezones import now_local
@@ -159,6 +161,13 @@ class LangChainRAGWrapper:
         Returns:
             Historial formateado como texto, o "" si no hay historial.
         """
+        # Si MongoDB está deshabilitado (p. ej. en un replay), usar memoria local.
+        if not self.mongodb_enabled:
+            memory = _session_memories[session_id]
+            history_vars = memory.load_memory_variables({})
+            if "chat_history" in history_vars:
+                return "\n".join([f"- {msg.type}: {msg.content}" for msg in history_vars["chat_history"]])
+            return ""
         try:
             conversations = await self.conv_service.get_conversations_by_session(session_id, limit=limit)
             if not conversations:
@@ -313,6 +322,47 @@ class LangChainRAGWrapper:
             # Sin event loop activo: guardar inline
             await self._save_to_mongodb(*args, **kwargs)
 
+    # --- Condensación de consultas encadenadas (multi-turn) ---
+
+    def _es_consulta_contextual(self, question: str) -> bool:
+        """Heurística: ¿la pregunta depende de un turno previo?"""
+        q = str(question).strip().lower()
+        if len(q) < 45:
+            return True
+        patron = re.compile(
+            r"^(y|¿y|entonces|¿ni siquiera|pero|ahora|despu[eé]s|y el|y la|si ya|y no|tambi[eé]n)\b",
+            re.IGNORECASE,
+        )
+        return bool(patron.match(q))
+
+    def _condensar_consulta(self, question: str, history_text: str) -> str:
+        """Reescribe una pregunta de seguimiento como pregunta autónoma.
+
+        Usa el historial para resolver referencias ("¿Y después?", "y el plan
+        de estudiosi?", "¿Cuándo termina?"). Si falla, devuelve la original.
+        """
+        try:
+            llm = GroqWrapper()
+            prompt = (
+                "Historial reciente de la conversación:\n"
+                f"{history_text}\n\n"
+                "La siguiente pregunta depende del contexto anterior. Reescríbela como una "
+                "pregunta autónoma y breve, en español, sin explicaciones ni comillas. "
+                "Devuelve solo la pregunta reescrita.\n"
+                f"Pregunta de seguimiento: {question}\nPregunta autónoma:"
+            )
+            reescrita = (llm.generate(prompt) or "").strip().strip('"').strip()
+            reescrita = reescrita.splitlines()[0].strip() if reescrita else question
+            # Si el LLM devolvió un mensaje de error/mantenimiento, no usarlo.
+            invalidos = ("modo de mantenimiento", "problema procesando", "no puedo procesar")
+            if any(bad in reescrita.lower() for bad in invalidos):
+                return question
+            if 3 <= len(reescrita) <= 200:
+                return reescrita
+        except Exception as e:
+            logger.debug("No se pudo condensar la consulta: %s", e)
+        return question
+
     async def query_with_memory(
         self,
         question: str,
@@ -352,15 +402,65 @@ class LangChainRAGWrapper:
 
         fecha_hoy = self._fecha_actual_es()
 
-        palabras_clave_fecha = ["fecha", "hoy", "día"]
-        palabras_clave_saludo = ["hola", "saludos", "buenos días", "buenas tardes", "buenas noches"]
-        palabras_clave_presentacion = ["quién eres", "quien eres", "cómo te llamas", "como te llamas"]
+        # --- Manejo de crisis (prioridad máxima) ---
+        if detectar_crisis(question):
+            logger.warning("🚨 Mensaje de crisis detectado en sesión %s: '%s'", session_id, motivo_crisis(question))
+            response_text = MENSAJE_CRISIS
+            is_rag, confidence, sources, intent = False, 0.0, [], "crisis"
+            if self.memory_enabled:
+                memory.save_context({"input": question}, {"output": response_text})
+            latency_ms = round((time.time() - start_time) * 1000, 2)
+            conv_id = conversation_id or str(uuid.uuid4())
+            await self._schedule_save(
+                question=question,
+                response_text=response_text,
+                session_id=session_id,
+                user_id=user_id,
+                conversation_id=conv_id,
+                is_rag=is_rag,
+                confidence=confidence,
+                sources=sources,
+                latency_ms=latency_ms,
+                message_id=str(uuid.uuid4()),
+                intent=intent,
+                model_used="regla",
+                fecha_actual_sistema=fecha_hoy,
+                tokens_prompt=0,
+                tokens_completion=self._estimate_tokens(response_text),
+            )
+            return {
+                "response": response_text,
+                "sources": sources,
+                "is_rag_response": is_rag,
+                "confidence": confidence,
+                "session_id": session_id,
+                "conversation_id": conv_id,
+                "user_id": user_id,
+                "latency_ms": latency_ms,
+                "intent": intent,
+                "model_used": "regla",
+                "fecha_actual_sistema": fecha_hoy,
+                "langchain_version": True,
+                "memory_active": self.memory_enabled,
+                "direct_response": True,
+                "crisis": True,
+            }
 
-        es_general = (
-            any(palabra in question.lower() for palabra in palabras_clave_fecha) or
-            any(palabra in question.lower() for palabra in palabras_clave_saludo) or
-            any(palabra in question.lower() for palabra in palabras_clave_presentacion)
+        # --- Detección de preguntas generales (fecha/saludo/presentación) ---
+        #     Precisa: NO dispara con "día" suelto (p. ej. "horas al día") ni con
+        #     saludos embebidos en una pregunta larga.
+        patron_general = re.compile(
+            r"(\b(fecha|hoy)\b|qu[eé] d[ií]a|qui[eé]n eres|c[oó]mo te llamas)",
+            re.IGNORECASE,
         )
+        es_general = bool(patron_general.search(question))
+        if not es_general:
+            palabras = question.strip().split()
+            es_saludo_corto = (
+                len(palabras) <= 3
+                and bool(re.search(r"\b(hola|saludos|buenos d[ií]as|buenas tardes|buenas noches)\b", question, re.IGNORECASE))
+            )
+            es_general = es_saludo_corto
 
         if "fecha" in question.lower() and "hoy" in question.lower():
             es_general = True
@@ -440,6 +540,11 @@ Pregunta del usuario: {question}
 Responde usando la información del contexto oficial. Si la pregunta involucra fechas, compáralas con la fecha actual y menciona si ya pasó, está vigente o aún no comienza."""
 
         pregunta_retrieval = question
+        if history_text and self._es_consulta_contextual(question):
+            condensada = self._condensar_consulta(question, history_text)
+            if condensada and condensada != question:
+                logger.info("🔄 Consulta condensada: '%s' -> '%s'", question, condensada)
+                pregunta_retrieval = condensada
         print(f"🧪 RETRIEVAL CON: {pregunta_retrieval}")
 
         response_text, is_rag, confidence, sources = self.rag_system.process_query(pregunta_retrieval)

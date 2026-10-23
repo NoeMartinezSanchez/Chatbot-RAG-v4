@@ -201,7 +201,8 @@ PATRON_FALLBACK = re.compile(
     r"no encontre informacion|no dispongo de informaci[oó]n|no dispongo de la informaci[oó]n|"
     r"no tengo informaci[oó]n|no cuento con informaci[oó]n|no cuenta con informaci[oó]n|"
     r"no logre encontrar|lamento informarte|solo puedo ayudarte con temas|"
-    r"no pude encontrar|no se encontro informacion|no se encontró información)",
+    r"no pude encontrar|no se encontro informacion|no se encontró información|"
+    r"no encontré esa información en los documentos oficiales)",
     re.IGNORECASE,
 )
 
@@ -1279,6 +1280,7 @@ def main():
     parser.add_argument("--manuales", default="", help="JSON opcional con revisión manual por índice")
     parser.add_argument("--titulo", default="", help="Título del reporte (HTML y consola)")
     parser.add_argument("--subtitulo", default="", help="Subtítulo descriptivo del reporte")
+    parser.add_argument("--nombre-html", default="", help="Nombre del archivo HTML de salida (evita colisiones)")
     args = parser.parse_args()
 
     ruta_csv = Path(args.csv)
@@ -1337,7 +1339,7 @@ def main():
 
     m = re.search(r"(\d{4}-\d{2}-\d{2})", nombre_base)
     fecha_html = m.group(1) if m else desde.strftime("%Y-%m-%d")
-    ruta_html = ruta_salida / f"reporte_analitica_chatbot_{fecha_html}.html"
+    ruta_html = ruta_salida / (args.nombre_html or f"reporte_analitica_chatbot_{fecha_html}.html")
 
     titulo = args.titulo or f"Analítica del Chatbot RAG ({etiqueta_dia(desde.strftime('%Y-%m-%d'))} - {etiqueta_dia(hasta.strftime('%Y-%m-%d'))})"
     n_dias = (hasta - desde).days + 1

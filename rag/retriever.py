@@ -6,6 +6,8 @@ import numpy as np
 import pickle
 import json
 import os
+import re
+import unicodedata
 import hashlib
 from typing import List, Dict, Any, Optional, Tuple
 import logging
@@ -18,6 +20,49 @@ logger = logging.getLogger(__name__)
 # --- Placeholder resolution cache ---
 _RESOLVER_URL_MAP: Optional[Dict[str, str]] = None
 _RESOLVER_FECHA_MAP: Optional[Dict[str, Dict[str, str]]] = None
+_RESOLVER_PATRON_MAP: Optional[Dict[str, str]] = None
+_RESOLVER_PATRON_COMPILED: Optional[list] = None
+
+# Marcadores residuales que NUNCA deben llegar al usuario (X-run tipo XX / XXXX)
+_PATRON_X_RESIDUAL = re.compile(r"\bX{2,}\b")
+
+# Clases de acentos para construir regex insensibles a acentos (español)
+_ACCENT_CLASSES = {
+    "a": "[aá]", "e": "[eé]", "i": "[ií]", "o": "[oó]", "u": "[uúü]", "n": "[nñ]",
+}
+
+
+def _base_letter(ch: str) -> str:
+    """Devuelve la letra base sin acento (ó -> o, ñ -> n)."""
+    descompuesto = unicodedata.normalize("NFD", ch)
+    return "".join(c for c in descompuesto if unicodedata.category(c) != "Mn")
+
+
+def _patron_a_regex(patron: str):
+    """Construye una regex insensible a acentos para un patrón con comodines.
+
+    Convierte ``Generación XX`` en ``Generaci[oó]n X{2,}`` para que coincida
+    tanto con ``Generación XX`` como con ``Generacion XX``.
+    """
+    partes = []
+    i = 0
+    while i < len(patron):
+        ch = patron[i]
+        if ch in ("X", "x"):
+            j = i
+            while j < len(patron) and patron[j] in ("X", "x"):
+                j += 1
+            partes.append(r"X{2,}")
+            i = j
+            continue
+        base = _base_letter(ch).lower()
+        if base in _ACCENT_CLASSES:
+            clase = _ACCENT_CLASSES[base]
+            partes.append(clase if ch.islower() else clase.upper())
+        else:
+            partes.append(re.escape(ch))
+        i += 1
+    return re.compile("".join(partes), re.IGNORECASE)
 
 
 def get_placeholder_maps() -> Tuple[Dict[str, str], Dict[str, Dict[str, str]]]:
@@ -35,7 +80,7 @@ def get_placeholder_maps() -> Tuple[Dict[str, str], Dict[str, Dict[str, str]]]:
     return (dict(_RESOLVER_URL_MAP or {}), dict(_RESOLVER_FECHA_MAP or {}))
 
 def _load_resolver_maps():
-    global _RESOLVER_URL_MAP, _RESOLVER_FECHA_MAP
+    global _RESOLVER_URL_MAP, _RESOLVER_FECHA_MAP, _RESOLVER_PATRON_MAP, _RESOLVER_PATRON_COMPILED
     if _RESOLVER_URL_MAP is None:
         url_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'mapeo_urls_global.json')
         try:
@@ -54,25 +99,60 @@ def _load_resolver_maps():
         except Exception as e:
             logger.error(f"Failed to load fecha map: {e}")
             _RESOLVER_FECHA_MAP = {}
+    if _RESOLVER_PATRON_MAP is None:
+        # Mapea los patrones con comodines (p. ej. "del XX al XX de XXXX de XXXX")
+        # al valor actual. Algunos chunks guardaron el PATRÓN en lugar de la clave
+        # (fechaN), por lo que sin esto el usuario veía "XX" en la respuesta.
+        patron_map: Dict[str, str] = {}
+        base = os.path.dirname(os.path.dirname(__file__))
+        for nombre in ('mapeo_fechas_completo.json', 'mapeo_fechas_categorizadas.json'):
+            try:
+                with open(os.path.join(base, 'data', nombre), 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+            except Exception:
+                continue
+            for entry in data.values():
+                if not isinstance(entry, dict):
+                    continue
+                patron = entry.get('patron')
+                valor = entry.get('valor_actual')
+                if patron and valor:
+                    patron_map[patron] = valor
+        _RESOLVER_PATRON_MAP = patron_map
+        _RESOLVER_PATRON_COMPILED = [
+            (_patron_a_regex(patron), valor)
+            for patron, valor in sorted(patron_map.items(), key=lambda kv: len(kv[0]), reverse=True)
+        ]
+        logger.info(f"Loaded patron map with {len(_RESOLVER_PATRON_MAP)} entries")
 
 def resolver_placeholders(text: str) -> str:
     """Replace urlN and fechaN placeholders in text with actual values.
 
+    Además de las claves (``fecha1``, ``url1``), sustituye los PATRONES con
+    comodines (``del XX al XX de XXXX de XXXX``, ``Generación XX``) por su
+    ``valor_actual``, porque algunos chunks almacenaron el patrón en lugar de
+    la clave. Es idempotente y no rompe el pipeline si faltan los mapas.
+
     Args:
-        text: Text that may contain placeholders like url1, url2, fecha1, etc.
+        text: Texto que puede contener placeholders o patrones sin resolver.
 
     Returns:
-        Text with all placeholders resolved to their actual values.
+        Texto con los placeholders/patrones resueltos.
     """
     _load_resolver_maps()
     result = text
 
-    # Replace URL placeholders (longest keys first to avoid partial overlap)
+    # 0) Sustituir PATRONES con comodines (más largos primero para no solapar)
+    if _RESOLVER_PATRON_COMPILED:
+        for patron_re, valor in _RESOLVER_PATRON_COMPILED:
+            result = patron_re.sub(valor, result)
+
+    # 1) Replace URL placeholders (longest keys first to avoid partial overlap)
     if _RESOLVER_URL_MAP:
         for key in sorted(_RESOLVER_URL_MAP.keys(), key=len, reverse=True):
             result = result.replace(key, _RESOLVER_URL_MAP[key])
 
-    # Replace fecha placeholders (longest keys first to avoid partial overlap)
+    # 2) Replace fecha placeholders (longest keys first to avoid partial overlap)
     if _RESOLVER_FECHA_MAP:
         for key in sorted(_RESOLVER_FECHA_MAP.keys(), key=len, reverse=True):
             entry = _RESOLVER_FECHA_MAP[key]
@@ -83,6 +163,37 @@ def resolver_placeholders(text: str) -> str:
     if result != text:
         logger.info(f"Placeholders resolved in text (len before: {len(text)}, after: {len(result)})")
 
+    return result
+
+
+def limpiar_marcadores_residuales(text: str) -> str:
+    """Elimina marcadores de plantilla que hayan quedado sin resolver.
+
+    Red de seguridad: si tras :func:`resolver_placeholders` aún aparece un
+    bloque de comodines (``XX``/``XXXX``) o una clave sin valor, se retira para
+    que el usuario NUNCA vea ``Generación XX`` o ``del XX al XX``.
+
+    Args:
+        text: Respuesta final del chatbot.
+
+    Returns:
+        Texto limpio y con espacios normalizados.
+    """
+    if not text:
+        return text
+    result = text
+    # Claves residuales (url1, fecha3, ...)
+    result = re.sub(r"\b(?:url|fecha)\d+\b", "", result, flags=re.IGNORECASE)
+    # Bloques de comodines: "del XX al XX de XXXX..." -> frase neutral
+    result = re.sub(r"\bdel\s+X{2,}\s+al\s+X{2,}(?:\s+de\s+X{2,})*", "en fechas por confirmar", result, flags=re.IGNORECASE)
+    result = re.sub(r"\bGeneraci[oó]n\s+X{2,}", "próxima generación", result, flags=re.IGNORECASE)
+    # Cualquier X-run restante
+    result = _PATRON_X_RESIDUAL.sub("", result)
+    # Normalizar espacios y puntuación colgante
+    result = re.sub(r"\s{2,}", " ", result)
+    result = re.sub(r"\s+([,.;:])", r"\1", result)
+    result = re.sub(r"([,.;:])\1+", r"\1", result)
+    result = result.replace(" .", ".").replace(" ,", ",").strip()
     return result
 
 class VectorStoreFAISS:
@@ -420,27 +531,35 @@ class VectorStoreFAISS:
         documents_result = []
         metadatas_result = []
         distances_result = []
-        
+        indices_result = []
+
         for i, idx in enumerate(indices[0]):
             if idx < len(self.documents):
-                similarity = float(distances[0][i])
-                if similarity >= min_similarity:
+                dist = float(distances[0][i])
+                # Embeddings normalizados: d² = 2 - 2·cos  →  cos = 1 - d²/2.
+                # (Antes se comparaba la distancia L2 directamente, descartando
+                #  los chunks MÁS similares; bug corregido.)
+                cosine = 1.0 - (dist / 2.0)
+                if cosine >= min_similarity:
                     documents_result.append(self.documents[idx])
                     metadatas_result.append(self.metadata[idx])
-                    distances_result.append(similarity)
-        
-        # Si no hay resultados con suficiente similitud,返回 vacío
+                    distances_result.append(dist)
+                    indices_result.append(int(idx))
+
+        # Si no hay resultados con suficiente similitud, devolver vacío
         if not documents_result:
             return {
                 'documents': [[]],
                 'distances': [[]],
-                'metadatas': [[]]
+                'metadatas': [[]],
+                'indices': [[]],
             }
-        
+
         return {
             'documents': [documents_result],
             'distances': [distances_result],
-            'metadatas': [metadatas_result]
+            'metadatas': [metadatas_result],
+            'indices': [indices_result],
         }
     
     def semantic_search(self, query_embedding: np.ndarray, top_k: int = 3) -> List[Dict]:
@@ -455,24 +574,27 @@ class VectorStoreFAISS:
             Lista de resultados con score de similitud
         """
         results = self.search_documents(query_embedding, top_k)
-        
+        indices = results.get('indices', [[]])
+        indices = indices[0] if indices else []
+
         formatted = []
-        for doc, meta, dist in zip(
+        for pos, (doc, meta, dist) in enumerate(zip(
             results['documents'][0],
             results['metadatas'][0],
             results['distances'][0]
-        ):
+        )):
             # Convertir distancia L2 a similitud coseno (aproximado)
             similarity = 1 / (1 + dist) if dist > 0 else 1.0
-            
+
             formatted.append({
                 "content": doc,
                 "metadata": meta,
                 "distance": dist,
                 "similarity": similarity,
-                "score": similarity  # Para compatibilidad
+                "score": similarity,  # Para compatibilidad
+                "doc_index": indices[pos] if pos < len(indices) else None,
             })
-        
+
         return formatted
     
     def get_stats(self) -> Dict:

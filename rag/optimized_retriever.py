@@ -9,6 +9,7 @@ import json
 import os
 import hashlib
 import re
+import math
 import time
 from typing import List, Dict, Any, Optional, Tuple, Set
 import logging
@@ -53,6 +54,8 @@ class OptimizedRetriever:
             "use_query_expansion": True,
             "use_multi_query": True,   # Activar para preguntas complejas
             "use_synonyms": True,    # Usar diccionario de sinónimos
+            "use_keyword_search": True,  # Retrieval híbrido (léxico + semántico)
+            "hybrid_weights": {"semantic": 0.6, "keyword": 0.4},
         }
         
         # Diccionario de sinónimos para mejor matching
@@ -70,6 +73,19 @@ class OptimizedRetriever:
             "irregular": ["reprueb", "no acredita", "baja"],
         }
         
+        # Corrección de errores de escritura frecuentes observados en las
+        # pruebas reales (mejora el retrieval léxico).
+        self.typo_map = {
+            "sertificado": "certificado", "sertificados": "certificados",
+            "cecundharia": "secundaria", "secundharia": "secundaria",
+            "komo": "como", "kual": "cual", "kiero": "quiero",
+            "kuento": "cuento", "rekisitos": "requisitos",
+            "insvrinirme": "inscribirme", "iscrivirme": "inscribirme",
+            "inscrivirme": "inscribirme", "buelben": "vuelven",
+            "yego": "llego", "clabes": "claves", "axeso": "acceso",
+            "saver": "saber", "pa": "para", "xq": "porque",
+        }
+
         # Configuración de metadata boost
         self.config["metadata_boost"] = {
             "importance": 1.0,
@@ -95,6 +111,11 @@ class OptimizedRetriever:
         }
         
         logger.info(f"OptimizedRetriever inicializado con config: {self.config}")
+
+        # Estado del índice de palabras clave (retrieval híbrido BM25-lite)
+        self._kw_ready = False
+        self._kw_docs = []
+        self._kw_idf = {}
     
     # ==================== 1. INTENT CLASSIFICATION ====================
     
@@ -389,7 +410,87 @@ class OptimizedRetriever:
         
         logger.debug(f"Keywords encontrados: {found_keywords}")
         return found_keywords
-    
+
+    # ==================== 6b. BÚSQUEDA POR PALABRAS CLAVE (HÍBRIDO) ====================
+
+    def _tokens_retrieval(self, text: str) -> List[str]:
+        """Tokeniza para retrieval: normaliza y quita SOLO stopwords base.
+
+        No usa las stopwords de dominio del dashboard (que eliminan términos
+        útiles como "prepa", "registro" o "módulo").
+        """
+        from utils.stopwords import normalize_keyword, _BASE_ES
+        tokens = []
+        for word in str(text).split():
+            norm = normalize_keyword(word)
+            norm = self.typo_map.get(norm, norm)
+            if len(norm) >= 3 and norm not in _BASE_ES:
+                tokens.append(norm)
+        return tokens
+
+    def _build_keyword_index(self):
+        """Construye el índice de tokens e IDF sobre los documentos del vector store.
+
+        Se calcula una sola vez (o cuando cambia el número de documentos) para
+        mantener el costo despreciable.
+        """
+        total = len(self.vs.documents)
+        if self._kw_ready and len(self._kw_docs) == total:
+            return
+        df = defaultdict(int)
+        self._kw_docs = []
+        for doc in self.vs.documents:
+            tokens = set(self._tokens_retrieval(doc))
+            self._kw_docs.append(tokens)
+            for t in tokens:
+                df[t] += 1
+        n = max(1, len(self._kw_docs))
+        self._kw_idf = {t: (math.log((n + 1) / (c + 1)) + 1.0) for t, c in df.items()}
+        self._kw_ready = True
+        logger.info(f"Índice de palabras clave construido: {n} documentos, {len(self._kw_idf)} términos")
+
+    def keyword_search(self, query: str, top_k: int = 10) -> List[Dict]:
+        """Búsqueda léxica (BM25-lite) para complementar la búsqueda semántica.
+
+        Recupera chunks que comparten términos significativos con la consulta,
+        aunque el embedding no los acerque. Clave para preguntas literales como
+        "¿Dónde me registro?" o "¿Qué es Prepa en Línea?".
+        """
+        self._build_keyword_index()
+        q_tokens = set(self._tokens_retrieval(query))
+        if not q_tokens or not self._kw_docs:
+            return []
+
+        puntajes = []
+        for idx, tokens in enumerate(self._kw_docs):
+            interseccion = q_tokens & tokens
+            if not interseccion:
+                continue
+            score = sum(self._kw_idf.get(t, 1.0) for t in interseccion) / (len(tokens) ** 0.5 + 1.0)
+            puntajes.append((idx, score))
+
+        if not puntajes:
+            return []
+        puntajes.sort(key=lambda x: x[1], reverse=True)
+        top = puntajes[:top_k]
+        max_score = top[0][1] or 1.0
+
+        resultados = []
+        for idx, score in top:
+            if idx >= len(self.vs.documents):
+                continue
+            normalizado = score / max_score
+            resultados.append({
+                "content": self.vs.documents[idx],
+                "metadata": self.vs.metadata[idx] if idx < len(self.vs.metadata) else {},
+                "doc_index": idx,
+                "keyword_score": normalizado,
+                "similarity": normalizado,
+                "score": normalizado,
+            })
+        logger.debug(f"keyword_search recuperó {len(resultados)} chunks")
+        return resultados
+
     # ==================== 7. MÉTODO PRINCIPAL DE BÚSQUEDA ====================
     
     def retrieve(self, query: str, query_embedding: np.ndarray, top_k: int = None) -> List[Dict]:
@@ -422,10 +523,41 @@ class OptimizedRetriever:
         # PASO 2: Expandir query (opcional)
         expanded_query = self.expand_query(query, intent)
         
-        # PASO 3: Búsqueda inicial (top_k_initial)
+        # PASO 3: Búsqueda inicial híbrida (semántica + palabras clave)
         initial_top_k = self.config["top_k_initial"]
-        results = self.vs.semantic_search(query_embedding, top_k=initial_top_k)
-        
+        semantic_results = self.vs.semantic_search(query_embedding, top_k=initial_top_k)
+        keyword_results = []
+        if self.config.get("use_keyword_search", True):
+            keyword_results = self.keyword_search(query, top_k=initial_top_k)
+
+        # Fusionar por doc_index combinando similitud semántica y léxica
+        pesos = self.config.get("hybrid_weights", {"semantic": 0.6, "keyword": 0.4})
+        fusionados = {}
+        for r in semantic_results:
+            idx = r.get("doc_index")
+            r["semantic_similarity"] = r.get("similarity", 0.0)
+            r.setdefault("keyword_score", 0.0)
+            fusionados[idx] = r
+        for r in keyword_results:
+            idx = r.get("doc_index")
+            if idx in fusionados:
+                fusionados[idx]["keyword_score"] = r.get("keyword_score", 0.0)
+            else:
+                r["semantic_similarity"] = 0.0
+                fusionados[idx] = r
+        for r in fusionados.values():
+            r["similarity"] = (
+                pesos.get("semantic", 0.6) * r.get("semantic_similarity", 0.0)
+                + pesos.get("keyword", 0.4) * r.get("keyword_score", 0.0)
+            )
+            r["score"] = r["similarity"]
+
+        results = list(fusionados.values())
+        logger.info(
+            f"🔀 Híbrido: {len(semantic_results)} semánticos + {len(keyword_results)} léxicos "
+            f"→ {len(results)} fusionados"
+        )
+
         if not results:
             logger.warning(f"No se encontraron resultados para: {query[:50]}...")
             search_time = (time.time() - start_time) * 1000
