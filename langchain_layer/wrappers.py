@@ -14,7 +14,15 @@ from scripts.extract_dates import DateExtractor
 from security.sanitizer import InputSanitizer
 from security.monitor import get_monitor
 from security.crisis import detectar_crisis, motivo_crisis
-from utils.respuestas import MENSAJE_CRISIS
+from utils.respuestas import (
+    MENSAJE_CRISIS,
+    MENSAJE_RIESGO_SISTEMA,
+    MENSAJE_REQUIERE_OTRA_AREA,
+    IDENTIDAD_AVI,
+    CAPACIDADES_AVI,
+    SMALLTALK_AVI,
+)
+from utils.glosario import expandir_abreviaturas, definir_termino
 from mongodb.models import MessageRole, ConversationMessage, ConversationCreate, MetricCreate
 from mongodb.services import ConversationService, MetricsService
 from utils.timezones import now_local
@@ -363,6 +371,91 @@ class LangChainRAGWrapper:
             logger.debug("No se pudo condensar la consulta: %s", e)
         return question
 
+    # --- Respuestas directas (identidad, capacidades, glosario, otra área) ---
+
+    _PATRON_IDENTIDAD = re.compile(
+        r"(c[oó]mo te llamas|cu[aá]l es tu nombre|cu[aá]l es su nombre|tienes (alg[uú]n )?nombre|"
+        r"qui[eé]n eres|qui[eé]n te cre[oó]|qu[eé] eres|eres (un )?(bot|robot|asistente))",
+        re.IGNORECASE,
+    )
+    _PATRON_CAPACIDADES = re.compile(
+        r"(qu[eé] puedes hacer|para qu[eé] sirves|en qu[eé] me puedes ayudar|qu[eé] haces|"
+        r"tus funciones|c[oó]mo me puedes ayudar|qu[eé] ofreces|qu[eé] temas manejas)",
+        re.IGNORECASE,
+    )
+    _PATRON_UNIVERSIDAD = re.compile(
+        r"(universidad|carrera|licenciatura|pase directo|unam|ipn|comipems|feria[s]? vocacional|"
+        r"estudios superiores|nivel superior|ingenier|medicina)",
+        re.IGNORECASE,
+    )
+    _PATRON_SMALLTALK = re.compile(
+        r"(c[oó]mo est[aá]s|qu[eé] tal|gracias|buenos d[ií]as|buenas tardes|buenas noches|^hola\b)",
+        re.IGNORECASE,
+    )
+
+    def _respuesta_especial(self, question: str):
+        """Respuesta fija para identidad, capacidades, glosario o temas de otra área.
+
+        Returns:
+            Texto de respuesta, o ``None`` si la pregunta no aplica.
+        """
+        q = str(question).strip()
+        if self._PATRON_IDENTIDAD.search(q):
+            return IDENTIDAD_AVI
+        if self._PATRON_CAPACIDADES.search(q):
+            return CAPACIDADES_AVI
+        if len(q.split()) <= 12:
+            definicion = definir_termino(q)
+            if definicion:
+                return definicion
+        if self._PATRON_UNIVERSIDAD.search(q):
+            return MENSAJE_REQUIERE_OTRA_AREA
+        if self._PATRON_SMALLTALK.search(q) and len(q.split()) <= 6:
+            return SMALLTALK_AVI
+        return None
+
+    async def _responder_directo(self, question, response_text, intent, session_id, user_id,
+                                 conversation_id, fecha_hoy, start_time, memory):
+        """Guarda en memoria/MongoDB y devuelve la respuesta directa."""
+        is_rag, confidence, sources = False, 0.0, []
+        if self.memory_enabled:
+            memory.save_context({"input": question}, {"output": response_text})
+        latency_ms = round((time.time() - start_time) * 1000, 2)
+        conv_id = conversation_id or str(uuid.uuid4())
+        await self._schedule_save(
+            question=question,
+            response_text=response_text,
+            session_id=session_id,
+            user_id=user_id,
+            conversation_id=conv_id,
+            is_rag=is_rag,
+            confidence=confidence,
+            sources=sources,
+            latency_ms=latency_ms,
+            message_id=str(uuid.uuid4()),
+            intent=intent,
+            model_used="regla",
+            fecha_actual_sistema=fecha_hoy,
+            tokens_prompt=0,
+            tokens_completion=self._estimate_tokens(response_text),
+        )
+        return {
+            "response": response_text,
+            "sources": sources,
+            "is_rag_response": is_rag,
+            "confidence": confidence,
+            "session_id": session_id,
+            "conversation_id": conv_id,
+            "user_id": user_id,
+            "latency_ms": latency_ms,
+            "intent": intent,
+            "model_used": "regla",
+            "fecha_actual_sistema": fecha_hoy,
+            "langchain_version": True,
+            "memory_active": self.memory_enabled,
+            "direct_response": True,
+        }
+
     async def query_with_memory(
         self,
         question: str,
@@ -401,6 +494,14 @@ class LangChainRAGWrapper:
         history_text = await self._load_history(session_id)
 
         fecha_hoy = self._fecha_actual_es()
+
+        # --- Bloqueo de seguridad (jailbreak / inyección detectada) ---
+        if sanitized.severity in ("high", "critical"):
+            logger.warning("🔒 Solicitud bloqueada por seguridad (severidad %s): %s", sanitized.severity, question[:60])
+            return await self._responder_directo(
+                question, MENSAJE_RIESGO_SISTEMA, "seguridad", session_id, user_id,
+                conversation_id, fecha_hoy, start_time, memory,
+            )
 
         # --- Manejo de crisis (prioridad máxima) ---
         if detectar_crisis(question):
@@ -445,6 +546,15 @@ class LangChainRAGWrapper:
                 "direct_response": True,
                 "crisis": True,
             }
+
+        # --- Respuestas especiales: identidad, capacidades, glosario, otra área ---
+        respuesta_especial = self._respuesta_especial(question)
+        if respuesta_especial is not None:
+            logger.info("📢 Respuesta directa (identidad/capacidades/glosario/otra área)")
+            return await self._responder_directo(
+                question, respuesta_especial, "directo", session_id, user_id,
+                conversation_id, fecha_hoy, start_time, memory,
+            )
 
         # --- Detección de preguntas generales (fecha/saludo/presentación) ---
         #     Precisa: NO dispara con "día" suelto (p. ej. "horas al día") ni con
@@ -545,6 +655,8 @@ Responde usando la información del contexto oficial. Si la pregunta involucra f
             if condensada and condensada != question:
                 logger.info("🔄 Consulta condensada: '%s' -> '%s'", question, condensada)
                 pregunta_retrieval = condensada
+        # Expandir abreviaturas (PL, PL-SEP, G85, ...) para mejorar la recuperación.
+        pregunta_retrieval = expandir_abreviaturas(pregunta_retrieval)
         print(f"🧪 RETRIEVAL CON: {pregunta_retrieval}")
 
         response_text, is_rag, confidence, sources = self.rag_system.process_query(pregunta_retrieval)

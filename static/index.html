@@ -534,6 +534,14 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
         }
 
+        /* Formato de las respuestas del bot (listas, párrafos y negritas) */
+        .message-content p { margin: 0 0 8px; }
+        .message-content p:last-child { margin-bottom: 0; }
+        .message-content ul,
+        .message-content ol { margin: 6px 0 8px 22px; padding-left: 4px; }
+        .message-content li { margin-bottom: 4px; line-height: 1.5; }
+        .message-content strong { font-weight: 700; }
+
         .message-time {
             font-size: 10px;
             opacity: 0.6;
@@ -1076,7 +1084,7 @@
             let html = `
                 <div class="message-content">
                     <strong><i class="${icon}"></i> Asistente:</strong> ${badge}<br>
-                    ${escapeHtml(data.response)}
+                    ${formatMessage(data.response)}
             `;
 
             if (data.is_rag_response && data.sources && data.sources.length > 0 && showSources) {
@@ -1401,6 +1409,36 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // Convierte Markdown básico (**negrita**, listas y saltos) a HTML legible.
+        function formatMessage(text) {
+            if (!text) return '';
+            const esc = escapeHtml(text);
+            const inline = s => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            const lines = esc.split('\n');
+            let html = '';
+            let listType = null;
+            const closeList = () => { if (listType) { html += `</${listType}>`; listType = null; } };
+            for (const raw of lines) {
+                const line = raw.replace(/\s+$/, '');
+                let m;
+                if ((m = line.match(/^\s*[-*•]\s+(.*)$/))) {
+                    if (listType !== 'ul') { closeList(); html += '<ul>'; listType = 'ul'; }
+                    html += `<li>${inline(m[1])}</li>`;
+                } else if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) {
+                    if (listType !== 'ol') { closeList(); html += '<ol>'; listType = 'ol'; }
+                    html += `<li>${inline(m[1])}</li>`;
+                } else if (line.trim() === '') {
+                    closeList();
+                    html += '<br>';
+                } else {
+                    closeList();
+                    html += `<p>${inline(line)}</p>`;
+                }
+            }
+            closeList();
+            return html;
         }
     </script>
 </body>

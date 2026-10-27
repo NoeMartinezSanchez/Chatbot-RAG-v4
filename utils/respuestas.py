@@ -1,30 +1,98 @@
 """Mensajes estándar y limpieza de respuestas del chatbot.
 
-Centraliza los textos que NO deben depender del modelo generativo:
+Centraliza los textos que NO deben depender del modelo generativo. Incluye los
+mensajes propuestos por el equipo (evaluación de Ma. Fernanda):
 
-- ``MENSAJE_FUERA_DOMINIO``: respuesta cordial cuando la consulta no pertenece
-  a los documentos oficiales de Prepa en Línea-SEP.
-- ``MENSAJE_CRISIS``: respuesta empática + derivación a ayuda ante mensajes
-  emocionales o de riesgo.
-- ``limpiar_artefactos_respuesta``: retira marcadores de plantilla/citas que no
-  deben llegar al usuario (p. ej. ``【CONTROL_ESCOLAR】``, ``(Fuente: ...)``).
+- Variantes de ``MENSAJE_FUERA_DOMINIO`` con lenguaje más empático.
+- ``MENSAJE_RIESGO_SISTEMA``: rechazo amable a intentos de jailbreak.
+- ``MENSAJE_AREA_OPORTUNIDAD``: no se encontró información; invita a reformular.
+- ``MENSAJE_REQUIERE_OTRA_AREA``: temas que corresponden a otra área (carreras).
+- ``MENSAJE_CRISIS``: respuesta empática + derivación (Línea de la Vida / WhatsApp).
+- ``limpiar_artefactos_respuesta``: retira marcadores internos/citas.
 """
+import random
 import re
 from typing import List
 
-MENSAJE_FUERA_DOMINIO = (
-    "No encontré esa información en los documentos oficiales de Prepa en Línea-SEP. "
-    "Puedo ayudarte con temas de registro y convocatoria, módulos y control escolar, "
-    "normas de convivencia y reglas de comunicación virtual. "
-    "Si tu consulta es de otro tipo, te recomiendo contactar a la Mesa de Servicio: "
-    "https://prepaenlinea.sep.gob.mx/mesadeservicio"
+# --- Fuera de dominio: variantes con tono empático (se rotan) ---
+MENSAJE_FUERA_DOMINIO_VARIANTES = [
+    "¡Hola! Por el momento todavía estoy aprendiendo y solo puedo ayudarte con dudas sobre la "
+    "convocatoria, el registro, el curso propedéutico o las inscripciones para nuevos aspirantes. "
+    "No logré encontrar información exacta sobre lo que me preguntas, pero te invito a revisar "
+    "nuestro menú de opciones o a intentar con otra pregunta relacionada con los temas anteriores. "
+    "¡Estoy aquí para guiarte en tu ingreso!",
+    "¡Ups! Esa pregunta se sale un poco de mi área de conocimiento actual. Por ahora, mi especialidad "
+    "es guiarte en todo el proceso de admisión e inscripción (convocatoria, registro, propedéutico y "
+    "dudas generales del servicio). Te sugiero elegir alguna opción del menú principal o escribir una "
+    "nueva pregunta sobre estos temas para poder ayudarte mejor.",
+    "Agradezco tu consulta. Actualmente este canal está habilitado para resolver dudas generales del "
+    "servicio y guiar a los nuevos aspirantes en sus etapas de convocatoria, registro, curso "
+    "propedéutico e inscripción. Lamento no poder responder a tu solicitud específica en este momento; "
+    "te invito a consultar el menú de temas disponibles para continuar con tu proceso.",
+    "¡Me encantaría ayudarte con eso, pero aún no tengo esa información en mi sistema! Como soy un "
+    "asistente en entrenamiento, solo conozco los detalles de los procesos de admisión, registro, "
+    "propedéutico e inscripción. Si tu duda tiene que ver con alguno de estos pasos, intenta "
+    "reescribirla con otras palabras o navega con los botones del menú.",
+]
+
+# Se mantiene por compatibilidad (se usa en el prompt del generador).
+MENSAJE_FUERA_DOMINIO = MENSAJE_FUERA_DOMINIO_VARIANTES[0]
+
+
+def obtener_mensaje_fuera_dominio() -> str:
+    """Devuelve una variante aleatoria del mensaje de fuera de dominio."""
+    return random.choice(MENSAJE_FUERA_DOMINIO_VARIANTES)
+
+
+MENSAJE_RIESGO_SISTEMA = (
+    "No puedo compartir detalles sobre el funcionamiento interno, código o arquitectura de este "
+    "sistema. Mi única función es orientarte sobre trámites, convocatorias y dudas académicas de "
+    "Prepa en Línea-SEP. Por favor, escribe tu duda sobre tu proceso o estudios."
+)
+
+MENSAJE_AREA_OPORTUNIDAD = (
+    "No logré encontrar información sobre este tema. Para ayudarte mejor, intenta hacer tu pregunta "
+    "con otras palabras o de forma más directa. ¡Gracias!"
+)
+
+MENSAJE_REQUIERE_OTRA_AREA = (
+    "Prepa en Línea-SEP solo imparte el nivel bachillerato y no ofrece carreras universitarias. "
+    "Para dudas sobre tu egreso, certificado o canalización con áreas institucionales, te pido "
+    "generar un ticket en la Mesa de Servicio (apartado Estudiantes, tema Control Escolar): "
+    "https://prepaenlinea.sep.gob.mx/mesadeservicio  "
+    "Además, puedes conocer la oferta educativa en las Ferias Vocacionales que se difunden por los "
+    "canales oficiales de la SEP."
+)
+
+NOMBRE_ASISTENTE = "Avi"
+
+IDENTIDAD_AVI = (
+    "¡Hola! Soy **Avi**, el asistente virtual de Prepa en Línea-SEP. Puedo ayudarte con dudas sobre "
+    "la convocatoria, el registro, el curso propedéutico, la inscripción, los módulos y trámites "
+    "académicos. ¿En qué te ayudo?"
+)
+
+CAPACIDADES_AVI = (
+    "Soy **Avi** y puedo ayudarte con:\n"
+    "- Convocatoria y registro\n"
+    "- Curso propedéutico\n"
+    "- Inscripción y documentación\n"
+    "- Módulos y control escolar\n"
+    "- Normas de convivencia y reglas de comunicación virtual\n"
+    "También puedo definirte términos (por ejemplo, PL = Prepa en Línea). ¿Qué necesitas?"
+)
+
+SMALLTALK_AVI = (
+    "¡Hola! Estoy muy bien y listo para ayudarte. Cuéntame, ¿tienes alguna duda sobre tu registro, "
+    "el curso propedéutico o tu inscripción en Prepa en Línea-SEP?"
 )
 
 MENSAJE_CRISIS = (
     "Lamento mucho que te sientas así, y quiero que sepas que tu bienestar es lo más importante. "
-    "No estás solo(a). Te animo a hablar con una persona de tu confianza o a llamar a la "
-    "Línea de la Vida (800 911 2000), gratuita y disponible las 24 horas. "
-    "Si quieres, también puedo orientarte para encontrar apoyo dentro de la comunidad educativa."
+    "No estás solo(a). Para recibir apoyo emocional gratuito, confidencial y especializado las 24 "
+    "horas, puedes llamar a la Línea de la Vida al 800 911 2000 o enviar un mensaje por WhatsApp al "
+    "55 7055 5555. Si quieres, también puedo orientarte para encontrar apoyo dentro de la comunidad "
+    "educativa."
 )
 
 # Marcadores de cita/plantilla que no deben mostrarse al usuario.

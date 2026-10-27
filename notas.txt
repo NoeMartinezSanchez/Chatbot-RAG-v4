@@ -168,7 +168,7 @@ git rm informe.html
 git add .
 git commit -m " Limpieza: informe.htlm y reporte.html"
 
-3.-Subir a GitHub
+3.-Subir a GitHub -.--.-.-.-.este funciona
 git push github main
 
 #-----------Eliminar un archivo de github manteniendolo en local

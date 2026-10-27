@@ -345,7 +345,12 @@ async def chat(chat_request: ChatRequest, fastapi_request: Request):
             logger.warning(f"🔒 Bloqueada consulta maliciosa (severidad: {sanitized.severity}): {pregunta[:80]}")
             return JSONResponse(
                 content={
-                    "response": "⚠️ No puedo procesar esa solicitud.",
+                    "response": (
+                        "No puedo compartir detalles sobre el funcionamiento interno, código o "
+                        "arquitectura de este sistema. Mi única función es orientarte sobre trámites, "
+                        "convocatorias y dudas académicas de Prepa en Línea-SEP. Por favor, escribe tu "
+                        "duda sobre tu proceso o estudios."
+                    ),
                     "sources": [],
                     "is_rag_response": False,
                     "confidence": 0.0,

@@ -9,7 +9,7 @@ import random
 import re
 
 from config.settings import settings
-from utils.respuestas import MENSAJE_FUERA_DOMINIO, limpiar_artefactos_respuesta
+from utils.respuestas import MENSAJE_FUERA_DOMINIO, MENSAJE_FUERA_DOMINIO_VARIANTES, obtener_mensaje_fuera_dominio, limpiar_artefactos_respuesta
 from .embeddings import EmbeddingModel
 from .retriever import VectorStoreFAISS, resolver_placeholders, limpiar_marcadores_residuales
 from .generator import TinyLlamaGenerator
@@ -165,7 +165,7 @@ class RAGSystem:
             
             # 3. Verificar si hay resultados relevantes
             if not results:
-                return MENSAJE_FUERA_DOMINIO, False, 0.0, []
+                return obtener_mensaje_fuera_dominio(), False, 0.0, []
 
             # 4. Extraer contextos y metadatos
             contexts = [r.get("content", r.get("text", "")) for r in results]
@@ -173,7 +173,7 @@ class RAGSystem:
             context_str = " ".join(contexts)
             
             if not context_str.strip():
-                return MENSAJE_FUERA_DOMINIO, False, 0.0, []
+                return obtener_mensaje_fuera_dominio(), False, 0.0, []
             
             # Resolver placeholders (urlN, fechaN) en el contexto
             context_str = resolver_placeholders(context_str)
@@ -229,7 +229,20 @@ class RAGSystem:
                 confidence = results[0]["reranked_score"]
             elif results and results[0].get("similarity"):
                 confidence = results[0]["similarity"]
-            
+
+            # 7b. Coherencia: si el modelo terminó en fallback (no respondió del
+            #     contexto), no marcar como respuesta RAG ni reportar confianza alta.
+            respuesta_lower = response.lower()
+            es_fallback = (
+                "no encontré" in respuesta_lower
+                or "no logré encontrar" in respuesta_lower
+                or "no logre encontrar" in respuesta_lower
+                or response.strip() in MENSAJE_FUERA_DOMINIO_VARIANTES
+            )
+            if es_fallback:
+                logger.info("⚠️ Respuesta de fallback detectada; se marca como no-RAG (confianza 0).")
+                return response, False, 0.0, []
+
             return response, True, confidence, sources
             
         except Exception as e:
