@@ -206,3 +206,5 @@ https://ecotecds-Chatbot-RAG-v4.hf.space/api/docs
 
 -.-.Chatbot-.-.-.-.-.-
 https://huggingface.co/spaces/ecotecds/Chatbot-RAG-v4
+
+Se actualizo el apikey de groq 5 de noviembre
